@@ -1,0 +1,216 @@
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useConversations } from "@/hooks/use-conversations";
+import { useMessages } from "@/hooks/use-messages";
+
+function initials(name: string | null) {
+  if (!name) return "?";
+  const p = name.trim().split(/\s+/);
+  return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+function timeAgo(iso: string | null) {
+  if (!iso) return "";
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "agora";
+  if (s < 3600) return `há ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `há ${Math.floor(s / 3600)} h`;
+  return `há ${Math.floor(s / 86400)} d`;
+}
+function hhmm(iso: string) {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+function contentLabel(type: string, content: string | null) {
+  if (content && content.trim()) return content;
+  const map: Record<string, string> = {
+    audio: "Áudio",
+    image: "Imagem",
+    video: "Vídeo",
+    document: "Documento",
+    location: "Localização",
+    sticker: "Figurinha",
+  };
+  return map[type] ?? "Mensagem";
+}
+const statusLabel: Record<string, string> = {
+  open: "Aberto",
+  pending: "Aguardando",
+  closed: "Fechado",
+};
+const statusClass: Record<string, string> = {
+  open: "bg-[#8FC549]/15 text-[#3d6b1f]",
+  pending: "bg-amber-100 text-amber-800",
+  closed: "bg-gray-100 text-gray-600",
+};
+
+export function InboxScreen() {
+  const { data: conversations, isLoading } = useConversations();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = useMemo(
+    () => (conversations ?? []).find((c) => c.id === selectedId) ?? null,
+    [conversations, selectedId],
+  );
+  const { data: messages, isLoading: loadingMsgs } = useMessages(selectedId);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, selectedId]);
+
+  const [draft, setDraft] = useState("");
+  const [hint, setHint] = useState(false);
+  function handleSend() {
+    if (!draft.trim()) return;
+    setHint(true);
+    setDraft("");
+  }
+
+  return (
+    <div className="flex h-full min-h-0 overflow-hidden">
+      {/* Lista de conversas */}
+      <aside className="flex w-[320px] shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white">
+        <div className="border-b border-gray-200 px-4 py-3">
+          <h2 className="text-sm font-semibold text-gray-900">Conversas</h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {isLoading && (
+            <ul>
+              {[...Array(6)].map((_, i) => (
+                <li key={i} className="flex items-center gap-3 border-b border-gray-100 px-4 py-3">
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-gray-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-2/3 animate-pulse rounded bg-gray-200" />
+                    <div className="h-3 w-1/3 animate-pulse rounded bg-gray-200" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!isLoading && (conversations ?? []).length === 0 && (
+            <p className="px-4 py-10 text-center text-sm text-gray-500">Nenhuma conversa ainda</p>
+          )}
+          {!isLoading &&
+            (conversations ?? []).map((c) => {
+              const name = c.contact?.name || "Sem nome";
+              const active = c.id === selectedId;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedId(c.id)}
+                  className={`flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${active ? "bg-blue-50" : ""}`}
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
+                    {initials(c.contact?.name ?? null)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium text-gray-900">{name}</span>
+                      <span className="shrink-0 text-[11px] text-gray-500">
+                        {timeAgo(c.last_message_at)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusClass[c.status] ?? "bg-gray-100 text-gray-600"}`}
+                      >
+                        {statusLabel[c.status] ?? c.status}
+                      </span>
+                      <span className="truncate text-[11px] text-gray-500">
+                        {c.channel?.name ?? ""}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+      </aside>
+
+      {/* Painel da conversa */}
+      <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
+        {!selected ? (
+          <div className="flex flex-1 items-center justify-center">
+            <p className="text-sm text-gray-500">Selecione uma conversa</p>
+          </div>
+        ) : (
+          <>
+            <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
+                  {initials(selected.contact?.name ?? null)}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {selected.contact?.name || "Sem nome"}
+                  </p>
+                  <p className="truncate text-xs text-gray-500">
+                    {selected.channel?.name ?? ""}
+                  </p>
+                </div>
+              </div>
+              <button className="rounded-lg bg-[#8FC549] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#7db13d]">
+                Atender
+              </button>
+            </header>
+
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              {loadingMsgs && <p className="text-center text-sm text-gray-500">Carregando…</p>}
+              {!loadingMsgs &&
+                (messages ?? []).map((m) => {
+                  const out = m.direction === "outbound";
+                  return (
+                    <div
+                      key={m.id}
+                      className={`mb-2 flex ${out ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-[#0055A6] text-white" : "border border-gray-200 bg-white text-gray-900"}`}
+                      >
+                        <p className="whitespace-pre-wrap break-words">
+                          {contentLabel(m.content_type, m.content)}
+                        </p>
+                        <p
+                          className={`mt-1 text-[10px] ${out ? "text-white/70" : "text-gray-500"}`}
+                        >
+                          {hhmm(m.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            <div className="border-t border-gray-200 bg-white px-4 py-3">
+              {hint && (
+                <p className="mb-2 text-xs text-gray-500">
+                  O envio pelo WhatsApp será ativado no próximo passo.
+                </p>
+              )}
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  rows={1}
+                  placeholder="Escreva uma mensagem…"
+                  className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0055A6] focus:outline-none focus:ring-1 focus:ring-[#0055A6]"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!draft.trim()}
+                  className="rounded-lg bg-[#0055A6] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#00478c] disabled:opacity-50"
+                >
+                  Enviar
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}

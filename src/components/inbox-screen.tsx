@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages } from "@/hooks/use-messages";
 
@@ -56,12 +58,27 @@ export function InboxScreen() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, selectedId]);
 
+  const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
-  const [hint, setHint] = useState(false);
-  function handleSend() {
-    if (!draft.trim()) return;
-    setHint(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSend() {
+    if (!draft.trim() || !selectedId || sending) return;
+    setSending(true);
+    setError(null);
+    const text = draft.trim();
+    const { data, error: invokeErr } = await supabase.functions.invoke("send-message", {
+      body: { conversationId: selectedId, text },
+    });
+    setSending(false);
+    if (invokeErr || (data as any)?.error) {
+      setError("Não foi possível enviar. Tente novamente.");
+      return;
+    }
     setDraft("");
+    queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
   return (
@@ -180,9 +197,9 @@ export function InboxScreen() {
             </div>
 
             <div className="border-t border-gray-200 bg-white px-4 py-3">
-              {hint && (
-                <p className="mb-2 text-xs text-gray-500">
-                  O envio pelo WhatsApp será ativado no próximo passo.
+              {error && (
+                <p className="mb-2 text-xs text-red-600">
+                  {error}
                 </p>
               )}
               <div className="flex items-end gap-2">
@@ -201,10 +218,10 @@ export function InboxScreen() {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!draft.trim()}
+                  disabled={!draft.trim() || sending}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                 >
-                  Enviar
+                  {sending ? "Enviando…" : "Enviar"}
                 </button>
               </div>
             </div>

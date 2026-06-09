@@ -60,6 +60,7 @@ export function InboxScreen() {
   );
   const { data: messages, isLoading: loadingMsgs } = useMessages(selectedId);
 
+  const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
@@ -81,8 +82,6 @@ export function InboxScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
-
-  const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);

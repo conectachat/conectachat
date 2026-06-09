@@ -111,6 +111,15 @@ export function InboxScreen() {
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
+  async function handleMarkUnread() {
+    if (!selectedId) return;
+    await supabase.from("conversations").update({ unread_count: 1 }).eq("id", selectedId);
+    setSelectedId(null);
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
@@ -202,9 +211,17 @@ export function InboxScreen() {
                   </p>
                 </div>
               </div>
-              <button className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-brand-green-foreground transition-colors hover:bg-brand-green/90">
-                Atender
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleMarkUnread}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                >
+                  Marcar como não lida
+                </button>
+                <button className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-brand-green-foreground transition-colors hover:bg-brand-green/90">
+                  Atender
+                </button>
+              </div>
             </header>
 
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">

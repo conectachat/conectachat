@@ -225,6 +225,30 @@ export function InboxScreen() {
   function stopAndSend() { cancelRef.current = false; mediaRecorderRef.current?.stop(); setRecording(false); }
   function cancelRecording() { cancelRef.current = true; mediaRecorderRef.current?.stop(); setRecording(false); }
 
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  async function saveName() {
+    const contatoId = selected?.contact?.id;
+    if (!contatoId) return;
+    setSavingName(true);
+    const novoNome = nameDraft.trim();
+    const patch = novoNome
+      ? { name: novoNome, name_locked: true }
+      : { name: null, name_locked: false };
+    queryClient.setQueryData<any>(["conversations"], (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((c: any) =>
+        c.contact?.id === contatoId ? { ...c, contact: { ...c.contact, ...patch } } : c,
+      );
+    });
+    const { error } = await supabase.from("contacts").update(patch).eq("id", contatoId);
+    setSavingName(false);
+    if (error) { alert("Não foi possível salvar o nome."); }
+    setEditingName(false);
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}

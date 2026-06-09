@@ -221,9 +221,7 @@ export function InboxScreen() {
                   onClick={() => setSelectedId(c.id)}
                   className={`flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${active ? "bg-blue-50" : ""}`}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
-                    {c.contact?.name ? initials(c.contact.name) : "#"}
-                  </div>
+                  <ContactAvatar path={c.contact?.avatar_url} initials={c.contact?.name ? initials(c.contact.name) : "#"} className="h-10 w-10 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className={`truncate text-sm ${unread ? "font-bold" : "font-medium"} text-gray-900`}>{name}</span>
@@ -266,9 +264,7 @@ export function InboxScreen() {
           <>
             <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
-                  {selected.contact?.name ? initials(selected.contact.name) : "#"}
-                </div>
+                <ContactAvatar path={selected.contact?.avatar_url} initials={selected.contact?.name ? initials(selected.contact.name) : "#"} className="h-9 w-9 shrink-0" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-gray-900">
                     {displayName(selected.contact)}

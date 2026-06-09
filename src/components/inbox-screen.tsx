@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages } from "@/hooks/use-messages";
 import { Logo } from "@/components/logo";
-import { Paperclip, Mic, Square, X } from "lucide-react";
+import { Paperclip, Mic, Square, X, Pencil } from "lucide-react";
 
 function initials(name: string | null) {
   if (!name) return "?";
@@ -225,6 +225,30 @@ export function InboxScreen() {
   function stopAndSend() { cancelRef.current = false; mediaRecorderRef.current?.stop(); setRecording(false); }
   function cancelRecording() { cancelRef.current = true; mediaRecorderRef.current?.stop(); setRecording(false); }
 
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  async function saveName() {
+    const contatoId = selected?.contact?.id;
+    if (!contatoId) return;
+    setSavingName(true);
+    const novoNome = nameDraft.trim();
+    const patch = novoNome
+      ? { name: novoNome, name_locked: true }
+      : { name: null, name_locked: false };
+    queryClient.setQueryData<any>(["conversations"], (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((c: any) =>
+        c.contact?.id === contatoId ? { ...c, contact: { ...c.contact, ...patch } } : c,
+      );
+    });
+    const { error } = await supabase.from("contacts").update(patch).eq("id", contatoId);
+    setSavingName(false);
+    if (error) { alert("Não foi possível salvar o nome."); }
+    setEditingName(false);
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
@@ -304,10 +328,52 @@ export function InboxScreen() {
             <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <ContactAvatar path={selected.contact?.avatar_url} initials={selected.contact?.name ? initials(selected.contact.name) : "#"} className="h-9 w-9 shrink-0" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900">
-                    {displayName(selected.contact)}
-                  </p>
+                <div className="min-w-0 flex-1">
+                  {editingName ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        value={nameDraft}
+                        onChange={(e) => setNameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); saveName(); }
+                          if (e.key === "Escape") { e.preventDefault(); setEditingName(false); }
+                        }}
+                        placeholder={formatPhone(selected.contact?.external_id) ?? ""}
+                        className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none"
+                      />
+                      <button
+                        onClick={saveName}
+                        disabled={savingName}
+                        className="rounded-lg bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        Salvar
+                      </button>
+                      <button
+                        onClick={() => setEditingName(false)}
+                        disabled={savingName}
+                        className="rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-gray-900">
+                        {displayName(selected.contact)}
+                      </p>
+                      <button
+                        onClick={() => {
+                          setNameDraft(selected.contact?.name ?? "");
+                          setEditingName(true);
+                        }}
+                        className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        title="Editar nome"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  )}
                   <p className="truncate text-xs text-gray-500">
                     {selected.channel?.name ?? ""}
                   </p>

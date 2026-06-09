@@ -299,7 +299,7 @@ export function InboxScreen() {
                       >
                         {m.media_url && ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
                           <>
-                            <MessageMedia path={m.media_url} contentType={m.content_type} />
+                            <MessageMedia path={m.media_url} contentType={m.content_type} name={m.media_name} size={m.media_size} />
                             {m.content && (
                               <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>
                             )}

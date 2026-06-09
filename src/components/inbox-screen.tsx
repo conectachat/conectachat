@@ -53,7 +53,14 @@ const statusClass: Record<string, string> = {
   closed: "bg-gray-100 text-gray-600",
 };
 
-function MessageMedia({ path, contentType }: { path: string; contentType: string }) {
+function formatSize(bytes?: number | null): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function MessageMedia({ path, contentType, name, size }: { path: string; contentType: string; name?: string | null; size?: number | null }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -69,7 +76,19 @@ function MessageMedia({ path, contentType }: { path: string; contentType: string
     return <audio controls src={url} className="max-w-[260px]" />;
   if (contentType === "video")
     return <video controls src={url} className="max-w-[240px] rounded-lg" />;
-  return <a href={url} target="_blank" rel="noreferrer" className="underline text-sm">Baixar arquivo</a>;
+  return (() => {
+    const ext = (name?.split(".").pop() || "FILE").toUpperCase();
+    return (
+      <a href={url} target="_blank" rel="noreferrer"
+         className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 max-w-[280px] no-underline hover:bg-gray-50">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-600 text-[10px] font-bold">{ext}</div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium text-gray-800">{name || "Documento"}</div>
+          <div className="text-xs text-gray-500">{size ? formatSize(size) + " · " : ""}Clique para baixar</div>
+        </div>
+      </a>
+    );
+  })();
 }
 
 export function InboxScreen() {
@@ -280,7 +299,7 @@ export function InboxScreen() {
                       >
                         {m.media_url && ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
                           <>
-                            <MessageMedia path={m.media_url} contentType={m.content_type} />
+                            <MessageMedia path={m.media_url} contentType={m.content_type} name={m.media_name} size={m.media_size} />
                             {m.content && (
                               <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>
                             )}

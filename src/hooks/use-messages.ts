@@ -7,6 +7,8 @@ export type Message = {
   content_type: string;
   content: string | null;
   media_url: string | null;
+  media_name: string | null;
+  media_size: number | null;
   status: string;
   created_at: string;
 };

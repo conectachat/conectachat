@@ -82,6 +82,13 @@ export function InboxScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+    supabase.from("conversations").update({ unread_count: 0 }).eq("id", selectedId).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    });
+  }, [selectedId, queryClient]);
+
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +139,7 @@ export function InboxScreen() {
             (conversations ?? []).map((c) => {
               const name = displayName(c.contact);
               const active = c.id === selectedId;
+              const unread = (c.unread_count ?? 0) > 0;
               return (
                 <button
                   key={c.id}
@@ -141,24 +149,31 @@ export function InboxScreen() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
                     {c.contact?.name ? initials(c.contact.name) : "#"}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium text-gray-900">{name}</span>
-                      <span className="shrink-0 text-[11px] text-gray-500">
-                        {timeAgo(c.last_message_at)}
-                      </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`truncate text-sm ${unread ? "font-bold" : "font-medium"} text-gray-900`}>{name}</span>
+                        <span className="shrink-0 text-[11px] text-gray-500">
+                          {timeAgo(c.last_message_at)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusClass[c.status] ?? "bg-gray-100 text-gray-600"}`}
+                          >
+                            {statusLabel[c.status] ?? c.status}
+                          </span>
+                          <span className="truncate text-[11px] text-gray-500">
+                            {c.channel?.name ?? ""}
+                          </span>
+                        </div>
+                        {unread && (
+                          <span className="rounded-full bg-brand-green px-2 text-xs font-semibold text-white">
+                            {c.unread_count}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusClass[c.status] ?? "bg-gray-100 text-gray-600"}`}
-                      >
-                        {statusLabel[c.status] ?? c.status}
-                      </span>
-                      <span className="truncate text-[11px] text-gray-500">
-                        {c.channel?.name ?? ""}
-                      </span>
-                    </div>
-                  </div>
                 </button>
               );
             })}

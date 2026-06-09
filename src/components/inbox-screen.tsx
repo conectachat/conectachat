@@ -371,51 +371,14 @@ export function InboxScreen() {
               <div className="flex min-w-0 items-center gap-3">
                 <ContactAvatar path={selected.contact?.avatar_url} initials={selected.contact?.name ? initials(selected.contact.name) : "#"} className="h-9 w-9 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  {editingName ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        value={nameDraft}
-                        onChange={(e) => setNameDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { e.preventDefault(); saveName(); }
-                          if (e.key === "Escape") { e.preventDefault(); setEditingName(false); }
-                        }}
-                        placeholder={formatPhone(selected.contact?.external_id) ?? ""}
-                        className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none"
-                      />
-                      <button
-                        onClick={saveName}
-                        disabled={savingName}
-                        className="rounded-lg bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        Salvar
-                      </button>
-                      <button
-                        onClick={() => setEditingName(false)}
-                        disabled={savingName}
-                        className="rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-gray-900">
-                        {displayName(selected.contact)}
-                      </p>
-                      <button
-                        onClick={() => {
-                          setNameDraft(selected.contact?.name ?? "");
-                          setEditingName(true);
-                        }}
-                        className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                        title="Editar nome"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowContactPanel((v) => !v)}
+                    className="truncate text-left text-sm font-semibold text-gray-900 hover:underline"
+                    title="Ver dados do contato"
+                  >
+                    {displayName(selected.contact)}
+                  </button>
                   <p className="truncate text-xs text-gray-500">
                     {selected.channel?.name ?? ""}
                   </p>

@@ -68,17 +68,39 @@ export function InboxScreen() {
     setSending(true);
     setError(null);
     const text = draft.trim();
-    const { data, error: invokeErr } = await supabase.functions.invoke("send-message", {
-      body: { conversationId: selectedId, text },
-    });
-    setSending(false);
-    if (invokeErr || (data as any)?.error) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        setError("Sessão expirada. Faça login novamente.");
+        setSending(false);
+        return;
+      }
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-message`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ conversationId: selectedId, text }),
+        },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || `HTTP ${res.status}`);
+      }
+      setDraft("");
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    } catch (err) {
+      console.error("send-message error:", err);
       setError("Não foi possível enviar. Tente novamente.");
-      return;
+    } finally {
+      setSending(false);
     }
-    setDraft("");
-    queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
-    queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
   return (

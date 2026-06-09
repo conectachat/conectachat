@@ -197,12 +197,12 @@ export function InboxScreen() {
                   }}
                   rows={1}
                   placeholder="Escreva uma mensagem…"
-                  className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0055A6] focus:outline-none focus:ring-1 focus:ring-[#0055A6]"
+                  className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <button
                   onClick={handleSend}
                   disabled={!draft.trim()}
-                  className="rounded-lg bg-[#0055A6] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#00478c] disabled:opacity-50"
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                 >
                   Enviar
                 </button>

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages } from "@/hooks/use-messages";
 import { Logo } from "@/components/logo";
+import { Paperclip } from "lucide-react";
 
 function initials(name: string | null) {
   if (!name) return "?";
@@ -131,8 +132,28 @@ export function InboxScreen() {
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sendingMedia, setSendingMedia] = useState(false);
 
-
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !selectedId) return;
+    if (file.size > 5 * 1024 * 1024) { alert("Por enquanto, envie arquivos de até 5 MB."); return; }
+    setSendingMedia(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { error } = await supabase.functions.invoke("send-media", {
+        body: { conversationId: selectedId, base64, mimetype: file.type || "application/octet-stream", fileName: file.name, caption: "" },
+      });
+      if (error) alert("Não foi possível enviar o arquivo.");
+    } finally { setSendingMedia(false); }
+  }
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
@@ -287,6 +308,15 @@ export function InboxScreen() {
                 </p>
               )}
               <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sendingMedia}
+                  className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Paperclip size={18} />
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*,video/*,application/pdf" className="hidden" onChange={handleFileSelected} />
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}

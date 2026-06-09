@@ -111,12 +111,6 @@ export function InboxScreen() {
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
-  async function handleMarkUnread() {
-    if (!selectedId) return;
-    await supabase.from("conversations").update({ unread_count: 1 }).eq("id", selectedId);
-    setSelectedId(null);
-    queryClient.invalidateQueries({ queryKey: ["conversations"] });
-  }
 
 
 
@@ -213,8 +207,13 @@ export function InboxScreen() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleMarkUnread}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                  onClick={async () => {
+                    if (!selectedId) return;
+                    await supabase.from("conversations").update({ unread_count: 1 }).eq("id", selectedId);
+                    setSelectedId(null);
+                    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+                  }}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
                 >
                   Marcar como não lida
                 </button>

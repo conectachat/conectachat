@@ -168,9 +168,7 @@ export function InboxScreen() {
                         <p className="whitespace-pre-wrap break-words">
                           {contentLabel(m.content_type, m.content)}
                         </p>
-                        <p
-                          className={`mt-1 text-[10px] ${out ? "text-white/70" : "text-gray-500"}`}
-                        >
+                          className={`mt-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}
                           {hhmm(m.created_at)}
                         </p>
                       </div>

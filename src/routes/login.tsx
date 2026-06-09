@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { MessageSquare } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -53,14 +53,13 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
       <Card className="w-full max-w-sm border-border/60 shadow-sm">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <MessageSquare className="h-5 w-5" />
-          </div>
+          <Logo variant="vertical" className="h-20 w-auto mx-auto" />
           <div className="space-y-1">
             <CardTitle className="text-xl font-semibold tracking-tight">ConectaChat</CardTitle>
             <CardDescription>Entre na sua caixa de entrada</CardDescription>
           </div>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">

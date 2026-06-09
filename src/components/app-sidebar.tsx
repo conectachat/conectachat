@@ -1,6 +1,7 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut, MessageSquare } from "lucide-react";
+import { Inbox, LogOut } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 import {
   Sidebar,
@@ -56,15 +57,15 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <MessageSquare className="h-4 w-4" />
-          </div>
-          {!collapsed && (
-            <span className="text-sm font-semibold tracking-tight">ConectaChat</span>
+        <div className="flex items-center px-2 py-1.5">
+          {collapsed ? (
+            <Logo variant="icon" className="h-8 w-8" />
+          ) : (
+            <Logo variant="horizontal" className="h-7 w-auto" />
           )}
         </div>
       </SidebarHeader>
+
 
       <SidebarContent>
         <SidebarGroup>

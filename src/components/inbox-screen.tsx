@@ -308,6 +308,15 @@ export function InboxScreen() {
                 </p>
               )}
               <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sendingMedia}
+                  className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Paperclip size={18} />
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*,video/*,application/pdf" className="hidden" onChange={handleFileSelected} />
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}

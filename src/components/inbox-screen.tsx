@@ -60,13 +60,28 @@ export function InboxScreen() {
   );
   const { data: messages, isLoading: loadingMsgs } = useMessages(selectedId);
 
+  const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, selectedId]);
 
-  const queryClient = useQueryClient();
+  useEffect(() => {
+    const channel = supabase
+      .channel("inbox-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const convId = (payload.new as { conversation_id?: string })?.conversation_id;
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        if (convId) queryClient.invalidateQueries({ queryKey: ["messages", convId] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);

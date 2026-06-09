@@ -257,9 +257,18 @@ export function InboxScreen() {
                       <div
                         className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                       >
-                        <p className="whitespace-pre-wrap break-words">
-                          {contentLabel(m.content_type, m.content)}
-                        </p>
+                        {m.media_url && ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
+                          <>
+                            <MessageMedia path={m.media_url} contentType={m.content_type} />
+                            {m.content && (
+                              <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="whitespace-pre-wrap break-words">
+                            {contentLabel(m.content_type, m.content)}
+                          </p>
+                        )}
                         <p
                           className={`mt-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}
                         >

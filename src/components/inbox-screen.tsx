@@ -52,6 +52,25 @@ const statusClass: Record<string, string> = {
   closed: "bg-gray-100 text-gray-600",
 };
 
+function MessageMedia({ path, contentType }: { path: string; contentType: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    supabase.storage.from("media").createSignedUrl(path, 3600).then(({ data }) => {
+      if (active) setUrl(data?.signedUrl ?? null);
+    });
+    return () => { active = false; };
+  }, [path]);
+  if (!url) return <span className="text-xs opacity-60">Carregando mídia…</span>;
+  if (contentType === "image" || contentType === "sticker")
+    return <img src={url} alt="" className="max-w-[240px] rounded-lg" />;
+  if (contentType === "audio")
+    return <audio controls src={url} className="max-w-[260px]" />;
+  if (contentType === "video")
+    return <video controls src={url} className="max-w-[240px] rounded-lg" />;
+  return <a href={url} target="_blank" rel="noreferrer" className="underline text-sm">Baixar arquivo</a>;
+}
+
 export function InboxScreen() {
   const { data: conversations, isLoading } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);

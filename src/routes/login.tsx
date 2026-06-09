@@ -1,11 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { MessageSquare } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -14,6 +16,7 @@ export const Route = createFileRoute("/login")({
       { name: "description", content: "Acesse sua caixa de entrada do ConectaChat." },
     ],
   }),
+  ssr: false,
   component: LoginPage,
 });
 
@@ -21,11 +24,29 @@ function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate({ to: "/inbox", replace: true });
+    });
+  }, [navigate]);
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Auth real será adicionada quando o Supabase for conectado.
-    navigate({ to: "/inbox" });
+    setSubmitting(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setSubmitting(false);
+    if (error) {
+      toast.error("Não foi possível entrar", {
+        description:
+          error.message === "Invalid login credentials"
+            ? "Email ou senha incorretos."
+            : error.message,
+      });
+      return;
+    }
+    navigate({ to: "/inbox", replace: true });
   };
 
   return (
@@ -55,15 +76,7 @@ function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Senha</Label>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Esqueci minha senha
-                </button>
-              </div>
+              <Label htmlFor="password">Senha</Label>
               <Input
                 id="password"
                 type="password"
@@ -73,8 +86,8 @@ function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full">
-              Entrar
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Entrando..." : "Entrar"}
             </Button>
           </form>
         </CardContent>

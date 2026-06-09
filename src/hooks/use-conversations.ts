@@ -7,7 +7,17 @@ export type ConversationListItem = {
   last_message_at: string | null;
   created_at: string;
   unread_count: number;
-  contact: { id: string; name: string | null; avatar_url: string | null; channel_type: string; external_id: string } | null;
+  contact: {
+    id: string;
+    name: string | null;
+    name_locked: boolean | null;
+    avatar_url: string | null;
+    channel_type: string;
+    external_id: string;
+    email: string | null;
+    birth_date: string | null;
+    notes: string | null;
+  } | null;
   channel: { id: string; name: string; type: string } | null;
 };
 
@@ -19,7 +29,7 @@ export function useConversations() {
         .from("conversations")
         .select(`
           id, status, last_message_at, created_at, unread_count,
-          contact:contacts ( id, name, avatar_url, channel_type, external_id ),
+          contact:contacts ( id, name, name_locked, avatar_url, channel_type, external_id, email, birth_date, notes ),
           channel:channels ( id, name, type )
         `)
         .order("last_message_at", { ascending: false, nullsFirst: false });

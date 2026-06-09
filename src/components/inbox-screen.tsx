@@ -225,27 +225,69 @@ export function InboxScreen() {
   function stopAndSend() { cancelRef.current = false; mediaRecorderRef.current?.stop(); setRecording(false); }
   function cancelRecording() { cancelRef.current = true; mediaRecorderRef.current?.stop(); setRecording(false); }
 
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState("");
-  const [savingName, setSavingName] = useState(false);
-  async function saveName() {
-    const contatoId = selected?.contact?.id;
-    if (!contatoId) return;
-    setSavingName(true);
-    const novoNome = nameDraft.trim();
-    const patch = novoNome
-      ? { name: novoNome, name_locked: true }
-      : { name: null, name_locked: false };
+  const [showContactPanel, setShowContactPanel] = useState(false);
+  const [editingContact, setEditingContact] = useState(false);
+  const [cName, setCName] = useState("");
+  const [cEmail, setCEmail] = useState("");
+  const [cBirth, setCBirth] = useState("");
+  const [savingContact, setSavingContact] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  const contact = selected?.contact ?? null;
+
+  useEffect(() => {
+    setShowContactPanel(false);
+    setEditingContact(false);
+  }, [selectedId]);
+
+  useEffect(() => {
+    setNotesDraft(contact?.notes ?? "");
+  }, [contact?.id, contact?.notes]);
+
+  function patchContactInCache(contatoId: string, patch: Record<string, unknown>) {
     queryClient.setQueryData<any>(["conversations"], (old: any) => {
       if (!Array.isArray(old)) return old;
       return old.map((c: any) =>
         c.contact?.id === contatoId ? { ...c, contact: { ...c.contact, ...patch } } : c,
       );
     });
+  }
+
+  function openEditContact() {
+    setCName(contact?.name ?? "");
+    setCEmail(contact?.email ?? "");
+    setCBirth(contact?.birth_date ?? "");
+    setEditingContact(true);
+  }
+
+  async function saveContact() {
+    const contatoId = contact?.id;
+    if (!contatoId) return;
+    setSavingContact(true);
+    const nome = cName.trim();
+    const patch = {
+      name: nome || null,
+      name_locked: nome.length > 0,
+      email: cEmail.trim() || null,
+      birth_date: cBirth || null,
+    };
+    patchContactInCache(contatoId, patch);
     const { error } = await supabase.from("contacts").update(patch).eq("id", contatoId);
-    setSavingName(false);
-    if (error) { alert("Não foi possível salvar o nome."); }
-    setEditingName(false);
+    setSavingContact(false);
+    if (error) { alert("Não foi possível salvar o contato."); }
+    setEditingContact(false);
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+  async function saveNotes() {
+    const contatoId = contact?.id;
+    if (!contatoId) return;
+    setSavingNotes(true);
+    patchContactInCache(contatoId, { notes: notesDraft });
+    const { error } = await supabase.from("contacts").update({ notes: notesDraft }).eq("id", contatoId);
+    setSavingNotes(false);
+    if (error) { alert("Não foi possível salvar as observações."); }
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 

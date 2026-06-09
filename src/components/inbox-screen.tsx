@@ -66,6 +66,22 @@ export function InboxScreen() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, selectedId]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel("inbox-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const convId = (payload.new as { conversation_id?: string })?.conversation_id;
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        if (convId) queryClient.invalidateQueries({ queryKey: ["messages", convId] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
+
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);

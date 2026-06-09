@@ -510,6 +510,169 @@ export function InboxScreen() {
           </>
         )}
       </section>
+
+      {selected && showContactPanel && contact && (
+        <aside className="flex w-[340px] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+            <h3 className="text-sm font-semibold text-gray-900">Dados do contato</h3>
+            <div className="flex items-center gap-1">
+              {!editingContact && (
+                <button
+                  onClick={openEditContact}
+                  className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  title="Editar"
+                >
+                  <Pencil size={16} />
+                </button>
+              )}
+              <button
+                onClick={() => { setShowContactPanel(false); setEditingContact(false); }}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            <div className="flex flex-col items-center gap-2">
+              <ContactAvatar
+                path={contact.avatar_url}
+                initials={contact.name ? initials(contact.name) : "#"}
+                className="h-20 w-20"
+              />
+              {!editingContact && (
+                <p className="text-base font-semibold text-gray-900">{displayName(contact)}</p>
+              )}
+            </div>
+
+            {!editingContact ? (
+              <dl className="mt-5 space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs font-medium text-gray-500">Telefone</dt>
+                  <dd className="text-gray-900">{formatPhone(contact.external_id) ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500">E-mail</dt>
+                  <dd className="text-gray-900">{contact.email || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500">Nascimento</dt>
+                  <dd className="text-gray-900">
+                    {contact.birth_date
+                      ? contact.birth_date.split("-").reverse().join("/")
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500">ID do contato</dt>
+                  <dd className="flex items-center gap-2">
+                    <span className="truncate text-[11px] text-gray-600">{contact.id}</span>
+                    <button
+                      onClick={() => navigator.clipboard?.writeText(contact.id)}
+                      className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                      title="Copiar ID"
+                    >
+                      <Copy size={12} />
+                    </button>
+                  </dd>
+                </div>
+              </dl>
+            ) : (
+              <div className="mt-5 space-y-3 text-sm">
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Nome</label>
+                  <input
+                    value={cName}
+                    onChange={(e) => setCName(e.target.value)}
+                    placeholder={formatPhone(contact.external_id) ?? ""}
+                    className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Telefone</label>
+                  <input
+                    value={formatPhone(contact.external_id) ?? ""}
+                    disabled
+                    className="mt-1 w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500">E-mail</label>
+                  <input
+                    type="email"
+                    value={cEmail}
+                    onChange={(e) => setCEmail(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Nascimento</label>
+                  <input
+                    type="date"
+                    value={cBirth}
+                    onChange={(e) => setCBirth(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500">ID do contato</label>
+                  <input
+                    value={contact.id}
+                    disabled
+                    className="mt-1 w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-[11px] text-gray-500"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => setEditingContact(false)}
+                    disabled={savingContact}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={saveContact}
+                    disabled={savingContact}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {savingContact ? "Salvando…" : "Salvar"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 border-t border-gray-200 pt-4">
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Observações
+              </h4>
+              <textarea
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                rows={5}
+                placeholder="Anote algo sobre este contato…"
+                className="w-full resize-none rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+              />
+              <div className="mt-2 flex justify-end gap-2">
+                <button
+                  onClick={() => setNotesDraft(contact.notes ?? "")}
+                  disabled={savingNotes}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveNotes}
+                  disabled={savingNotes}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {savingNotes ? "Salvando…" : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

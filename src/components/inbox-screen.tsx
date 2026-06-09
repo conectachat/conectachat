@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages } from "@/hooks/use-messages";
 import { Logo } from "@/components/logo";
-import { Paperclip, Mic, Square, X } from "lucide-react";
+import { Paperclip, Mic, Square, X, Pencil } from "lucide-react";
 
 function initials(name: string | null) {
   if (!name) return "?";

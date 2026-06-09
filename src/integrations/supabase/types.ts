@@ -64,6 +64,7 @@ export type Database = {
           id: string
           metadata: Json
           name: string | null
+          name_locked: boolean
           org_id: string
         }
         Insert: {
@@ -74,6 +75,7 @@ export type Database = {
           id?: string
           metadata?: Json
           name?: string | null
+          name_locked?: boolean
           org_id: string
         }
         Update: {
@@ -84,6 +86,7 @@ export type Database = {
           id?: string
           metadata?: Json
           name?: string | null
+          name_locked?: boolean
           org_id?: string
         }
         Relationships: [

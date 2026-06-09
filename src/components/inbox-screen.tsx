@@ -383,6 +383,37 @@ export function InboxScreen() {
                   <Paperclip size={18} />
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*,video/*,application/pdf" className="hidden" onChange={handleFileSelected} />
+                {!recording ? (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    disabled={sendingAudio}
+                    className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Mic size={18} />
+                  </button>
+                ) : (
+                  <div className="mb-0.5 flex shrink-0 items-center gap-2">
+                    <span className="flex items-center gap-1.5 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-600">
+                      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-600" />
+                      Gravando…
+                    </span>
+                    <button
+                      type="button"
+                      onClick={stopAndSend}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700"
+                    >
+                      <Square size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelRecording}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}

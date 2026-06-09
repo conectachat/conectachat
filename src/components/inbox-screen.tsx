@@ -9,6 +9,14 @@ function initials(name: string | null) {
   const p = name.trim().split(/\s+/);
   return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "?";
 }
+function formatPhone(id?: string | null) {
+  if (!id) return null;
+  return "+" + String(id).replace(/\D/g, "");
+}
+function displayName(contact: { name: string | null; external_id?: string } | null) {
+  if (contact?.name && contact.name.trim()) return contact.name;
+  return formatPhone(contact?.external_id) ?? "Sem nome";
+}
 function timeAgo(iso: string | null) {
   if (!iso) return "";
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -107,7 +115,7 @@ export function InboxScreen() {
           )}
           {!isLoading &&
             (conversations ?? []).map((c) => {
-              const name = c.contact?.name || "Sem nome";
+              const name = displayName(c.contact);
               const active = c.id === selectedId;
               return (
                 <button
@@ -116,7 +124,7 @@ export function InboxScreen() {
                   className={`flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${active ? "bg-blue-50" : ""}`}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
-                    {initials(c.contact?.name ?? null)}
+                    {c.contact?.name ? initials(c.contact.name) : "#"}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
@@ -153,11 +161,11 @@ export function InboxScreen() {
             <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
-                  {initials(selected.contact?.name ?? null)}
+                  {selected.contact?.name ? initials(selected.contact.name) : "#"}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-gray-900">
-                    {selected.contact?.name || "Sem nome"}
+                    {displayName(selected.contact)}
                   </p>
                   <p className="truncate text-xs text-gray-500">
                     {selected.channel?.name ?? ""}

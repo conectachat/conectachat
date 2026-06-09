@@ -58,35 +58,44 @@ export type Database = {
       contacts: {
         Row: {
           avatar_url: string | null
+          birth_date: string | null
           channel_type: Database["public"]["Enums"]["channel_type"]
           created_at: string
+          email: string | null
           external_id: string
           id: string
           metadata: Json
           name: string | null
           name_locked: boolean
+          notes: string | null
           org_id: string
         }
         Insert: {
           avatar_url?: string | null
+          birth_date?: string | null
           channel_type: Database["public"]["Enums"]["channel_type"]
           created_at?: string
+          email?: string | null
           external_id: string
           id?: string
           metadata?: Json
           name?: string | null
           name_locked?: boolean
+          notes?: string | null
           org_id: string
         }
         Update: {
           avatar_url?: string | null
+          birth_date?: string | null
           channel_type?: Database["public"]["Enums"]["channel_type"]
           created_at?: string
+          email?: string | null
           external_id?: string
           id?: string
           metadata?: Json
           name?: string | null
           name_locked?: boolean
+          notes?: string | null
           org_id?: string
         }
         Relationships: [

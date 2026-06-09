@@ -106,10 +106,13 @@ export function InboxScreen() {
       setError("Não foi possível enviar. Tente novamente.");
       return;
     }
-    setDraft("");
-    queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+  async function handleMarkUnread() {
+    if (!selectedId) return;
+    await supabase.from("conversations").update({ unread_count: 1 }).eq("id", selectedId);
+    setSelectedId(null);
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
+
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">

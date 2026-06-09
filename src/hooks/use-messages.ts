@@ -19,7 +19,7 @@ export function useMessages(conversationId: string | null) {
       const { data, error } = await supabase
         .from("messages")
         .select("id, direction, content_type, content, media_url, status, created_at")
-        .eq("conversation_id", conversationId)
+        .eq("conversation_id", conversationId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as Message[];

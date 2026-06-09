@@ -36,7 +36,7 @@ const statusLabel: Record<string, string> = {
   closed: "Fechado",
 };
 const statusClass: Record<string, string> = {
-  open: "bg-[#8FC549]/15 text-[#3d6b1f]",
+  open: "bg-brand-green/15 text-brand-green-foreground",
   pending: "bg-amber-100 text-amber-800",
   closed: "bg-gray-100 text-gray-600",
 };

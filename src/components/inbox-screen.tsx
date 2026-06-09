@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages } from "@/hooks/use-messages";
+import { Logo } from "@/components/logo";
 
 function initials(name: string | null) {
   if (!name) return "?";
@@ -186,8 +187,9 @@ export function InboxScreen() {
       {/* Painel da conversa */}
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
         {!selected ? (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-sm text-gray-500">Selecione uma conversa</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-4">
+            <Logo variant="horizontal" className="h-14 w-auto opacity-40" />
+            <p className="text-sm text-gray-400">Selecione uma conversa</p>
           </div>
         ) : (
           <>

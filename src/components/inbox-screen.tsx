@@ -53,6 +53,18 @@ const statusClass: Record<string, string> = {
   closed: "bg-gray-100 text-gray-600",
 };
 
+function ContactAvatar({ path, initials, className = "h-10 w-10" }: { path?: string | null; initials: string; className?: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!path) { setUrl(null); return; }
+    let active = true;
+    supabase.storage.from("media").createSignedUrl(path, 3600).then(({ data }) => { if (active) setUrl(data?.signedUrl ?? null); });
+    return () => { active = false; };
+  }, [path]);
+  if (url) return <img src={url} alt="" className={`${className} rounded-full object-cover`} />;
+  return <div className={`${className} flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-sm font-medium`}>{initials}</div>;
+}
+
 function formatSize(bytes?: number | null): string {
   if (!bytes) return "";
   if (bytes < 1024) return `${bytes} B`;

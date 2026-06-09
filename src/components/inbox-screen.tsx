@@ -132,8 +132,28 @@ export function InboxScreen() {
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sendingMedia, setSendingMedia] = useState(false);
 
-
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !selectedId) return;
+    if (file.size > 5 * 1024 * 1024) { alert("Por enquanto, envie arquivos de até 5 MB."); return; }
+    setSendingMedia(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { error } = await supabase.functions.invoke("send-media", {
+        body: { conversationId: selectedId, base64, mimetype: file.type || "application/octet-stream", fileName: file.name, caption: "" },
+      });
+      if (error) alert("Não foi possível enviar o arquivo.");
+    } finally { setSendingMedia(false); }
+  }
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">

@@ -147,7 +147,7 @@ export function InboxScreen() {
                   </p>
                 </div>
               </div>
-              <button className="rounded-lg bg-[#8FC549] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#7db13d]">
+              <button className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-brand-green-foreground transition-colors hover:bg-brand-green/90">
                 Atender
               </button>
             </header>

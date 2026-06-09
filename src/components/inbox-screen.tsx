@@ -53,6 +53,18 @@ const statusClass: Record<string, string> = {
   closed: "bg-gray-100 text-gray-600",
 };
 
+function ContactAvatar({ path, initials, className = "h-10 w-10" }: { path?: string | null; initials: string; className?: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!path) { setUrl(null); return; }
+    let active = true;
+    supabase.storage.from("media").createSignedUrl(path, 3600).then(({ data }) => { if (active) setUrl(data?.signedUrl ?? null); });
+    return () => { active = false; };
+  }, [path]);
+  if (url) return <img src={url} alt="" className={`${className} rounded-full object-cover`} />;
+  return <div className={`${className} flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-sm font-medium`}>{initials}</div>;
+}
+
 function formatSize(bytes?: number | null): string {
   if (!bytes) return "";
   if (bytes < 1024) return `${bytes} B`;
@@ -209,9 +221,7 @@ export function InboxScreen() {
                   onClick={() => setSelectedId(c.id)}
                   className={`flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${active ? "bg-blue-50" : ""}`}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
-                    {c.contact?.name ? initials(c.contact.name) : "#"}
-                  </div>
+                  <ContactAvatar path={c.contact?.avatar_url} initials={c.contact?.name ? initials(c.contact.name) : "#"} className="h-10 w-10 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className={`truncate text-sm ${unread ? "font-bold" : "font-medium"} text-gray-900`}>{name}</span>
@@ -254,9 +264,7 @@ export function InboxScreen() {
           <>
             <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700">
-                  {selected.contact?.name ? initials(selected.contact.name) : "#"}
-                </div>
+                <ContactAvatar path={selected.contact?.avatar_url} initials={selected.contact?.name ? initials(selected.contact.name) : "#"} className="h-9 w-9 shrink-0" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-gray-900">
                     {displayName(selected.contact)}

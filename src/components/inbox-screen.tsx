@@ -106,6 +106,15 @@ function MessageMedia({ path, contentType, name, size }: { path: string; content
 export function InboxScreen() {
   const { data: conversations, isLoading } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem("openConvId");
+      if (pending) {
+        sessionStorage.removeItem("openConvId");
+        setSelectedId(pending);
+      }
+    } catch { /* ignore */ }
+  }, []);
   const selected = useMemo(
     () => (conversations ?? []).find((c) => c.id === selectedId) ?? null,
     [conversations, selectedId],

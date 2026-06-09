@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -33,15 +34,22 @@ const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedContactsRoute = AuthenticatedContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/contacts': typeof AuthenticatedContactsRoute
   '/inbox': typeof AuthenticatedInboxRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/contacts': typeof AuthenticatedContactsRoute
   '/inbox': typeof AuthenticatedInboxRoute
 }
 export interface FileRoutesById {
@@ -49,14 +57,21 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/contacts': typeof AuthenticatedContactsRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/inbox'
+  fullPaths: '/' | '/login' | '/contacts' | '/inbox'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/inbox'
-  id: '__root__' | '/' | '/_authenticated' | '/login' | '/_authenticated/inbox'
+  to: '/' | '/login' | '/contacts' | '/inbox'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/login'
+    | '/_authenticated/contacts'
+    | '/_authenticated/inbox'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -95,14 +110,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/contacts': {
+      id: '/_authenticated/contacts'
+      path: '/contacts'
+      fullPath: '/contacts'
+      preLoaderRoute: typeof AuthenticatedContactsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedContactsRoute: typeof AuthenticatedContactsRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedContactsRoute: AuthenticatedContactsRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
 }
 

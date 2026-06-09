@@ -18,6 +18,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 const TITLES: Record<string, string> = {
   "/inbox": "Caixa de entrada",
+  "/contacts": "Contatos",
 };
 
 function AuthenticatedLayout() {

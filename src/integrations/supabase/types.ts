@@ -59,6 +59,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           birth_date: string | null
+          blocked: boolean
           channel_type: Database["public"]["Enums"]["channel_type"]
           created_at: string
           email: string | null
@@ -73,6 +74,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           birth_date?: string | null
+          blocked?: boolean
           channel_type: Database["public"]["Enums"]["channel_type"]
           created_at?: string
           email?: string | null
@@ -87,6 +89,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           birth_date?: string | null
+          blocked?: boolean
           channel_type?: Database["public"]["Enums"]["channel_type"]
           created_at?: string
           email?: string | null

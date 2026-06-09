@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut } from "lucide-react";
+import { Inbox, LogOut, Contact } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 import {
@@ -21,7 +21,10 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
-const items = [{ title: "Caixa de entrada", url: "/inbox", icon: Inbox }];
+const items = [
+  { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
+  { title: "Contatos", url: "/contacts", icon: Contact },
+];
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Proprietário",

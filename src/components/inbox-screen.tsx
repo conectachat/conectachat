@@ -36,7 +36,7 @@ const statusLabel: Record<string, string> = {
   closed: "Fechado",
 };
 const statusClass: Record<string, string> = {
-  open: "bg-[#8FC549]/15 text-[#3d6b1f]",
+  open: "bg-brand-green/15 text-brand-green-foreground",
   pending: "bg-amber-100 text-amber-800",
   closed: "bg-gray-100 text-gray-600",
 };
@@ -147,7 +147,7 @@ export function InboxScreen() {
                   </p>
                 </div>
               </div>
-              <button className="rounded-lg bg-[#8FC549] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#7db13d]">
+              <button className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-brand-green-foreground transition-colors hover:bg-brand-green/90">
                 Atender
               </button>
             </header>
@@ -163,13 +163,13 @@ export function InboxScreen() {
                       className={`mb-2 flex ${out ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-[#0055A6] text-white" : "border border-gray-200 bg-white text-gray-900"}`}
+                        className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                       >
                         <p className="whitespace-pre-wrap break-words">
                           {contentLabel(m.content_type, m.content)}
                         </p>
                         <p
-                          className={`mt-1 text-[10px] ${out ? "text-white/70" : "text-gray-500"}`}
+                          className={`mt-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}
                         >
                           {hhmm(m.created_at)}
                         </p>
@@ -197,12 +197,12 @@ export function InboxScreen() {
                   }}
                   rows={1}
                   placeholder="Escreva uma mensagem…"
-                  className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0055A6] focus:outline-none focus:ring-1 focus:ring-[#0055A6]"
+                  className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <button
                   onClick={handleSend}
                   disabled={!draft.trim()}
-                  className="rounded-lg bg-[#0055A6] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#00478c] disabled:opacity-50"
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                 >
                   Enviar
                 </button>

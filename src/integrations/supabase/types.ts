@@ -328,6 +328,8 @@ export type Database = {
           direction: Database["public"]["Enums"]["msg_direction"]
           external_message_id: string | null
           id: string
+          media_name: string | null
+          media_size: number | null
           media_url: string | null
           org_id: string
           sender_user_id: string | null
@@ -341,6 +343,8 @@ export type Database = {
           direction: Database["public"]["Enums"]["msg_direction"]
           external_message_id?: string | null
           id?: string
+          media_name?: string | null
+          media_size?: number | null
           media_url?: string | null
           org_id: string
           sender_user_id?: string | null
@@ -354,6 +358,8 @@ export type Database = {
           direction?: Database["public"]["Enums"]["msg_direction"]
           external_message_id?: string | null
           id?: string
+          media_name?: string | null
+          media_size?: number | null
           media_url?: string | null
           org_id?: string
           sender_user_id?: string | null

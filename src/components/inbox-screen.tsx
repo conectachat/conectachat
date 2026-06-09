@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages } from "@/hooks/use-messages";
 import { Logo } from "@/components/logo";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Mic, Square, X } from "lucide-react";
 
 function initials(name: string | null) {
   if (!name) return "?";
@@ -186,6 +186,45 @@ export function InboxScreen() {
     } finally { setSendingMedia(false); }
   }
 
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const cancelRef = useRef(false);
+  const [recording, setRecording] = useState(false);
+  const [sendingAudio, setSendingAudio] = useState(false);
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      cancelRef.current = false;
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (cancelRef.current || !selectedId) return;
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        setSendingAudio(true);
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string).split(",")[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          const { error } = await supabase.functions.invoke("send-audio", { body: { conversationId: selectedId, base64 } });
+          if (error) alert("Não foi possível enviar o áudio.");
+        } finally { setSendingAudio(false); }
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+    } catch {
+      alert("Não consegui acessar o microfone. Verifique a permissão do navegador.");
+    }
+  }
+  function stopAndSend() { cancelRef.current = false; mediaRecorderRef.current?.stop(); setRecording(false); }
+  function cancelRecording() { cancelRef.current = true; mediaRecorderRef.current?.stop(); setRecording(false); }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
@@ -344,6 +383,37 @@ export function InboxScreen() {
                   <Paperclip size={18} />
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*,video/*,application/pdf" className="hidden" onChange={handleFileSelected} />
+                {!recording ? (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    disabled={sendingAudio}
+                    className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Mic size={18} />
+                  </button>
+                ) : (
+                  <div className="mb-0.5 flex shrink-0 items-center gap-2">
+                    <span className="flex items-center gap-1.5 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-600">
+                      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-600" />
+                      Gravando…
+                    </span>
+                    <button
+                      type="button"
+                      onClick={stopAndSend}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700"
+                    >
+                      <Square size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelRecording}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}

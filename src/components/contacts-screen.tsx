@@ -57,6 +57,7 @@ type ContactRow = {
   blocked: boolean | null;
   created_at: string;
   conversations: { last_message_at: string | null }[] | null;
+  contact_tags: { tag_id: string; tags: Tag | null }[] | null;
 };
 
 function initials(name: string | null, fallback: string) {

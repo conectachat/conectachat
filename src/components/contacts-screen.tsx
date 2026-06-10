@@ -343,7 +343,242 @@ export function ContactsScreen() {
       sessionStorage.setItem("openConvId", conv.id);
     } catch {
       /* ignore */
+  }
+
+  // ---------- Exportar ----------
+  const [exporting, setExporting] = useState(false);
+  async function handleExport() {
+    setExporting(true);
+    try {
+      let todos: Array<{
+        name: string | null;
+        external_id: string;
+        email: string | null;
+        birth_date: string | null;
+        blocked: boolean | null;
+        created_at: string;
+      }> = [];
+      let de = 0;
+      const lote = 1000;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from("contacts")
+          .select("name, external_id, email, birth_date, blocked, created_at")
+          .order("created_at", { ascending: false })
+          .range(de, de + lote - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        todos = todos.concat(data);
+        if (data.length < lote) break;
+        de += lote;
+      }
+      const cab = ["nome", "telefone", "email", "nascimento", "status", "criado_em"];
+      const linhas = [
+        cab,
+        ...todos.map((c) => [
+          c.name ?? "",
+          c.external_id ?? "",
+          c.email ?? "",
+          c.birth_date ?? "",
+          c.blocked ? "bloqueado" : "ativo",
+          c.created_at ?? "",
+        ]),
+      ];
+      const csv = linhas
+        .map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const blob = new Blob(["\ufeff" + csv], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "contatos.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      alert("Não foi possível exportar os contatos.");
+    } finally {
+      setExporting(false);
     }
+  }
+
+  // ---------- Importar ----------
+  type ParsedRow = { nome: string; telefone: string; email: string; suspeito: boolean };
+  const [importOpen, setImportOpen] = useState(false);
+  const [importCountry, setImportCountry] = useState<"NONE" | "BR">("NONE");
+  const [importFileName, setImportFileName] = useState<string>("");
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [previewValid, setPreviewValid] = useState<ParsedRow[]>([]);
+  const [previewSuspect, setPreviewSuspect] = useState<ParsedRow[]>([]);
+  const [previewInvalid, setPreviewInvalid] = useState<Array<{ nome: string; telefone: string; email: string }>>([]);
+  const [previewExisting, setPreviewExisting] = useState<Set<string>>(new Set());
+  const [dupMode, setDupMode] = useState<"keep" | "replace">("keep");
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  function resetImportState() {
+    setImportFileName("");
+    setPreviewValid([]);
+    setPreviewSuspect([]);
+    setPreviewInvalid([]);
+    setPreviewExisting(new Set());
+    setDupMode("keep");
+    setImportError(null);
+    setImportResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function openImport() {
+    resetImportState();
+    setImportOpen(true);
+  }
+
+  function downloadTemplate() {
+    const csv =
+      "nome,telefone,email\nJoão Exemplo,5547999998888,joao@exemplo.com\n";
+    const blob = new Blob(["\ufeff" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "modelo-contatos.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function normalizeRow(raw: Record<string, unknown>): { nome: string; telefoneRaw: string; email: string } {
+    const lower: Record<string, unknown> = {};
+    for (const k of Object.keys(raw)) {
+      lower[k.trim().toLowerCase()] = raw[k];
+    }
+    const nome = String(lower["nome"] ?? lower["name"] ?? "").trim();
+    const telefoneRaw = String(lower["telefone"] ?? lower["phone"] ?? lower["celular"] ?? "");
+    const email = String(lower["email"] ?? lower["e-mail"] ?? "").trim();
+    return { nome, telefoneRaw, email };
+  }
+
+  function processRows(raw: Array<Record<string, unknown>>, country: "NONE" | "BR") {
+    const valid: ParsedRow[] = [];
+    const suspect: ParsedRow[] = [];
+    const invalid: Array<{ nome: string; telefone: string; email: string }> = [];
+    for (const r of raw) {
+      const { nome, telefoneRaw, email } = normalizeRow(r);
+      let tel = String(telefoneRaw ?? "").replace(/\D/g, "");
+      if (country === "BR" && tel && !tel.startsWith("55") && tel.length <= 11) {
+        tel = "55" + tel;
+      }
+      const ok = tel.length >= 8;
+      const isSuspect = tel.length < 11;
+      if (!ok) {
+        invalid.push({ nome, telefone: telefoneRaw, email });
+      } else if (isSuspect) {
+        suspect.push({ nome, telefone: tel, email, suspeito: true });
+      } else {
+        valid.push({ nome, telefone: tel, email, suspeito: false });
+      }
+    }
+    return { valid, suspect, invalid };
+  }
+
+  async function handleFileChosen(file: File) {
+    setImportError(null);
+    setImportResult(null);
+    setImportFileName(file.name);
+    setImportBusy(true);
+    try {
+      const name = file.name.toLowerCase();
+      let raw: Array<Record<string, unknown>> = [];
+      if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array", cellText: true, raw: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { raw: false, defval: "" });
+      } else {
+        const text = await file.text();
+        const parsed = Papa.parse<Record<string, unknown>>(text, {
+          header: true,
+          skipEmptyLines: true,
+        });
+        raw = parsed.data ?? [];
+      }
+      const { valid, suspect, invalid } = processRows(raw, importCountry);
+      const allValid = [...valid, ...suspect];
+      // descobrir existentes
+      const existentes = new Set<string>();
+      const numeros = allValid.map((l) => l.telefone);
+      for (let i = 0; i < numeros.length; i += 500) {
+        const fatia = numeros.slice(i, i + 500);
+        if (fatia.length === 0) break;
+        const { data } = await supabase
+          .from("contacts")
+          .select("external_id")
+          .eq("channel_type", "whatsapp_baileys")
+          .in("external_id", fatia);
+        (data ?? []).forEach((c) => existentes.add(c.external_id));
+      }
+      setPreviewValid(valid);
+      setPreviewSuspect(suspect);
+      setPreviewInvalid(invalid);
+      setPreviewExisting(existentes);
+    } catch (e) {
+      setImportError("Não foi possível ler o arquivo.");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  // re-process when country changes after a file is loaded
+  async function reprocessWithCountry(country: "NONE" | "BR") {
+    setImportCountry(country);
+    if (!fileInputRef.current?.files?.[0]) return;
+    await handleFileChosen(fileInputRef.current.files[0]);
+  }
+
+  const importStats = useMemo(() => {
+    const all = [...previewValid, ...previewSuspect];
+    const novos = all.filter((l) => !previewExisting.has(l.telefone)).length;
+    const jaExistem = all.filter((l) => previewExisting.has(l.telefone)).length;
+    const invalidos = previewInvalid.length + previewSuspect.length;
+    return { novos, jaExistem, invalidos };
+  }, [previewValid, previewSuspect, previewInvalid, previewExisting]);
+
+  async function confirmImport() {
+    if (!orgId) {
+      setImportError("Sem empresa vinculada.");
+      return;
+    }
+    setImportBusy(true);
+    setImportError(null);
+    try {
+      const all = [...previewValid, ...previewSuspect];
+      const filtered =
+        dupMode === "replace" ? all : all.filter((l) => !previewExisting.has(l.telefone));
+      const registros = filtered.map((l) => ({
+        org_id: orgId,
+        channel_type: "whatsapp_baileys" as const,
+        external_id: l.telefone,
+        name: (l.nome || "").trim() || null,
+        name_locked: (l.nome || "").trim().length > 0,
+        email: (l.email || "").trim() || null,
+      }));
+      for (let i = 0; i < registros.length; i += 500) {
+        const { error } = await supabase
+          .from("contacts")
+          .upsert(registros.slice(i, i + 500), {
+            onConflict: "org_id,channel_type,external_id",
+          });
+        if (error) throw error;
+      }
+      setImportResult(`${registros.length} contatos importados.`);
+      reloadAll();
+    } catch (e) {
+      setImportError("Não foi possível importar os contatos.");
+    } finally {
+      setImportBusy(false);
+    }
+  }
     navigate({ to: "/inbox" });
   }
 

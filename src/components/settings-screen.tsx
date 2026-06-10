@@ -14,10 +14,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   TAG_PALETTE,
   ColorPicker,
   type Tag as TagType,
 } from "@/components/contact-tags";
+
+type FieldType = "text" | "number" | "date";
+type CustomField = {
+  id: string;
+  name: string;
+  field_type: FieldType;
+  position: number;
+};
+const FIELD_TYPE_LABEL: Record<FieldType, string> = {
+  text: "Texto",
+  number: "Número",
+  date: "Data",
+};
 
 
 function Placeholder({ message }: { message: string }) {
@@ -55,6 +75,15 @@ export function SettingsScreen() {
   const [tagColor, setTagColor] = useState(TAG_PALETTE[0]);
   const [tagBusy, setTagBusy] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
+
+  // Custom fields state
+  const [fieldModalOpen, setFieldModalOpen] = useState(false);
+  const [editingField, setEditingField] = useState<CustomField | null>(null);
+  const [fieldName, setFieldName] = useState("");
+  const [fieldType, setFieldType] = useState<FieldType>("text");
+  const [fieldBusy, setFieldBusy] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (!user) return;
@@ -241,6 +270,100 @@ export function SettingsScreen() {
     }
     invalidateTags();
   }
+
+  // Custom fields
+  const fieldsQuery = useQuery({
+    queryKey: ["custom-fields", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<CustomField[]> => {
+      const { data, error } = await supabase
+        .from("custom_fields")
+        .select("id, name, field_type, position")
+        .order("position")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as CustomField[];
+    },
+  });
+  const fieldsList = fieldsQuery.data ?? [];
+
+  function invalidateFields() {
+    qc.invalidateQueries({ queryKey: ["custom-fields"] });
+    qc.invalidateQueries({ queryKey: ["contacts-list"] });
+  }
+
+  function openNewField() {
+    setEditingField(null);
+    setFieldName("");
+    setFieldType("text");
+    setFieldError(null);
+    setFieldModalOpen(true);
+  }
+  function openEditField(f: CustomField) {
+    setEditingField(f);
+    setFieldName(f.name);
+    setFieldType(f.field_type);
+    setFieldError(null);
+    setFieldModalOpen(true);
+  }
+  async function saveField() {
+    setFieldError(null);
+    const n = fieldName.trim();
+    if (!n) return;
+    if (!orgId) {
+      setFieldError("Sem empresa vinculada.");
+      return;
+    }
+    setFieldBusy(true);
+    if (editingField) {
+      const { error } = await supabase
+        .from("custom_fields")
+        .update({ name: n, field_type: fieldType })
+        .eq("id", editingField.id);
+      setFieldBusy(false);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          setFieldError("Já existe um campo com esse nome.");
+        } else {
+          setFieldError("Não foi possível salvar o campo.");
+          console.error("Erro ao editar campo:", error);
+        }
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("custom_fields").insert({
+        org_id: orgId,
+        name: n,
+        field_type: fieldType,
+        position: fieldsList.length,
+      });
+      setFieldBusy(false);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          setFieldError("Já existe um campo com esse nome.");
+        } else {
+          setFieldError("Não foi possível criar o campo.");
+          console.error("Erro ao criar campo:", error);
+        }
+        return;
+      }
+    }
+    setFieldModalOpen(false);
+    setEditingField(null);
+    invalidateFields();
+  }
+  async function deleteField(f: CustomField) {
+    if (!confirm(`Excluir o campo "${f.name}"?`)) return;
+    const { error } = await supabase.from("custom_fields").delete().eq("id", f.id);
+    if (error) {
+      console.error("Erro ao excluir campo:", error);
+      alert("Não foi possível excluir o campo.");
+      return;
+    }
+    invalidateFields();
+  }
+
+
 
   return (
     <div className="h-full overflow-auto p-6">
@@ -456,8 +579,113 @@ export function SettingsScreen() {
             </Dialog>
           </TabsContent>
 
-          <TabsContent value="campos" className="mt-4">
-            <Placeholder message="Em construção — chega no próximo passo." />
+          <TabsContent value="campos" className="mt-4 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Campos extras que aparecerão no painel de detalhes do contato
+              </p>
+              <Button onClick={openNewField} size="sm">
+                <Plus className="mr-1 h-4 w-4" /> Novo Campo
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card">
+              {fieldsList.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center text-center text-sm">
+                  <p className="font-medium text-foreground">Nenhum campo criado</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Crie campos como CPF, Empresa, Cargo, etc.
+                  </p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {fieldsList.map((f) => (
+                    <li key={f.id} className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-foreground">{f.name}</span>
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                          {FIELD_TYPE_LABEL[f.field_type]}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditField(f)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteField(f)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <Dialog open={fieldModalOpen} onOpenChange={setFieldModalOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingField ? "Editar campo" : "Novo campo"}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="field-name">Nome</Label>
+                    <Input
+                      id="field-name"
+                      value={fieldName}
+                      onChange={(e) => setFieldName(e.target.value)}
+                      placeholder="Ex.: CPF"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={fieldType}
+                      onValueChange={(v) => setFieldType(v as FieldType)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="text">Texto</SelectItem>
+                        <SelectItem value="number">Número</SelectItem>
+                        <SelectItem value="date">Data</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {fieldError && (
+                    <p className="text-sm text-destructive">{fieldError}</p>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFieldModalOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={saveField}
+                      disabled={fieldBusy || !fieldName.trim()}
+                    >
+                      {fieldBusy ? "Salvando…" : editingField ? "Salvar" : "Criar"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="departamentos" className="mt-4">

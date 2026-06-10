@@ -56,8 +56,16 @@ type ContactRow = {
   avatar_url: string | null;
   blocked: boolean | null;
   created_at: string;
+  metadata: Record<string, any> | null;
   conversations: { last_message_at: string | null }[] | null;
   contact_tags: { tag_id: string; tags: Tag | null }[] | null;
+};
+
+export type CustomField = {
+  id: string;
+  name: string;
+  field_type: "text" | "number" | "date";
+  position: number;
 };
 
 function initials(name: string | null, fallback: string) {
@@ -153,7 +161,7 @@ export function ContactsScreen() {
       const from = (page - 1) * PER_PAGE;
       const to = from + PER_PAGE - 1;
       const baseCols =
-        "id, org_id, external_id, name, name_locked, email, birth_date, notes, avatar_url, blocked, created_at, conversations(last_message_at)";
+        "id, org_id, external_id, name, name_locked, email, birth_date, notes, avatar_url, blocked, created_at, metadata, conversations(last_message_at)";
       let q;
       if (tagFilter) {
         q = supabase
@@ -199,9 +207,25 @@ export function ContactsScreen() {
     },
   });
 
+  const customFieldsQuery = useQuery({
+    queryKey: ["custom-fields", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<CustomField[]> => {
+      const { data, error } = await supabase
+        .from("custom_fields")
+        .select("id, name, field_type, position")
+        .order("position")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as CustomField[];
+    },
+  });
+  const customFields = customFieldsQuery.data ?? [];
+
   function reloadAll() {
     queryClient.invalidateQueries({ queryKey: ["contacts-list"] });
     queryClient.invalidateQueries({ queryKey: ["contacts-counts"] });
+    queryClient.invalidateQueries({ queryKey: ["custom-fields"] });
   }
 
   const rows = listQuery.data?.rows ?? [];
@@ -264,6 +288,7 @@ export function ContactsScreen() {
   const [eEmail, setEEmail] = useState("");
   const [eBirth, setEBirth] = useState("");
   const [eNotes, setENotes] = useState("");
+  const [eCustom, setECustom] = useState<Record<string, string>>({});
   const [savingEdit, setSavingEdit] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -273,17 +298,35 @@ export function ContactsScreen() {
     setEEmail(c.email ?? "");
     setEBirth(c.birth_date ?? "");
     setENotes(c.notes ?? "");
+    const cf = (c.metadata?.custom_fields ?? {}) as Record<string, unknown>;
+    const initial: Record<string, string> = {};
+    for (const k of Object.keys(cf)) initial[k] = cf[k] == null ? "" : String(cf[k]);
+    setECustom(initial);
   }
 
   async function saveEdit() {
     if (!editing) return;
     setSavingEdit(true);
     const nome = eName.trim();
+    const metaAtual = (editing.metadata ?? {}) as Record<string, any>;
+    const cf: Record<string, string | number> = {
+      ...((metaAtual.custom_fields ?? {}) as Record<string, string | number>),
+    };
+    for (const f of customFields) {
+      const v = (eCustom[f.id] ?? "").trim();
+      if (v) {
+        cf[f.id] = f.field_type === "number" ? Number(v) : v;
+      } else {
+        delete cf[f.id];
+      }
+    }
+    const novaMeta = { ...metaAtual, custom_fields: cf };
     const patch = {
       name: nome || null,
       name_locked: nome.length > 0,
       email: eEmail.trim() || null,
       birth_date: eBirth || null,
+      metadata: novaMeta,
     };
     const { error } = await supabase
       .from("contacts")
@@ -291,6 +334,7 @@ export function ContactsScreen() {
       .eq("id", editing.id);
     setSavingEdit(false);
     if (error) {
+      console.error("Erro ao salvar contato:", error);
       alert("Não foi possível salvar o contato.");
       return;
     }
@@ -1127,6 +1171,25 @@ export function ContactsScreen() {
                     className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
                   />
                 </div>
+                {customFields.map((f) => (
+                  <div key={f.id}>
+                    <label className="text-xs font-medium text-gray-500">{f.name}</label>
+                    <input
+                      type={
+                        f.field_type === "number"
+                          ? "number"
+                          : f.field_type === "date"
+                          ? "date"
+                          : "text"
+                      }
+                      value={eCustom[f.id] ?? ""}
+                      onChange={(e) =>
+                        setECustom((prev) => ({ ...prev, [f.id]: e.target.value }))
+                      }
+                      className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                ))}
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     onClick={() => setEditing(null)}

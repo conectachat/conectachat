@@ -308,6 +308,41 @@ export type Database = {
           },
         ]
       }
+      custom_fields: {
+        Row: {
+          created_at: string
+          field_type: string
+          id: string
+          name: string
+          org_id: string
+          position: number
+        }
+        Insert: {
+          created_at?: string
+          field_type?: string
+          id?: string
+          name: string
+          org_id: string
+          position?: number
+        }
+        Update: {
+          created_at?: string
+          field_type?: string
+          id?: string
+          name?: string
+          org_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_fields_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       department_members: {
         Row: {
           department_id: string

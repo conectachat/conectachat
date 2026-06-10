@@ -593,13 +593,30 @@ export function ContactsScreen() {
                 Gerencie sua base de contatos.
               </p>
             </div>
-            <button
-              onClick={() => setAddOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus size={16} />
-              Adicionar
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <Download size={16} />
+                {exporting ? "Exportando…" : "Exportar"}
+              </button>
+              <button
+                onClick={openImport}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Upload size={16} />
+                Importar
+              </button>
+              <button
+                onClick={() => setAddOpen(true)}
+                className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus size={16} />
+                Adicionar
+              </button>
+            </div>
           </div>
 
           {/* Cards */}

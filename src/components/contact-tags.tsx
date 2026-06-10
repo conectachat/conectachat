@@ -367,9 +367,12 @@ export function ContactTagsSection({
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState("");
 
-  function refresh() {
-    qc.invalidateQueries({ queryKey: ["contact-tags", contactId] });
-    qc.invalidateQueries({ queryKey: ["contacts-list"] });
+  async function refresh() {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["contact-tags", contactId] }),
+      qc.invalidateQueries({ queryKey: ["contacts-list"] }),
+    ]);
+    await ctQuery.refetch();
     onChange?.();
   }
 
@@ -378,23 +381,25 @@ export function ContactTagsSection({
       .from("contact_tags")
       .insert({ contact_id: contactId, tag_id: tagId });
     if (error && (error as { code?: string }).code !== "23505") {
+      console.error("Erro ao colar tag:", error);
       alert("Não foi possível adicionar a tag.");
       return;
     }
-    refresh();
+    await refresh();
   }
 
   async function detach(tagId: string) {
-    const { error } = await supabase
+    const { error: errDel } = await supabase
       .from("contact_tags")
       .delete()
       .eq("contact_id", contactId)
       .eq("tag_id", tagId);
-    if (error) {
+    if (errDel) {
+      console.error("Erro ao remover tag:", errDel);
       alert("Não foi possível remover a tag.");
       return;
     }
-    refresh();
+    await refresh();
   }
 
   async function createAndAttach() {
@@ -407,6 +412,7 @@ export function ContactTagsSection({
       .select("id")
       .single();
     if (error) {
+      console.error("Erro ao criar tag:", error);
       setCreating(false);
       if ((error as { code?: string }).code === "23505") {
         alert("Já existe uma tag com esse nome.");
@@ -415,14 +421,17 @@ export function ContactTagsSection({
       }
       return;
     }
-    await supabase
+    const { error: linkErr } = await supabase
       .from("contact_tags")
       .insert({ contact_id: contactId, tag_id: data.id });
+    if (linkErr && (linkErr as { code?: string }).code !== "23505") {
+      console.error("Erro ao colar tag recém-criada:", linkErr);
+    }
     setCreating(false);
     setNewName("");
     setNewColor(TAG_PALETTE[0]);
-    qc.invalidateQueries({ queryKey: ["org-tags"] });
-    refresh();
+    await qc.invalidateQueries({ queryKey: ["org-tags"] });
+    await refresh();
   }
 
   const available = orgTags

@@ -14,10 +14,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   TAG_PALETTE,
   ColorPicker,
   type Tag as TagType,
 } from "@/components/contact-tags";
+
+type FieldType = "text" | "number" | "date";
+type CustomField = {
+  id: string;
+  name: string;
+  field_type: FieldType;
+  position: number;
+};
+const FIELD_TYPE_LABEL: Record<FieldType, string> = {
+  text: "Texto",
+  number: "Número",
+  date: "Data",
+};
 
 
 function Placeholder({ message }: { message: string }) {

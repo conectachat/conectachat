@@ -124,6 +124,8 @@ export function InboxScreen() {
   const { data: messages, isLoading: loadingMsgs } = useMessages(selectedId);
 
   const queryClient = useQueryClient();
+  const { activeMembership } = useCurrentUser();
+  const orgId = activeMembership?.org_id ?? null;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = scrollRef.current;

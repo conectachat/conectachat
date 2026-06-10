@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Settings, Plus, Pencil, Trash2, Check, Search, X, Tag } from "lucide-react";
+import { Settings, Plus, Pencil, Trash2, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -14,9 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  TagChip,
   TAG_PALETTE,
-  readableText,
   ColorPicker,
   type Tag as TagType,
 } from "@/components/contact-tags";

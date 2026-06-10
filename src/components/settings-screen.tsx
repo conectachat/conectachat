@@ -579,8 +579,113 @@ export function SettingsScreen() {
             </Dialog>
           </TabsContent>
 
-          <TabsContent value="campos" className="mt-4">
-            <Placeholder message="Em construção — chega no próximo passo." />
+          <TabsContent value="campos" className="mt-4 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Campos extras que aparecerão no painel de detalhes do contato
+              </p>
+              <Button onClick={openNewField} size="sm">
+                <Plus className="mr-1 h-4 w-4" /> Novo Campo
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card">
+              {fieldsList.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center text-center text-sm">
+                  <p className="font-medium text-foreground">Nenhum campo criado</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Crie campos como CPF, Empresa, Cargo, etc.
+                  </p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {fieldsList.map((f) => (
+                    <li key={f.id} className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-foreground">{f.name}</span>
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                          {FIELD_TYPE_LABEL[f.field_type]}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditField(f)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteField(f)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <Dialog open={fieldModalOpen} onOpenChange={setFieldModalOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingField ? "Editar campo" : "Novo campo"}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="field-name">Nome</Label>
+                    <Input
+                      id="field-name"
+                      value={fieldName}
+                      onChange={(e) => setFieldName(e.target.value)}
+                      placeholder="Ex.: CPF"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={fieldType}
+                      onValueChange={(v) => setFieldType(v as FieldType)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="text">Texto</SelectItem>
+                        <SelectItem value="number">Número</SelectItem>
+                        <SelectItem value="date">Data</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {fieldError && (
+                    <p className="text-sm text-destructive">{fieldError}</p>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFieldModalOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={saveField}
+                      disabled={fieldBusy || !fieldName.trim()}
+                    >
+                      {fieldBusy ? "Salvando…" : editingField ? "Salvar" : "Criar"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="departamentos" className="mt-4">

@@ -1,11 +1,26 @@
-import { useEffect, useState } from "react";
-import { Settings } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Settings, Plus, Pencil, Trash2, Check, Search, X, Tag } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  TagChip,
+  TAG_PALETTE,
+  readableText,
+  ColorPicker,
+  type Tag as TagType,
+} from "@/components/contact-tags";
+
 
 function Placeholder({ message }: { message: string }) {
   return (

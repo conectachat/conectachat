@@ -136,6 +136,8 @@ export function ContactsScreen() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [page, setPage] = useState(1);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [tagsManagerOpen, setTagsManagerOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -143,21 +145,36 @@ export function ContactsScreen() {
   }, [search]);
   useEffect(() => {
     setPage(1);
-  }, [debounced]);
+  }, [debounced, tagFilter]);
 
   const listQuery = useQuery({
-    queryKey: ["contacts-list", debounced, page],
+    queryKey: ["contacts-list", debounced, page, tagFilter],
     queryFn: async () => {
       const from = (page - 1) * PER_PAGE;
       const to = from + PER_PAGE - 1;
-      let q = supabase
-        .from("contacts")
-        .select(
-          "id, org_id, external_id, name, name_locked, email, birth_date, notes, avatar_url, blocked, created_at, conversations(last_message_at)",
-          { count: "exact" },
-        )
-        .order("created_at", { ascending: false })
-        .range(from, to);
+      const baseCols =
+        "id, org_id, external_id, name, name_locked, email, birth_date, notes, avatar_url, blocked, created_at, conversations(last_message_at)";
+      let q;
+      if (tagFilter) {
+        q = supabase
+          .from("contacts")
+          .select(
+            `${baseCols}, contact_tags!inner(tag_id, tags(id, name, color))`,
+            { count: "exact" },
+          )
+          .eq("contact_tags.tag_id", tagFilter)
+          .order("created_at", { ascending: false })
+          .range(from, to);
+      } else {
+        q = supabase
+          .from("contacts")
+          .select(
+            `${baseCols}, contact_tags(tag_id, tags(id, name, color))`,
+            { count: "exact" },
+          )
+          .order("created_at", { ascending: false })
+          .range(from, to);
+      }
       const term = debounced.trim();
       if (term) q = q.or(`name.ilike.%${term}%,external_id.ilike.%${term}%`);
       const { data, count, error } = await q;

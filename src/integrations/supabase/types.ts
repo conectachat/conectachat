@@ -644,6 +644,44 @@ export type Database = {
         }
         Relationships: []
       }
+      quick_replies: {
+        Row: {
+          active: boolean
+          content: string
+          created_at: string
+          id: string
+          org_id: string
+          shortcut: string
+          title: string | null
+        }
+        Insert: {
+          active?: boolean
+          content: string
+          created_at?: string
+          id?: string
+          org_id: string
+          shortcut: string
+          title?: string | null
+        }
+        Update: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+          shortcut?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_replies_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           created_at: string

@@ -76,6 +76,15 @@ export function SettingsScreen() {
   const [tagBusy, setTagBusy] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
 
+  // Custom fields state
+  const [fieldModalOpen, setFieldModalOpen] = useState(false);
+  const [editingField, setEditingField] = useState<CustomField | null>(null);
+  const [fieldName, setFieldName] = useState("");
+  const [fieldType, setFieldType] = useState<FieldType>("text");
+  const [fieldBusy, setFieldBusy] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+
+
   useEffect(() => {
     if (!user) return;
     supabase

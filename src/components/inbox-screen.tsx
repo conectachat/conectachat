@@ -6,7 +6,9 @@ import { useMessages } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
-import { Paperclip, Mic, Square, X, Pencil, Copy } from "lucide-react";
+import { Paperclip, Mic, Square, X, Pencil, Copy, Smile } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
 function initials(name: string | null) {
   if (!name) return "?";

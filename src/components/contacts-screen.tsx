@@ -636,6 +636,12 @@ export function ContactsScreen() {
                 Importar
               </button>
               <button
+                onClick={() => setTagsManagerOpen(true)}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <TagIcon size={16} />
+                Gerenciar tags
+              <button
                 onClick={() => setAddOpen(true)}
                 className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >

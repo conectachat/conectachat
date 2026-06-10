@@ -56,8 +56,16 @@ type ContactRow = {
   avatar_url: string | null;
   blocked: boolean | null;
   created_at: string;
+  metadata: Record<string, any> | null;
   conversations: { last_message_at: string | null }[] | null;
   contact_tags: { tag_id: string; tags: Tag | null }[] | null;
+};
+
+export type CustomField = {
+  id: string;
+  name: string;
+  field_type: "text" | "number" | "date";
+  position: number;
 };
 
 function initials(name: string | null, fallback: string) {

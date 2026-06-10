@@ -10,6 +10,8 @@ import { Paperclip, Mic, Square, X, Pencil, Copy, Smile } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
+type QuickReply = { id: string; shortcut: string; title: string | null; content: string };
+
 function initials(name: string | null) {
   if (!name) return "?";
   const p = name.trim().split(/\s+/);
@@ -253,6 +255,9 @@ export function InboxScreen() {
   const [openEmoji, setOpenEmoji] = useState(false);
   const [pendingCursor, setPendingCursor] = useState<number | null>(null);
 
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
+  const [qrIndex, setQrIndex] = useState(0);
+
   useEffect(() => {
     if (pendingCursor !== null && textareaRef.current) {
       textareaRef.current.focus();
@@ -262,6 +267,41 @@ export function InboxScreen() {
   }, [pendingCursor]);
 
   const contact = selected?.contact ?? null;
+
+  // Respostas rápidas (menu do "/")
+  useEffect(() => {
+    if (!orgId) { setQuickReplies([]); return; }
+    let active = true;
+    supabase
+      .from("quick_replies")
+      .select("id, shortcut, title, content")
+      .eq("active", true)
+      .order("shortcut")
+      .then(({ data }) => { if (active) setQuickReplies(data ?? []); });
+    return () => { active = false; };
+  }, [orgId]);
+
+  const qrQuery = draft.startsWith("/") ? draft.slice(1).toLowerCase() : "";
+  const filteredQr = useMemo(
+    () =>
+      !draft.startsWith("/")
+        ? []
+        : quickReplies.filter(
+            (q) =>
+              q.shortcut.toLowerCase().includes(qrQuery) ||
+              (q.title ?? "").toLowerCase().includes(qrQuery),
+          ),
+    [quickReplies, qrQuery, draft],
+  );
+  const qrMenuVisible = filteredQr.length > 0;
+  useEffect(() => { setQrIndex(0); }, [qrQuery]);
+
+  function applyQuickReply(q: QuickReply) {
+    const nome = contact?.name?.trim() || displayName(contact);
+    const text = q.content.replace(/\{\{\s*nome\s*\}\}/gi, nome);
+    setDraft(text);
+    setPendingCursor(text.length);
+  }
 
   useEffect(() => {
     setShowContactPanel(false);
@@ -465,7 +505,26 @@ export function InboxScreen() {
                 })}
             </div>
 
-            <div className="border-t border-gray-200 bg-white px-4 py-3">
+            <div className="relative border-t border-gray-200 bg-white px-4 py-3">
+              {qrMenuVisible && (
+                <div className="absolute bottom-full left-4 right-4 mb-2 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-20">
+                  {filteredQr.map((q, i) => (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); applyQuickReply(q); }}
+                      onMouseEnter={() => setQrIndex(i)}
+                      className={`block w-full px-3 py-2 text-left ${i === qrIndex ? "bg-gray-100" : "hover:bg-gray-50"}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-900">{q.title?.trim() || q.shortcut}</span>
+                        <span className="text-xs text-gray-500">/{q.shortcut}</span>
+                      </div>
+                      <p className="truncate text-xs text-gray-500">{q.content}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
               {error && (
                 <p className="mb-2 text-xs text-red-600">
                   {error}
@@ -542,13 +601,19 @@ export function InboxScreen() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
+                    if (qrMenuVisible) {
+                      if (e.key === "ArrowDown") { e.preventDefault(); setQrIndex((i) => Math.min(i + 1, filteredQr.length - 1)); return; }
+                      if (e.key === "ArrowUp") { e.preventDefault(); setQrIndex((i) => Math.max(i - 1, 0)); return; }
+                      if (e.key === "Enter") { e.preventDefault(); const q = filteredQr[qrIndex]; if (q) applyQuickReply(q); return; }
+                      if (e.key === "Escape") { e.preventDefault(); setDraft(""); return; }
+                    }
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSend();
                     }
                   }}
                   rows={1}
-                  placeholder="Escreva uma mensagem…"
+                  placeholder="Escreva uma mensagem ou digite / para respostas rápidas…"
                   className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <button

@@ -853,6 +853,167 @@ export function ContactsScreen() {
         </DialogContent>
       </Dialog>
 
+      {/* Import modal */}
+      <Dialog
+        open={importOpen}
+        onOpenChange={(o) => {
+          setImportOpen(o);
+          if (!o) resetImportState();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar contatos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="flex items-center justify-between rounded border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
+              <span className="text-xs text-gray-600">
+                Use o modelo para evitar erros de cabeçalho.
+              </span>
+              <button
+                onClick={downloadTemplate}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Baixar modelo
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600">
+                Completar com país
+              </label>
+              <select
+                value={importCountry}
+                onChange={(e) =>
+                  reprocessWithCountry(e.target.value as "NONE" | "BR")
+                }
+                className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+              >
+                <option value="NONE">
+                  Nenhum — os números já têm o código do país
+                </option>
+                <option value="BR">Brasil (+55)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600">
+                Arquivo (.csv, .xlsx, .xls)
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFileChosen(f);
+                }}
+                className="mt-1 w-full text-xs"
+              />
+              {importFileName && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Arquivo: {importFileName}
+                </p>
+              )}
+            </div>
+
+            {importBusy && (
+              <p className="text-xs text-gray-500">Processando…</p>
+            )}
+
+            {(previewValid.length > 0 ||
+              previewSuspect.length > 0 ||
+              previewInvalid.length > 0) && (
+              <div className="space-y-3 rounded border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs text-gray-700">
+                  <strong>{importStats.novos}</strong> serão adicionados (novos),{" "}
+                  <strong>{importStats.jaExistem}</strong> já existem,{" "}
+                  <strong>{importStats.invalidos}</strong> com número inválido/suspeito.
+                </p>
+
+                {importStats.jaExistem > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-700">
+                      Como tratar os números já existentes?
+                    </p>
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      <input
+                        type="radio"
+                        name="dup"
+                        checked={dupMode === "keep"}
+                        onChange={() => setDupMode("keep")}
+                      />
+                      Manter os dados atuais
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      <input
+                        type="radio"
+                        name="dup"
+                        checked={dupMode === "replace"}
+                        onChange={() => setDupMode("replace")}
+                      />
+                      Substituir pelos dados da planilha
+                    </label>
+                  </div>
+                )}
+
+                {(previewSuspect.length > 0 || previewInvalid.length > 0) && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-gray-600">
+                      Ver números suspeitos/inválidos
+                    </summary>
+                    <div className="mt-2 max-h-40 overflow-auto rounded border border-gray-200 bg-white p-2">
+                      {previewSuspect.map((r, i) => (
+                        <div key={`s-${i}`} className="text-amber-700">
+                          {r.telefone} — {r.nome || "(sem nome)"} · suspeito
+                        </div>
+                      ))}
+                      {previewInvalid.map((r, i) => (
+                        <div key={`i-${i}`} className="text-red-700">
+                          {r.telefone || "(vazio)"} — {r.nome || "(sem nome)"} · inválido
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {importError && (
+              <p className="text-xs text-red-600">{importError}</p>
+            )}
+            {importResult && (
+              <p className="text-xs text-green-700">{importResult}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setImportOpen(false);
+                resetImportState();
+              }}
+              disabled={importBusy}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+            >
+              Fechar
+            </button>
+            <button
+              onClick={confirmImport}
+              disabled={
+                importBusy ||
+                !!importResult ||
+                previewValid.length + previewSuspect.length === 0
+              }
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {importBusy ? "Importando…" : "Confirmar importação"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+
       {/* Edit drawer */}
       {editing && (
         <div className="fixed inset-0 z-50 flex">

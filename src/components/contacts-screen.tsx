@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,7 +12,11 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Upload,
 } from "lucide-react";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -343,6 +347,241 @@ export function ContactsScreen() {
     navigate({ to: "/inbox" });
   }
 
+  const [exporting, setExporting] = useState(false);
+  async function handleExport() {
+    setExporting(true);
+    try {
+      let todos: Array<{
+        name: string | null;
+        external_id: string;
+        email: string | null;
+        birth_date: string | null;
+        blocked: boolean | null;
+        created_at: string;
+      }> = [];
+      let de = 0;
+      const lote = 1000;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from("contacts")
+          .select("name, external_id, email, birth_date, blocked, created_at")
+          .order("created_at", { ascending: false })
+          .range(de, de + lote - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        todos = todos.concat(data);
+        if (data.length < lote) break;
+        de += lote;
+      }
+      const cab = ["nome", "telefone", "email", "nascimento", "status", "criado_em"];
+      const linhas = [
+        cab,
+        ...todos.map((c) => [
+          c.name ?? "",
+          c.external_id ?? "",
+          c.email ?? "",
+          c.birth_date ?? "",
+          c.blocked ? "bloqueado" : "ativo",
+          c.created_at ?? "",
+        ]),
+      ];
+      const csv = linhas
+        .map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const blob = new Blob(["\ufeff" + csv], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "contatos.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      alert("Não foi possível exportar os contatos.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // ---------- Importar ----------
+  type ParsedRow = { nome: string; telefone: string; email: string; suspeito: boolean };
+  const [importOpen, setImportOpen] = useState(false);
+  const [importCountry, setImportCountry] = useState<"NONE" | "BR">("NONE");
+  const [importFileName, setImportFileName] = useState<string>("");
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [previewValid, setPreviewValid] = useState<ParsedRow[]>([]);
+  const [previewSuspect, setPreviewSuspect] = useState<ParsedRow[]>([]);
+  const [previewInvalid, setPreviewInvalid] = useState<Array<{ nome: string; telefone: string; email: string }>>([]);
+  const [previewExisting, setPreviewExisting] = useState<Set<string>>(new Set());
+  const [dupMode, setDupMode] = useState<"keep" | "replace">("keep");
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  function resetImportState() {
+    setImportFileName("");
+    setPreviewValid([]);
+    setPreviewSuspect([]);
+    setPreviewInvalid([]);
+    setPreviewExisting(new Set());
+    setDupMode("keep");
+    setImportError(null);
+    setImportResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function openImport() {
+    resetImportState();
+    setImportOpen(true);
+  }
+
+  function downloadTemplate() {
+    const csv =
+      "nome,telefone,email\nJoão Exemplo,5547999998888,joao@exemplo.com\n";
+    const blob = new Blob(["\ufeff" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "modelo-contatos.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function normalizeRow(raw: Record<string, unknown>): { nome: string; telefoneRaw: string; email: string } {
+    const lower: Record<string, unknown> = {};
+    for (const k of Object.keys(raw)) {
+      lower[k.trim().toLowerCase()] = raw[k];
+    }
+    const nome = String(lower["nome"] ?? lower["name"] ?? "").trim();
+    const telefoneRaw = String(lower["telefone"] ?? lower["phone"] ?? lower["celular"] ?? "");
+    const email = String(lower["email"] ?? lower["e-mail"] ?? "").trim();
+    return { nome, telefoneRaw, email };
+  }
+
+  function processRows(raw: Array<Record<string, unknown>>, country: "NONE" | "BR") {
+    const valid: ParsedRow[] = [];
+    const suspect: ParsedRow[] = [];
+    const invalid: Array<{ nome: string; telefone: string; email: string }> = [];
+    for (const r of raw) {
+      const { nome, telefoneRaw, email } = normalizeRow(r);
+      let tel = String(telefoneRaw ?? "").replace(/\D/g, "");
+      if (country === "BR" && tel && !tel.startsWith("55") && tel.length <= 11) {
+        tel = "55" + tel;
+      }
+      const ok = tel.length >= 8;
+      const isSuspect = tel.length < 11;
+      if (!ok) {
+        invalid.push({ nome, telefone: telefoneRaw, email });
+      } else if (isSuspect) {
+        suspect.push({ nome, telefone: tel, email, suspeito: true });
+      } else {
+        valid.push({ nome, telefone: tel, email, suspeito: false });
+      }
+    }
+    return { valid, suspect, invalid };
+  }
+
+  async function handleFileChosen(file: File) {
+    setImportError(null);
+    setImportResult(null);
+    setImportFileName(file.name);
+    setImportBusy(true);
+    try {
+      const name = file.name.toLowerCase();
+      let raw: Array<Record<string, unknown>> = [];
+      if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array", cellText: true, raw: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { raw: false, defval: "" });
+      } else {
+        const text = await file.text();
+        const parsed = Papa.parse<Record<string, unknown>>(text, {
+          header: true,
+          skipEmptyLines: true,
+        });
+        raw = parsed.data ?? [];
+      }
+      const { valid, suspect, invalid } = processRows(raw, importCountry);
+      const allValid = [...valid, ...suspect];
+      // descobrir existentes
+      const existentes = new Set<string>();
+      const numeros = allValid.map((l) => l.telefone);
+      for (let i = 0; i < numeros.length; i += 500) {
+        const fatia = numeros.slice(i, i + 500);
+        if (fatia.length === 0) break;
+        const { data } = await supabase
+          .from("contacts")
+          .select("external_id")
+          .eq("channel_type", "whatsapp_baileys")
+          .in("external_id", fatia);
+        (data ?? []).forEach((c) => existentes.add(c.external_id));
+      }
+      setPreviewValid(valid);
+      setPreviewSuspect(suspect);
+      setPreviewInvalid(invalid);
+      setPreviewExisting(existentes);
+    } catch (e) {
+      setImportError("Não foi possível ler o arquivo.");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  // re-process when country changes after a file is loaded
+  async function reprocessWithCountry(country: "NONE" | "BR") {
+    setImportCountry(country);
+    if (!fileInputRef.current?.files?.[0]) return;
+    await handleFileChosen(fileInputRef.current.files[0]);
+  }
+
+  const importStats = useMemo(() => {
+    const all = [...previewValid, ...previewSuspect];
+    const novos = all.filter((l) => !previewExisting.has(l.telefone)).length;
+    const jaExistem = all.filter((l) => previewExisting.has(l.telefone)).length;
+    const invalidos = previewInvalid.length + previewSuspect.length;
+    return { novos, jaExistem, invalidos };
+  }, [previewValid, previewSuspect, previewInvalid, previewExisting]);
+
+  async function confirmImport() {
+    if (!orgId) {
+      setImportError("Sem empresa vinculada.");
+      return;
+    }
+    setImportBusy(true);
+    setImportError(null);
+    try {
+      const all = [...previewValid, ...previewSuspect];
+      const filtered =
+        dupMode === "replace" ? all : all.filter((l) => !previewExisting.has(l.telefone));
+      const registros = filtered.map((l) => ({
+        org_id: orgId,
+        channel_type: "whatsapp_baileys" as const,
+        external_id: l.telefone,
+        name: (l.nome || "").trim() || null,
+        name_locked: (l.nome || "").trim().length > 0,
+        email: (l.email || "").trim() || null,
+      }));
+      for (let i = 0; i < registros.length; i += 500) {
+        const { error } = await supabase
+          .from("contacts")
+          .upsert(registros.slice(i, i + 500), {
+            onConflict: "org_id,channel_type,external_id",
+          });
+        if (error) throw error;
+      }
+      setImportResult(`${registros.length} contatos importados.`);
+      reloadAll();
+    } catch (e) {
+      setImportError("Não foi possível importar os contatos.");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50">
       <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -354,13 +593,30 @@ export function ContactsScreen() {
                 Gerencie sua base de contatos.
               </p>
             </div>
-            <button
-              onClick={() => setAddOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus size={16} />
-              Adicionar
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <Download size={16} />
+                {exporting ? "Exportando…" : "Exportar"}
+              </button>
+              <button
+                onClick={openImport}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Upload size={16} />
+                Importar
+              </button>
+              <button
+                onClick={() => setAddOpen(true)}
+                className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus size={16} />
+                Adicionar
+              </button>
+            </div>
           </div>
 
           {/* Cards */}
@@ -596,6 +852,167 @@ export function ContactsScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import modal */}
+      <Dialog
+        open={importOpen}
+        onOpenChange={(o) => {
+          setImportOpen(o);
+          if (!o) resetImportState();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar contatos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="flex items-center justify-between rounded border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
+              <span className="text-xs text-gray-600">
+                Use o modelo para evitar erros de cabeçalho.
+              </span>
+              <button
+                onClick={downloadTemplate}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Baixar modelo
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600">
+                Completar com país
+              </label>
+              <select
+                value={importCountry}
+                onChange={(e) =>
+                  reprocessWithCountry(e.target.value as "NONE" | "BR")
+                }
+                className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+              >
+                <option value="NONE">
+                  Nenhum — os números já têm o código do país
+                </option>
+                <option value="BR">Brasil (+55)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600">
+                Arquivo (.csv, .xlsx, .xls)
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFileChosen(f);
+                }}
+                className="mt-1 w-full text-xs"
+              />
+              {importFileName && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Arquivo: {importFileName}
+                </p>
+              )}
+            </div>
+
+            {importBusy && (
+              <p className="text-xs text-gray-500">Processando…</p>
+            )}
+
+            {(previewValid.length > 0 ||
+              previewSuspect.length > 0 ||
+              previewInvalid.length > 0) && (
+              <div className="space-y-3 rounded border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs text-gray-700">
+                  <strong>{importStats.novos}</strong> serão adicionados (novos),{" "}
+                  <strong>{importStats.jaExistem}</strong> já existem,{" "}
+                  <strong>{importStats.invalidos}</strong> com número inválido/suspeito.
+                </p>
+
+                {importStats.jaExistem > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-700">
+                      Como tratar os números já existentes?
+                    </p>
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      <input
+                        type="radio"
+                        name="dup"
+                        checked={dupMode === "keep"}
+                        onChange={() => setDupMode("keep")}
+                      />
+                      Manter os dados atuais
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      <input
+                        type="radio"
+                        name="dup"
+                        checked={dupMode === "replace"}
+                        onChange={() => setDupMode("replace")}
+                      />
+                      Substituir pelos dados da planilha
+                    </label>
+                  </div>
+                )}
+
+                {(previewSuspect.length > 0 || previewInvalid.length > 0) && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-gray-600">
+                      Ver números suspeitos/inválidos
+                    </summary>
+                    <div className="mt-2 max-h-40 overflow-auto rounded border border-gray-200 bg-white p-2">
+                      {previewSuspect.map((r, i) => (
+                        <div key={`s-${i}`} className="text-amber-700">
+                          {r.telefone} — {r.nome || "(sem nome)"} · suspeito
+                        </div>
+                      ))}
+                      {previewInvalid.map((r, i) => (
+                        <div key={`i-${i}`} className="text-red-700">
+                          {r.telefone || "(vazio)"} — {r.nome || "(sem nome)"} · inválido
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {importError && (
+              <p className="text-xs text-red-600">{importError}</p>
+            )}
+            {importResult && (
+              <p className="text-xs text-green-700">{importResult}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setImportOpen(false);
+                resetImportState();
+              }}
+              disabled={importBusy}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+            >
+              Fechar
+            </button>
+            <button
+              onClick={confirmImport}
+              disabled={
+                importBusy ||
+                !!importResult ||
+                previewValid.length + previewSuspect.length === 0
+              }
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {importBusy ? "Importando…" : "Confirmar importação"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
 
       {/* Edit drawer */}
       {editing && (

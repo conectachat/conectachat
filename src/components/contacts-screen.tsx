@@ -739,7 +739,22 @@ export function ContactsScreen() {
                       <td className="px-4 py-3 text-gray-700">
                         {formatPhone(c.external_id)}
                       </td>
-                      <td className="px-4 py-3 text-gray-400">—</td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const ts = (c.contact_tags ?? [])
+                            .map((x) => x.tags)
+                            .filter((t): t is Tag => !!t);
+                          if (ts.length === 0)
+                            return <span className="text-gray-400">—</span>;
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {ts.map((t) => (
+                                <TagChip key={t.id} tag={t} size="xs" />
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3 text-gray-700">
                         {fmtDate(c.created_at)}
                       </td>

@@ -530,7 +530,3 @@ export function TagFilterSelect({
   );
 }
 
-// silence unused import warning when tree-shaking
-export const __icons = { Plus, X, Pencil, Trash2, Check, TagIcon };
-// satisfies useEffect import (kept for potential future use)
-export const __noop = () => useEffect(() => {}, []);

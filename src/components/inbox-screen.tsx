@@ -6,7 +6,7 @@ import { useMessages } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
-import { Paperclip, Mic, Square, X, Pencil, Copy, Smile } from "lucide-react";
+import { Paperclip, Mic, Square, X, Pencil, Copy, Smile, Eye } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
@@ -59,16 +59,40 @@ const statusClass: Record<string, string> = {
   closed: "bg-gray-100 text-gray-600",
 };
 
-function ContactAvatar({ path, initials, className = "h-10 w-10" }: { path?: string | null; initials: string; className?: string }) {
+function ContactAvatar({
+  path,
+  initials,
+  className = "h-10 w-10",
+}: {
+  path?: string | null;
+  initials: string;
+  className?: string;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (!path) { setUrl(null); return; }
+    if (!path) {
+      setUrl(null);
+      return;
+    }
     let active = true;
-    supabase.storage.from("media").createSignedUrl(path, 3600).then(({ data }) => { if (active) setUrl(data?.signedUrl ?? null); });
-    return () => { active = false; };
+    supabase.storage
+      .from("media")
+      .createSignedUrl(path, 3600)
+      .then(({ data }) => {
+        if (active) setUrl(data?.signedUrl ?? null);
+      });
+    return () => {
+      active = false;
+    };
   }, [path]);
   if (url) return <img src={url} alt="" className={`${className} rounded-full object-cover`} />;
-  return <div className={`${className} flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-sm font-medium`}>{initials}</div>;
+  return (
+    <div
+      className={`${className} flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-sm font-medium`}
+    >
+      {initials}
+    </div>
+  );
 }
 
 function formatSize(bytes?: number | null): string {
@@ -78,28 +102,47 @@ function formatSize(bytes?: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function MessageMedia({ path, contentType, name, size }: { path: string; contentType: string; name?: string | null; size?: number | null }) {
+function MessageMedia({
+  path,
+  contentType,
+  name,
+  size,
+}: {
+  path: string;
+  contentType: string;
+  name?: string | null;
+  size?: number | null;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    supabase.storage.from("media").createSignedUrl(path, 3600).then(({ data }) => {
-      if (active) setUrl(data?.signedUrl ?? null);
-    });
-    return () => { active = false; };
+    supabase.storage
+      .from("media")
+      .createSignedUrl(path, 3600)
+      .then(({ data }) => {
+        if (active) setUrl(data?.signedUrl ?? null);
+      });
+    return () => {
+      active = false;
+    };
   }, [path]);
   if (!url) return <span className="text-xs opacity-60">Carregando mídia…</span>;
   if (contentType === "image" || contentType === "sticker")
     return <img src={url} alt="" className="max-w-[240px] rounded-lg" />;
-  if (contentType === "audio")
-    return <audio controls src={url} className="max-w-[260px]" />;
-  if (contentType === "video")
-    return <video controls src={url} className="max-w-[240px] rounded-lg" />;
+  if (contentType === "audio") return <audio controls src={url} className="max-w-[260px]" />;
+  if (contentType === "video") return <video controls src={url} className="max-w-[240px] rounded-lg" />;
   return (() => {
     const ext = (name?.split(".").pop() || "FILE").toUpperCase();
     return (
-      <a href={url} target="_blank" rel="noreferrer"
-         className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 max-w-[280px] no-underline hover:bg-gray-50">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-600 text-[10px] font-bold">{ext}</div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 max-w-[280px] no-underline hover:bg-gray-50"
+      >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-600 text-[10px] font-bold">
+          {ext}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-gray-800">{name || "Documento"}</div>
           <div className="text-xs text-gray-500">{size ? formatSize(size) + " · " : ""}Clique para baixar</div>
@@ -112,6 +155,7 @@ function MessageMedia({ path, contentType, name, size }: { path: string; content
 export function InboxScreen() {
   const { data: conversations, isLoading } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const previewRef = useRef(false);
   useEffect(() => {
     try {
       const pending = sessionStorage.getItem("openConvId");
@@ -119,7 +163,9 @@ export function InboxScreen() {
         sessionStorage.removeItem("openConvId");
         setSelectedId(pending);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
   const selected = useMemo(
     () => (conversations ?? []).find((c) => c.id === selectedId) ?? null,
@@ -148,14 +194,24 @@ export function InboxScreen() {
         queryClient.invalidateQueries({ queryKey: ["conversations"] });
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [queryClient]);
 
   useEffect(() => {
     if (!selectedId) return;
-    supabase.from("conversations").update({ unread_count: 0 }).eq("id", selectedId).then(() => {
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-    });
+    if (previewRef.current) {
+      previewRef.current = false;
+      return;
+    } // aberta em modo "ver sem marcar como lida"
+    supabase
+      .from("conversations")
+      .update({ unread_count: 0 })
+      .eq("id", selectedId)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      });
   }, [selectedId, queryClient]);
 
   const [draft, setDraft] = useState("");
@@ -187,7 +243,10 @@ export function InboxScreen() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !selectedId) return;
-    if (file.size > 5 * 1024 * 1024) { alert("Por enquanto, envie arquivos de até 5 MB."); return; }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Por enquanto, envie arquivos de até 5 MB.");
+      return;
+    }
     setSendingMedia(true);
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -197,10 +256,18 @@ export function InboxScreen() {
         reader.readAsDataURL(file);
       });
       const { error } = await supabase.functions.invoke("send-media", {
-        body: { conversationId: selectedId, base64, mimetype: file.type || "application/octet-stream", fileName: file.name, caption: "" },
+        body: {
+          conversationId: selectedId,
+          base64,
+          mimetype: file.type || "application/octet-stream",
+          fileName: file.name,
+          caption: "",
+        },
       });
       if (error) alert("Não foi possível enviar o arquivo.");
-    } finally { setSendingMedia(false); }
+    } finally {
+      setSendingMedia(false);
+    }
   }
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -215,7 +282,9 @@ export function InboxScreen() {
       const mr = new MediaRecorder(stream);
       audioChunksRef.current = [];
       cancelRef.current = false;
-      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
       mr.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         if (cancelRef.current || !selectedId) return;
@@ -228,9 +297,13 @@ export function InboxScreen() {
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           });
-          const { error } = await supabase.functions.invoke("send-audio", { body: { conversationId: selectedId, base64 } });
+          const { error } = await supabase.functions.invoke("send-audio", {
+            body: { conversationId: selectedId, base64 },
+          });
           if (error) alert("Não foi possível enviar o áudio.");
-        } finally { setSendingAudio(false); }
+        } finally {
+          setSendingAudio(false);
+        }
       };
       mediaRecorderRef.current = mr;
       mr.start();
@@ -239,8 +312,16 @@ export function InboxScreen() {
       alert("Não consegui acessar o microfone. Verifique a permissão do navegador.");
     }
   }
-  function stopAndSend() { cancelRef.current = false; mediaRecorderRef.current?.stop(); setRecording(false); }
-  function cancelRecording() { cancelRef.current = true; mediaRecorderRef.current?.stop(); setRecording(false); }
+  function stopAndSend() {
+    cancelRef.current = false;
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  }
+  function cancelRecording() {
+    cancelRef.current = true;
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  }
 
   const [showContactPanel, setShowContactPanel] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
@@ -270,15 +351,22 @@ export function InboxScreen() {
 
   // Respostas rápidas (menu do "/")
   useEffect(() => {
-    if (!orgId) { setQuickReplies([]); return; }
+    if (!orgId) {
+      setQuickReplies([]);
+      return;
+    }
     let active = true;
     supabase
       .from("quick_replies")
       .select("id, shortcut, title, content")
       .eq("active", true)
       .order("shortcut")
-      .then(({ data }) => { if (active) setQuickReplies(data ?? []); });
-    return () => { active = false; };
+      .then(({ data }) => {
+        if (active) setQuickReplies(data ?? []);
+      });
+    return () => {
+      active = false;
+    };
   }, [orgId]);
 
   const qrQuery = draft.startsWith("/") ? draft.slice(1).toLowerCase() : "";
@@ -287,14 +375,14 @@ export function InboxScreen() {
       !draft.startsWith("/")
         ? []
         : quickReplies.filter(
-            (q) =>
-              q.shortcut.toLowerCase().includes(qrQuery) ||
-              (q.title ?? "").toLowerCase().includes(qrQuery),
+            (q) => q.shortcut.toLowerCase().includes(qrQuery) || (q.title ?? "").toLowerCase().includes(qrQuery),
           ),
     [quickReplies, qrQuery, draft],
   );
   const qrMenuVisible = filteredQr.length > 0;
-  useEffect(() => { setQrIndex(0); }, [qrQuery]);
+  useEffect(() => {
+    setQrIndex(0);
+  }, [qrQuery]);
 
   function applyQuickReply(q: QuickReply) {
     const nome = contact?.name?.trim() || displayName(contact);
@@ -315,9 +403,7 @@ export function InboxScreen() {
   function patchContactInCache(contatoId: string, patch: Record<string, unknown>) {
     queryClient.setQueryData<any>(["conversations"], (old: any) => {
       if (!Array.isArray(old)) return old;
-      return old.map((c: any) =>
-        c.contact?.id === contatoId ? { ...c, contact: { ...c.contact, ...patch } } : c,
-      );
+      return old.map((c: any) => (c.contact?.id === contatoId ? { ...c, contact: { ...c.contact, ...patch } } : c));
     });
   }
 
@@ -342,7 +428,9 @@ export function InboxScreen() {
     patchContactInCache(contatoId, patch);
     const { error } = await supabase.from("contacts").update(patch).eq("id", contatoId);
     setSavingContact(false);
-    if (error) { alert("Não foi possível salvar o contato."); }
+    if (error) {
+      alert("Não foi possível salvar o contato.");
+    }
     setEditingContact(false);
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
@@ -354,7 +442,9 @@ export function InboxScreen() {
     patchContactInCache(contatoId, { notes: notesDraft });
     const { error } = await supabase.from("contacts").update({ notes: notesDraft }).eq("id", contatoId);
     setSavingNotes(false);
-    if (error) { alert("Não foi possível salvar as observações."); }
+    if (error) {
+      alert("Não foi possível salvar as observações.");
+    }
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
@@ -390,35 +480,65 @@ export function InboxScreen() {
               return (
                 <button
                   key={c.id}
-                  onClick={() => setSelectedId(c.id)}
+                  onClick={() => {
+                    previewRef.current = false;
+                    if (c.id === selectedId && (c.unread_count ?? 0) > 0) {
+                      supabase
+                        .from("conversations")
+                        .update({ unread_count: 0 })
+                        .eq("id", c.id)
+                        .then(() => queryClient.invalidateQueries({ queryKey: ["conversations"] }));
+                    } else {
+                      setSelectedId(c.id);
+                    }
+                  }}
                   className={`flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${active ? "bg-blue-50" : ""}`}
                 >
-                  <ContactAvatar path={c.contact?.avatar_url} initials={c.contact?.name ? initials(c.contact.name) : "#"} className="h-10 w-10 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`truncate text-sm ${unread ? "font-bold" : "font-medium"} text-gray-900`}>{name}</span>
-                        <span className="shrink-0 text-[11px] text-gray-500">
-                          {timeAgo(c.last_message_at)}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusClass[c.status] ?? "bg-gray-100 text-gray-600"}`}
-                          >
-                            {statusLabel[c.status] ?? c.status}
-                          </span>
-                          <span className="truncate text-[11px] text-gray-500">
-                            {c.channel?.name ?? ""}
-                          </span>
-                        </div>
+                  <ContactAvatar
+                    path={c.contact?.avatar_url}
+                    initials={c.contact?.name ? initials(c.contact.name) : "#"}
+                    className="h-10 w-10 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`truncate text-sm ${unread ? "font-bold" : "font-medium"} text-gray-900`}>
+                        {name}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
                         {unread && (
-                          <span className="rounded-full bg-brand-green px-2 text-xs font-semibold text-white">
-                            {c.unread_count}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            title="Ver sem marcar como lida"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              previewRef.current = true;
+                              setSelectedId(c.id);
+                            }}
+                            className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          >
+                            <Eye size={14} />
                           </span>
                         )}
+                        <span className="text-[11px] text-gray-500">{timeAgo(c.last_message_at)}</span>
                       </div>
                     </div>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusClass[c.status] ?? "bg-gray-100 text-gray-600"}`}
+                        >
+                          {statusLabel[c.status] ?? c.status}
+                        </span>
+                        <span className="truncate text-[11px] text-gray-500">{c.channel?.name ?? ""}</span>
+                      </div>
+                      {unread && (
+                        <span className="rounded-full bg-brand-green px-2 text-xs font-semibold text-white">
+                          {c.unread_count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </button>
               );
             })}
@@ -436,7 +556,11 @@ export function InboxScreen() {
           <>
             <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <ContactAvatar path={selected.contact?.avatar_url} initials={selected.contact?.name ? initials(selected.contact.name) : "#"} className="h-9 w-9 shrink-0" />
+                <ContactAvatar
+                  path={selected.contact?.avatar_url}
+                  initials={selected.contact?.name ? initials(selected.contact.name) : "#"}
+                  className="h-9 w-9 shrink-0"
+                />
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
@@ -446,9 +570,7 @@ export function InboxScreen() {
                   >
                     {displayName(selected.contact)}
                   </button>
-                  <p className="truncate text-xs text-gray-500">
-                    {selected.channel?.name ?? ""}
-                  </p>
+                  <p className="truncate text-xs text-gray-500">{selected.channel?.name ?? ""}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -475,28 +597,24 @@ export function InboxScreen() {
                 (messages ?? []).map((m) => {
                   const out = m.direction === "outbound";
                   return (
-                    <div
-                      key={m.id}
-                      className={`mb-2 flex ${out ? "justify-end" : "justify-start"}`}
-                    >
+                    <div key={m.id} className={`mb-2 flex ${out ? "justify-end" : "justify-start"}`}>
                       <div
                         className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                       >
                         {m.media_url && ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
                           <>
-                            <MessageMedia path={m.media_url} contentType={m.content_type} name={m.media_name} size={m.media_size} />
-                            {m.content && (
-                              <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>
-                            )}
+                            <MessageMedia
+                              path={m.media_url}
+                              contentType={m.content_type}
+                              name={m.media_name}
+                              size={m.media_size}
+                            />
+                            {m.content && <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>}
                           </>
                         ) : (
-                          <p className="whitespace-pre-wrap break-words">
-                            {contentLabel(m.content_type, m.content)}
-                          </p>
+                          <p className="whitespace-pre-wrap break-words">{contentLabel(m.content_type, m.content)}</p>
                         )}
-                        <p
-                          className={`mt-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}
-                        >
+                        <p className={`mt-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}>
                           {hhmm(m.created_at)}
                         </p>
                       </div>
@@ -512,7 +630,10 @@ export function InboxScreen() {
                     <button
                       key={q.id}
                       type="button"
-                      onMouseDown={(e) => { e.preventDefault(); applyQuickReply(q); }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        applyQuickReply(q);
+                      }}
                       onMouseEnter={() => setQrIndex(i)}
                       className={`block w-full px-3 py-2 text-left ${i === qrIndex ? "bg-gray-100" : "hover:bg-gray-50"}`}
                     >
@@ -525,11 +646,7 @@ export function InboxScreen() {
                   ))}
                 </div>
               )}
-              {error && (
-                <p className="mb-2 text-xs text-red-600">
-                  {error}
-                </p>
-              )}
+              {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
               <div className="flex items-end gap-2">
                 <button
                   type="button"
@@ -539,7 +656,13 @@ export function InboxScreen() {
                 >
                   <Paperclip size={18} />
                 </button>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*,application/pdf" className="hidden" onChange={handleFileSelected} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*,application/pdf"
+                  className="hidden"
+                  onChange={handleFileSelected}
+                />
                 {!recording ? (
                   <button
                     type="button"
@@ -602,10 +725,27 @@ export function InboxScreen() {
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
                     if (qrMenuVisible) {
-                      if (e.key === "ArrowDown") { e.preventDefault(); setQrIndex((i) => Math.min(i + 1, filteredQr.length - 1)); return; }
-                      if (e.key === "ArrowUp") { e.preventDefault(); setQrIndex((i) => Math.max(i - 1, 0)); return; }
-                      if (e.key === "Enter") { e.preventDefault(); const q = filteredQr[qrIndex]; if (q) applyQuickReply(q); return; }
-                      if (e.key === "Escape") { e.preventDefault(); setDraft(""); return; }
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setQrIndex((i) => Math.min(i + 1, filteredQr.length - 1));
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setQrIndex((i) => Math.max(i - 1, 0));
+                        return;
+                      }
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const q = filteredQr[qrIndex];
+                        if (q) applyQuickReply(q);
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setDraft("");
+                        return;
+                      }
                     }
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -644,7 +784,10 @@ export function InboxScreen() {
                 </button>
               )}
               <button
-                onClick={() => { setShowContactPanel(false); setEditingContact(false); }}
+                onClick={() => {
+                  setShowContactPanel(false);
+                  setEditingContact(false);
+                }}
                 className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                 title="Fechar"
               >
@@ -659,9 +802,7 @@ export function InboxScreen() {
                 initials={contact.name ? initials(contact.name) : "#"}
                 className="h-20 w-20"
               />
-              {!editingContact && (
-                <p className="text-base font-semibold text-gray-900">{displayName(contact)}</p>
-              )}
+              {!editingContact && <p className="text-base font-semibold text-gray-900">{displayName(contact)}</p>}
             </div>
 
             {!editingContact ? (
@@ -677,9 +818,7 @@ export function InboxScreen() {
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Nascimento</dt>
                   <dd className="text-gray-900">
-                    {contact.birth_date
-                      ? contact.birth_date.split("-").reverse().join("/")
-                      : "—"}
+                    {contact.birth_date ? contact.birth_date.split("-").reverse().join("/") : "—"}
                   </dd>
                 </div>
                 <div>
@@ -765,9 +904,7 @@ export function InboxScreen() {
             </div>
 
             <div className="mt-6 border-t border-gray-200 pt-4">
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Observações
-              </h4>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Observações</h4>
               <textarea
                 value={notesDraft}
                 onChange={(e) => setNotesDraft(e.target.value)}
@@ -798,4 +935,3 @@ export function InboxScreen() {
     </div>
   );
 }
-

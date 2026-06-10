@@ -297,7 +297,7 @@ export function TagsManagerDialog({
   );
 }
 
-function ColorPicker({
+export function ColorPicker({
   value,
   onChange,
 }: {

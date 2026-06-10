@@ -667,8 +667,8 @@ export function ContactsScreen() {
           </div>
 
           {/* Search */}
-          <div className="mb-3">
-            <div className="relative">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="relative flex-1">
               <Search
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -680,6 +680,7 @@ export function ContactsScreen() {
                 className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
+            <TagFilterSelect orgId={orgId} value={tagFilter} onChange={setTagFilter} />
           </div>
 
           {/* Table */}

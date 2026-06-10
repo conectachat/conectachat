@@ -1146,6 +1146,14 @@ export function ContactsScreen() {
               </div>
 
               <div className="mt-6 border-t border-gray-200 pt-4">
+                <ContactTagsSection
+                  contactId={editing.id}
+                  orgId={orgId}
+                  onChange={reloadAll}
+                />
+              </div>
+
+              <div className="mt-6 border-t border-gray-200 pt-4">
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Observações
                 </h4>

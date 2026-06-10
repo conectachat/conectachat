@@ -1185,6 +1185,13 @@ export function ContactsScreen() {
           </aside>
         </div>
       )}
+
+      <TagsManagerDialog
+        open={tagsManagerOpen}
+        onOpenChange={setTagsManagerOpen}
+        orgId={orgId}
+        onChanged={reloadAll}
+      />
     </div>
   );
 }

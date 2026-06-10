@@ -125,6 +125,125 @@ export function SettingsScreen() {
     setChangingPassword(false);
   };
 
+  // Tags queries
+  const tagsQuery = useQuery({
+    queryKey: ["settings-tags", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<Array<TagType & { contact_count: number }>> => {
+      const { data, error } = await supabase
+        .from("tags")
+        .select("id, name, color, contact_tags(count)")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        color: t.color,
+        contact_count: t.contact_tags?.[0]?.count ?? 0,
+      }));
+    },
+  });
+
+  const contactsWithTagQuery = useQuery({
+    queryKey: ["contacts-with-tag-count", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<number> => {
+      const { data, error } = await supabase.from("contact_tags").select("contact_id");
+      if (error) throw error;
+      return new Set((data ?? []).map((v: any) => v.contact_id)).size;
+    },
+  });
+
+  const tagsList = tagsQuery.data ?? [];
+  const filteredTags = useMemo(() => {
+    const s = tagSearch.trim().toLowerCase();
+    if (!s) return tagsList;
+    return tagsList.filter((t) => t.name.toLowerCase().includes(s));
+  }, [tagsList, tagSearch]);
+
+  function invalidateTags() {
+    qc.invalidateQueries({ queryKey: ["settings-tags"] });
+    qc.invalidateQueries({ queryKey: ["contacts-with-tag-count"] });
+    qc.invalidateQueries({ queryKey: ["org-tags"] });
+    qc.invalidateQueries({ queryKey: ["contacts-list"] });
+    qc.invalidateQueries({ queryKey: ["contact-tags"] });
+  }
+
+  function openNewTag() {
+    setEditingTag(null);
+    setTagName("");
+    setTagColor(TAG_PALETTE[0]);
+    setTagError(null);
+    setTagModalOpen(true);
+  }
+
+  function openEditTag(t: TagType) {
+    setEditingTag(t);
+    setTagName(t.name);
+    setTagColor(t.color);
+    setTagError(null);
+    setTagModalOpen(true);
+  }
+
+  async function saveTag() {
+    setTagError(null);
+    const n = tagName.trim();
+    if (!n) return;
+    if (!orgId) {
+      setTagError("Sem empresa vinculada.");
+      return;
+    }
+    setTagBusy(true);
+    if (editingTag) {
+      const { error } = await supabase
+        .from("tags")
+        .update({ name: n, color: tagColor })
+        .eq("id", editingTag.id);
+      setTagBusy(false);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          setTagError("Já existe uma tag com esse nome.");
+        } else {
+          setTagError("Não foi possível salvar a tag.");
+          console.error("Erro ao editar tag:", error);
+        }
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("tags")
+        .insert({ org_id: orgId, name: n, color: tagColor })
+        .select("id, name, color")
+        .single();
+      setTagBusy(false);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          setTagError("Já existe uma tag com esse nome.");
+        } else {
+          setTagError("Não foi possível criar a tag.");
+          console.error("Erro ao criar tag:", error);
+        }
+        return;
+      }
+    }
+    setTagModalOpen(false);
+    setEditingTag(null);
+    setTagName("");
+    setTagColor(TAG_PALETTE[0]);
+    invalidateTags();
+  }
+
+  async function deleteTag(t: TagType) {
+    if (!confirm(`Excluir a tag "${t.name}"? Ela será removida de todos os contatos.`)) return;
+    const { error } = await supabase.from("tags").delete().eq("id", t.id);
+    if (error) {
+      console.error("Erro ao excluir tag:", error);
+      alert("Não foi possível excluir a tag.");
+      return;
+    }
+    invalidateTags();
+  }
+
   return (
     <div className="h-full overflow-auto p-6">
       <div className="mx-auto max-w-4xl">
@@ -228,8 +347,115 @@ export function SettingsScreen() {
             </section>
           </TabsContent>
 
-          <TabsContent value="tags" className="mt-4">
-            <Placeholder message="Em construção — chega no próximo passo." />
+          <TabsContent value="tags" className="mt-4 space-y-4">
+            {/* Cards */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg border border-border bg-card p-4">
+                <p className="text-2xl font-semibold text-foreground">{tagsList.length}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Tags criadas</p>
+              </div>
+              <div className="rounded-lg border border-border bg-card p-4">
+                <p className="text-2xl font-semibold text-foreground">{contactsWithTagQuery.data ?? 0}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Contatos com tag</p>
+              </div>
+            </div>
+
+            {/* Search + New */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={tagSearch}
+                  onChange={(e) => setTagSearch(e.target.value)}
+                  placeholder="Buscar tag…"
+                  className="pl-9"
+                />
+              </div>
+              <Button onClick={openNewTag} size="sm">
+                <Plus className="mr-1 h-4 w-4" /> Nova Tag
+              </Button>
+            </div>
+
+            {/* List */}
+            <div className="rounded-lg border border-border bg-card">
+              {filteredTags.length === 0 ? (
+                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                  {tagSearch.trim() ? "Nenhuma tag encontrada." : "Nenhuma tag criada ainda."}
+                </div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {filteredTags.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="inline-block h-3 w-3 rounded-full"
+                          style={{ backgroundColor: t.color }}
+                        />
+                        <span className="text-sm font-medium text-foreground">{t.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {t.contact_count} {t.contact_count === 1 ? "contato" : "contatos"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditTag(t)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteTag(t)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Tag Modal (create / edit) */}
+            <Dialog open={tagModalOpen} onOpenChange={setTagModalOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{editingTag ? "Editar tag" : "Nova tag"}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tag-name">Nome</Label>
+                    <Input
+                      id="tag-name"
+                      value={tagName}
+                      onChange={(e) => setTagName(e.target.value)}
+                      placeholder="Nome da tag"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor</Label>
+                    <ColorPicker value={tagColor} onChange={setTagColor} />
+                  </div>
+                  {tagError && <p className="text-sm text-destructive">{tagError}</p>}
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTagModalOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button size="sm" onClick={saveTag} disabled={tagBusy || !tagName.trim()}>
+                      {tagBusy ? "Salvando…" : editingTag ? "Salvar" : "Criar"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="campos" className="mt-4">

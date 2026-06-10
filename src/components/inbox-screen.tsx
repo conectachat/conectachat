@@ -249,6 +249,18 @@ export function InboxScreen() {
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [openEmoji, setOpenEmoji] = useState(false);
+  const [pendingCursor, setPendingCursor] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (pendingCursor !== null && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(pendingCursor, pendingCursor);
+      setPendingCursor(null);
+    }
+  }, [pendingCursor]);
+
   const contact = selected?.contact ?? null;
 
   useEffect(() => {

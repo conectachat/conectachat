@@ -207,9 +207,25 @@ export function ContactsScreen() {
     },
   });
 
+  const customFieldsQuery = useQuery({
+    queryKey: ["custom-fields", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<CustomField[]> => {
+      const { data, error } = await supabase
+        .from("custom_fields")
+        .select("id, name, field_type, position")
+        .order("position")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as CustomField[];
+    },
+  });
+  const customFields = customFieldsQuery.data ?? [];
+
   function reloadAll() {
     queryClient.invalidateQueries({ queryKey: ["contacts-list"] });
     queryClient.invalidateQueries({ queryKey: ["contacts-counts"] });
+    queryClient.invalidateQueries({ queryKey: ["custom-fields"] });
   }
 
   const rows = listQuery.data?.rows ?? [];

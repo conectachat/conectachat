@@ -14,9 +14,17 @@ import {
   ChevronRight,
   Download,
   Upload,
+  Tag as TagIcon,
 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import {
+  TagsManagerDialog,
+  TagFilterSelect,
+  ContactTagsSection,
+  TagChip,
+  type Tag,
+} from "@/components/contact-tags";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -49,6 +57,7 @@ type ContactRow = {
   blocked: boolean | null;
   created_at: string;
   conversations: { last_message_at: string | null }[] | null;
+  contact_tags: { tag_id: string; tags: Tag | null }[] | null;
 };
 
 function initials(name: string | null, fallback: string) {
@@ -127,6 +136,8 @@ export function ContactsScreen() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [page, setPage] = useState(1);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [tagsManagerOpen, setTagsManagerOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -134,21 +145,36 @@ export function ContactsScreen() {
   }, [search]);
   useEffect(() => {
     setPage(1);
-  }, [debounced]);
+  }, [debounced, tagFilter]);
 
   const listQuery = useQuery({
-    queryKey: ["contacts-list", debounced, page],
+    queryKey: ["contacts-list", debounced, page, tagFilter],
     queryFn: async () => {
       const from = (page - 1) * PER_PAGE;
       const to = from + PER_PAGE - 1;
-      let q = supabase
-        .from("contacts")
-        .select(
-          "id, org_id, external_id, name, name_locked, email, birth_date, notes, avatar_url, blocked, created_at, conversations(last_message_at)",
-          { count: "exact" },
-        )
-        .order("created_at", { ascending: false })
-        .range(from, to);
+      const baseCols =
+        "id, org_id, external_id, name, name_locked, email, birth_date, notes, avatar_url, blocked, created_at, conversations(last_message_at)";
+      let q;
+      if (tagFilter) {
+        q = supabase
+          .from("contacts")
+          .select(
+            `${baseCols}, contact_tags!inner(tag_id, tags(id, name, color))`,
+            { count: "exact" },
+          )
+          .eq("contact_tags.tag_id", tagFilter)
+          .order("created_at", { ascending: false })
+          .range(from, to);
+      } else {
+        q = supabase
+          .from("contacts")
+          .select(
+            `${baseCols}, contact_tags(tag_id, tags(id, name, color))`,
+            { count: "exact" },
+          )
+          .order("created_at", { ascending: false })
+          .range(from, to);
+      }
       const term = debounced.trim();
       if (term) q = q.or(`name.ilike.%${term}%,external_id.ilike.%${term}%`);
       const { data, count, error } = await q;
@@ -610,6 +636,13 @@ export function ContactsScreen() {
                 Importar
               </button>
               <button
+                onClick={() => setTagsManagerOpen(true)}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <TagIcon size={16} />
+                Gerenciar tags
+              </button>
+              <button
                 onClick={() => setAddOpen(true)}
                 className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
@@ -634,8 +667,8 @@ export function ContactsScreen() {
           </div>
 
           {/* Search */}
-          <div className="mb-3">
-            <div className="relative">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="relative flex-1">
               <Search
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -647,6 +680,7 @@ export function ContactsScreen() {
                 className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
+            <TagFilterSelect orgId={orgId} value={tagFilter} onChange={setTagFilter} />
           </div>
 
           {/* Table */}
@@ -705,7 +739,22 @@ export function ContactsScreen() {
                       <td className="px-4 py-3 text-gray-700">
                         {formatPhone(c.external_id)}
                       </td>
-                      <td className="px-4 py-3 text-gray-400">—</td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const ts = (c.contact_tags ?? [])
+                            .map((x) => x.tags)
+                            .filter((t): t is Tag => !!t);
+                          if (ts.length === 0)
+                            return <span className="text-gray-400">—</span>;
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {ts.map((t) => (
+                                <TagChip key={t.id} tag={t} size="xs" />
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3 text-gray-700">
                         {fmtDate(c.created_at)}
                       </td>
@@ -1097,6 +1146,14 @@ export function ContactsScreen() {
               </div>
 
               <div className="mt-6 border-t border-gray-200 pt-4">
+                <ContactTagsSection
+                  contactId={editing.id}
+                  orgId={orgId}
+                  onChange={reloadAll}
+                />
+              </div>
+
+              <div className="mt-6 border-t border-gray-200 pt-4">
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Observações
                 </h4>
@@ -1128,6 +1185,13 @@ export function ContactsScreen() {
           </aside>
         </div>
       )}
+
+      <TagsManagerDialog
+        open={tagsManagerOpen}
+        onOpenChange={setTagsManagerOpen}
+        orgId={orgId}
+        onChanged={reloadAll}
+      />
     </div>
   );
 }

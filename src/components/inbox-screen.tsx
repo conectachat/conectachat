@@ -3,7 +3,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages } from "@/hooks/use-messages";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { Logo } from "@/components/logo";
+import { ContactTagsSection } from "@/components/contact-tags";
 import { Paperclip, Mic, Square, X, Pencil, Copy } from "lucide-react";
 
 function initials(name: string | null) {
@@ -122,6 +124,8 @@ export function InboxScreen() {
   const { data: messages, isLoading: loadingMsgs } = useMessages(selectedId);
 
   const queryClient = useQueryClient();
+  const { activeMembership } = useCurrentUser();
+  const orgId = activeMembership?.org_id ?? null;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
@@ -650,6 +654,10 @@ export function InboxScreen() {
                 </div>
               </div>
             )}
+
+            <div className="mt-6 border-t border-gray-200 pt-4">
+              <ContactTagsSection contactId={contact.id} orgId={orgId} />
+            </div>
 
             <div className="mt-6 border-t border-gray-200 pt-4">
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">

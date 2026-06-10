@@ -6,7 +6,9 @@ import { useMessages } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
-import { Paperclip, Mic, Square, X, Pencil, Copy } from "lucide-react";
+import { Paperclip, Mic, Square, X, Pencil, Copy, Smile } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
 function initials(name: string | null) {
   if (!name) return "?";
@@ -246,6 +248,18 @@ export function InboxScreen() {
   const [savingContact, setSavingContact] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [openEmoji, setOpenEmoji] = useState(false);
+  const [pendingCursor, setPendingCursor] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (pendingCursor !== null && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(pendingCursor, pendingCursor);
+      setPendingCursor(null);
+    }
+  }, [pendingCursor]);
 
   const contact = selected?.contact ?? null;
 
@@ -498,7 +512,33 @@ export function InboxScreen() {
                     </button>
                   </div>
                 )}
+                <Popover open={openEmoji} onOpenChange={setOpenEmoji}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      <Smile size={18} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="top" align="end" className="w-auto p-0">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData: EmojiClickData) => {
+                        const textarea = textareaRef.current;
+                        if (!textarea) return;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const newValue = draft.slice(0, start) + emojiData.emoji + draft.slice(end);
+                        setDraft(newValue);
+                        setPendingCursor(start + emojiData.emoji.length);
+                        setOpenEmoji(false);
+                      }}
+                      lazyLoadEmojis={true}
+                    />
+                  </PopoverContent>
+                </Popover>
                 <textarea
+                  ref={textareaRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {

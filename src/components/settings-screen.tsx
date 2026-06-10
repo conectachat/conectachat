@@ -271,6 +271,100 @@ export function SettingsScreen() {
     invalidateTags();
   }
 
+  // Custom fields
+  const fieldsQuery = useQuery({
+    queryKey: ["custom-fields", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<CustomField[]> => {
+      const { data, error } = await supabase
+        .from("custom_fields")
+        .select("id, name, field_type, position")
+        .order("position")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as CustomField[];
+    },
+  });
+  const fieldsList = fieldsQuery.data ?? [];
+
+  function invalidateFields() {
+    qc.invalidateQueries({ queryKey: ["custom-fields"] });
+    qc.invalidateQueries({ queryKey: ["contacts-list"] });
+  }
+
+  function openNewField() {
+    setEditingField(null);
+    setFieldName("");
+    setFieldType("text");
+    setFieldError(null);
+    setFieldModalOpen(true);
+  }
+  function openEditField(f: CustomField) {
+    setEditingField(f);
+    setFieldName(f.name);
+    setFieldType(f.field_type);
+    setFieldError(null);
+    setFieldModalOpen(true);
+  }
+  async function saveField() {
+    setFieldError(null);
+    const n = fieldName.trim();
+    if (!n) return;
+    if (!orgId) {
+      setFieldError("Sem empresa vinculada.");
+      return;
+    }
+    setFieldBusy(true);
+    if (editingField) {
+      const { error } = await supabase
+        .from("custom_fields")
+        .update({ name: n, field_type: fieldType })
+        .eq("id", editingField.id);
+      setFieldBusy(false);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          setFieldError("Já existe um campo com esse nome.");
+        } else {
+          setFieldError("Não foi possível salvar o campo.");
+          console.error("Erro ao editar campo:", error);
+        }
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("custom_fields").insert({
+        org_id: orgId,
+        name: n,
+        field_type: fieldType,
+        position: fieldsList.length,
+      });
+      setFieldBusy(false);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          setFieldError("Já existe um campo com esse nome.");
+        } else {
+          setFieldError("Não foi possível criar o campo.");
+          console.error("Erro ao criar campo:", error);
+        }
+        return;
+      }
+    }
+    setFieldModalOpen(false);
+    setEditingField(null);
+    invalidateFields();
+  }
+  async function deleteField(f: CustomField) {
+    if (!confirm(`Excluir o campo "${f.name}"?`)) return;
+    const { error } = await supabase.from("custom_fields").delete().eq("id", f.id);
+    if (error) {
+      console.error("Erro ao excluir campo:", error);
+      alert("Não foi possível excluir o campo.");
+      return;
+    }
+    invalidateFields();
+  }
+
+
+
   return (
     <div className="h-full overflow-auto p-6">
       <div className="mx-auto max-w-4xl">

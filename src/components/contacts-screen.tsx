@@ -343,9 +343,10 @@ export function ContactsScreen() {
       sessionStorage.setItem("openConvId", conv.id);
     } catch {
       /* ignore */
+    }
+    navigate({ to: "/inbox" });
   }
 
-  // ---------- Exportar ----------
   const [exporting, setExporting] = useState(false);
   async function handleExport() {
     setExporting(true);

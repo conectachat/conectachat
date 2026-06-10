@@ -1171,6 +1171,25 @@ export function ContactsScreen() {
                     className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
                   />
                 </div>
+                {customFields.map((f) => (
+                  <div key={f.id}>
+                    <label className="text-xs font-medium text-gray-500">{f.name}</label>
+                    <input
+                      type={
+                        f.field_type === "number"
+                          ? "number"
+                          : f.field_type === "date"
+                          ? "date"
+                          : "text"
+                      }
+                      value={eCustom[f.id] ?? ""}
+                      onChange={(e) =>
+                        setECustom((prev) => ({ ...prev, [f.id]: e.target.value }))
+                      }
+                      className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                ))}
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     onClick={() => setEditing(null)}

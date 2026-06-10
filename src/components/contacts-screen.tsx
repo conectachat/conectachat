@@ -14,9 +14,17 @@ import {
   ChevronRight,
   Download,
   Upload,
+  Tag as TagIcon,
 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import {
+  TagsManagerDialog,
+  TagFilterSelect,
+  ContactTagsSection,
+  TagChip,
+  type Tag,
+} from "@/components/contact-tags";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";

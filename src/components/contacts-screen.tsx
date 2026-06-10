@@ -161,7 +161,7 @@ export function ContactsScreen() {
       const from = (page - 1) * PER_PAGE;
       const to = from + PER_PAGE - 1;
       const baseCols =
-        "id, org_id, external_id, name, name_locked, email, birth_date, notes, avatar_url, blocked, created_at, conversations(last_message_at)";
+        "id, org_id, external_id, name, name_locked, email, birth_date, notes, avatar_url, blocked, created_at, metadata, conversations(last_message_at)";
       let q;
       if (tagFilter) {
         q = supabase

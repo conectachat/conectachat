@@ -34,7 +34,9 @@ function Placeholder({ message }: { message: string }) {
 }
 
 export function SettingsScreen() {
-  const { user } = useCurrentUser();
+  const { user, activeMembership } = useCurrentUser();
+  const orgId = activeMembership?.org_id ?? null;
+  const qc = useQueryClient();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -46,6 +48,15 @@ export function SettingsScreen() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
+  // Tags state
+  const [tagSearch, setTagSearch] = useState("");
+  const [tagModalOpen, setTagModalOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<TagType | null>(null);
+  const [tagName, setTagName] = useState("");
+  const [tagColor, setTagColor] = useState(TAG_PALETTE[0]);
+  const [tagBusy, setTagBusy] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;

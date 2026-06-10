@@ -288,6 +288,7 @@ export function ContactsScreen() {
   const [eEmail, setEEmail] = useState("");
   const [eBirth, setEBirth] = useState("");
   const [eNotes, setENotes] = useState("");
+  const [eCustom, setECustom] = useState<Record<string, string>>({});
   const [savingEdit, setSavingEdit] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -297,17 +298,35 @@ export function ContactsScreen() {
     setEEmail(c.email ?? "");
     setEBirth(c.birth_date ?? "");
     setENotes(c.notes ?? "");
+    const cf = (c.metadata?.custom_fields ?? {}) as Record<string, unknown>;
+    const initial: Record<string, string> = {};
+    for (const k of Object.keys(cf)) initial[k] = cf[k] == null ? "" : String(cf[k]);
+    setECustom(initial);
   }
 
   async function saveEdit() {
     if (!editing) return;
     setSavingEdit(true);
     const nome = eName.trim();
+    const metaAtual = (editing.metadata ?? {}) as Record<string, any>;
+    const cf: Record<string, string | number> = {
+      ...((metaAtual.custom_fields ?? {}) as Record<string, string | number>),
+    };
+    for (const f of customFields) {
+      const v = (eCustom[f.id] ?? "").trim();
+      if (v) {
+        cf[f.id] = f.field_type === "number" ? Number(v) : v;
+      } else {
+        delete cf[f.id];
+      }
+    }
+    const novaMeta = { ...metaAtual, custom_fields: cf };
     const patch = {
       name: nome || null,
       name_locked: nome.length > 0,
       email: eEmail.trim() || null,
       birth_date: eBirth || null,
+      metadata: novaMeta,
     };
     const { error } = await supabase
       .from("contacts")
@@ -315,6 +334,7 @@ export function ContactsScreen() {
       .eq("id", editing.id);
     setSavingEdit(false);
     if (error) {
+      console.error("Erro ao salvar contato:", error);
       alert("Não foi possível salvar o contato.");
       return;
     }

@@ -512,7 +512,33 @@ export function InboxScreen() {
                     </button>
                   </div>
                 )}
+                <Popover open={openEmoji} onOpenChange={setOpenEmoji}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      <Smile size={18} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="top" align="end" className="w-auto p-0">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData: EmojiClickData) => {
+                        const textarea = textareaRef.current;
+                        if (!textarea) return;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const newValue = draft.slice(0, start) + emojiData.emoji + draft.slice(end);
+                        setDraft(newValue);
+                        setPendingCursor(start + emojiData.emoji.length);
+                        setOpenEmoji(false);
+                      }}
+                      lazyLoadEmojis={true}
+                    />
+                  </PopoverContent>
+                </Popover>
                 <textarea
+                  ref={textareaRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {

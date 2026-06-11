@@ -18,13 +18,7 @@ import {
 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import {
-  TagsManagerDialog,
-  TagFilterSelect,
-  ContactTagsSection,
-  TagChip,
-  type Tag,
-} from "@/components/contact-tags";
+import { TagsManagerDialog, TagFilterSelect, ContactTagsSection, TagChip, type Tag } from "@/components/contact-tags";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -34,13 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const PER_PAGE = 20;
 
@@ -85,9 +73,7 @@ function fmtDate(iso?: string | null) {
   return `${dd}/${mm}/${d.getFullYear()}`;
 }
 function lastMsgOf(c: ContactRow) {
-  const list = (c.conversations ?? [])
-    .map((x) => x.last_message_at)
-    .filter((v): v is string => !!v);
+  const list = (c.conversations ?? []).map((x) => x.last_message_at).filter((v): v is string => !!v);
   if (!list.length) return null;
   return list.sort().slice(-1)[0];
 }
@@ -118,14 +104,7 @@ function Avatar({
       active = false;
     };
   }, [path]);
-  if (url)
-    return (
-      <img
-        src={url}
-        alt=""
-        className={`${className} rounded-full object-cover`}
-      />
-    );
+  if (url) return <img src={url} alt="" className={`${className} rounded-full object-cover`} />;
   return (
     <div
       className={`${className} flex items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600`}
@@ -166,20 +145,16 @@ export function ContactsScreen() {
       if (tagFilter) {
         q = supabase
           .from("contacts")
-          .select(
-            `${baseCols}, contact_tags!inner(tag_id, tags(id, name, color))`,
-            { count: "exact" },
-          )
+          .select(`${baseCols}, contact_tags!inner(tag_id, tags(id, name, color))`, { count: "exact" })
           .eq("contact_tags.tag_id", tagFilter)
+          .eq("is_group", false)
           .order("created_at", { ascending: false })
           .range(from, to);
       } else {
         q = supabase
           .from("contacts")
-          .select(
-            `${baseCols}, contact_tags(tag_id, tags(id, name, color))`,
-            { count: "exact" },
-          )
+          .select(`${baseCols}, contact_tags(tag_id, tags(id, name, color))`, { count: "exact" })
+          .eq("is_group", false)
           .order("created_at", { ascending: false })
           .range(from, to);
       }
@@ -195,10 +170,11 @@ export function ContactsScreen() {
     queryKey: ["contacts-counts"],
     queryFn: async () => {
       const [{ count: total }, { count: blocked }] = await Promise.all([
-        supabase.from("contacts").select("id", { count: "exact", head: true }),
+        supabase.from("contacts").select("id", { count: "exact", head: true }).eq("is_group", false),
         supabase
           .from("contacts")
           .select("id", { count: "exact", head: true })
+          .eq("is_group", false)
           .eq("blocked", true),
       ]);
       const t = total ?? 0;
@@ -244,9 +220,7 @@ export function ContactsScreen() {
     setAddError(null);
     const telefone = addPhone.replace(/\D/g, "");
     if (telefone.length < 10) {
-      setAddError(
-        "Número inválido. Use o código do país (ex.: 5547999998888).",
-      );
+      setAddError("Número inválido. Use o código do país (ex.: 5547999998888).");
       return;
     }
     if (!orgId) {
@@ -328,10 +302,7 @@ export function ContactsScreen() {
       birth_date: eBirth || null,
       metadata: novaMeta,
     };
-    const { error } = await supabase
-      .from("contacts")
-      .update(patch)
-      .eq("id", editing.id);
+    const { error } = await supabase.from("contacts").update(patch).eq("id", editing.id);
     setSavingEdit(false);
     if (error) {
       console.error("Erro ao salvar contato:", error);
@@ -345,10 +316,7 @@ export function ContactsScreen() {
   async function saveNotes() {
     if (!editing) return;
     setSavingNotes(true);
-    const { error } = await supabase
-      .from("contacts")
-      .update({ notes: eNotes })
-      .eq("id", editing.id);
+    const { error } = await supabase.from("contacts").update({ notes: eNotes }).eq("id", editing.id);
     setSavingNotes(false);
     if (error) {
       alert("Não foi possível salvar as observações.");
@@ -358,10 +326,7 @@ export function ContactsScreen() {
   }
 
   async function toggleBlock(c: ContactRow) {
-    const { error } = await supabase
-      .from("contacts")
-      .update({ blocked: !c.blocked })
-      .eq("id", c.id);
+    const { error } = await supabase.from("contacts").update({ blocked: !c.blocked }).eq("id", c.id);
     if (error) {
       alert("Não foi possível atualizar.");
       return;
@@ -436,6 +401,7 @@ export function ContactsScreen() {
         const { data, error } = await supabase
           .from("contacts")
           .select("name, external_id, email, birth_date, blocked, created_at")
+          .eq("is_group", false)
           .order("created_at", { ascending: false })
           .range(de, de + lote - 1);
         if (error) throw error;
@@ -456,9 +422,7 @@ export function ContactsScreen() {
           c.created_at ?? "",
         ]),
       ];
-      const csv = linhas
-        .map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
-        .join("\n");
+      const csv = linhas.map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
       const blob = new Blob(["\ufeff" + csv], {
         type: "text/csv;charset=utf-8;",
       });
@@ -507,8 +471,7 @@ export function ContactsScreen() {
   }
 
   function downloadTemplate() {
-    const csv =
-      "nome,telefone,email\nJoão Exemplo,5547999998888,joao@exemplo.com\n";
+    const csv = "nome,telefone,email\nJoão Exemplo,5547999998888,joao@exemplo.com\n";
     const blob = new Blob(["\ufeff" + csv], {
       type: "text/csv;charset=utf-8;",
     });
@@ -624,8 +587,7 @@ export function ContactsScreen() {
     setImportError(null);
     try {
       const all = [...previewValid, ...previewSuspect];
-      const filtered =
-        dupMode === "replace" ? all : all.filter((l) => !previewExisting.has(l.telefone));
+      const filtered = dupMode === "replace" ? all : all.filter((l) => !previewExisting.has(l.telefone));
       const registros = filtered.map((l) => ({
         org_id: orgId,
         channel_type: "whatsapp_baileys" as const,
@@ -635,11 +597,9 @@ export function ContactsScreen() {
         email: (l.email || "").trim() || null,
       }));
       for (let i = 0; i < registros.length; i += 500) {
-        const { error } = await supabase
-          .from("contacts")
-          .upsert(registros.slice(i, i + 500), {
-            onConflict: "org_id,channel_type,external_id",
-          });
+        const { error } = await supabase.from("contacts").upsert(registros.slice(i, i + 500), {
+          onConflict: "org_id,channel_type,external_id",
+        });
         if (error) throw error;
       }
       setImportResult(`${registros.length} contatos importados.`);
@@ -651,7 +611,6 @@ export function ContactsScreen() {
     }
   }
 
-
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50">
       <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -659,9 +618,7 @@ export function ContactsScreen() {
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Contatos</h1>
-              <p className="text-sm text-gray-500">
-                Gerencie sua base de contatos.
-              </p>
+              <p className="text-sm text-gray-500">Gerencie sua base de contatos.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -698,25 +655,15 @@ export function ContactsScreen() {
 
           {/* Cards */}
           <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatCard
-              label="Total de contatos"
-              value={countsQuery.data?.total}
-            />
+            <StatCard label="Total de contatos" value={countsQuery.data?.total} />
             <StatCard label="Ativos" value={countsQuery.data?.active} tone="green" />
-            <StatCard
-              label="Bloqueados"
-              value={countsQuery.data?.blocked}
-              tone="red"
-            />
+            <StatCard label="Bloqueados" value={countsQuery.data?.blocked} tone="red" />
           </div>
 
           {/* Search */}
           <div className="mb-3 flex items-center gap-2">
             <div className="relative flex-1">
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -744,20 +691,14 @@ export function ContactsScreen() {
               <tbody className="divide-y divide-gray-100">
                 {listQuery.isLoading && (
                   <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-10 text-center text-sm text-gray-500"
-                    >
+                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">
                       Carregando…
                     </td>
                   </tr>
                 )}
                 {!listQuery.isLoading && rows.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-10 text-center text-sm text-gray-500"
-                    >
+                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">
                       Nenhum contato encontrado.
                     </td>
                   </tr>
@@ -770,26 +711,15 @@ export function ContactsScreen() {
                     <tr key={c.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <Avatar
-                            path={c.avatar_url}
-                            initials={ini}
-                            className="h-9 w-9"
-                          />
-                          <span className="font-medium text-gray-900">
-                            {name}
-                          </span>
+                          <Avatar path={c.avatar_url} initials={ini} className="h-9 w-9" />
+                          <span className="font-medium text-gray-900">{name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {formatPhone(c.external_id)}
-                      </td>
+                      <td className="px-4 py-3 text-gray-700">{formatPhone(c.external_id)}</td>
                       <td className="px-4 py-3">
                         {(() => {
-                          const ts = (c.contact_tags ?? [])
-                            .map((x) => x.tags)
-                            .filter((t): t is Tag => !!t);
-                          if (ts.length === 0)
-                            return <span className="text-gray-400">—</span>;
+                          const ts = (c.contact_tags ?? []).map((x) => x.tags).filter((t): t is Tag => !!t);
+                          if (ts.length === 0) return <span className="text-gray-400">—</span>;
                           return (
                             <div className="flex flex-wrap gap-1">
                               {ts.map((t) => (
@@ -799,12 +729,8 @@ export function ContactsScreen() {
                           );
                         })()}
                       </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {fmtDate(c.created_at)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {fmtDate(lm)}
-                      </td>
+                      <td className="px-4 py-3 text-gray-700">{fmtDate(c.created_at)}</td>
+                      <td className="px-4 py-3 text-gray-700">{fmtDate(lm)}</td>
                       <td className="px-4 py-3">
                         {c.blocked ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
@@ -910,9 +836,7 @@ export function ContactsScreen() {
                 placeholder="55 47 99999 8888"
                 className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
               />
-              <p className="mt-1 text-[11px] text-gray-500">
-                Inclua o código do país (ex.: 5547999998888).
-              </p>
+              <p className="mt-1 text-[11px] text-gray-500">Inclua o código do país (ex.: 5547999998888).</p>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">E-mail</label>
@@ -923,9 +847,7 @@ export function ContactsScreen() {
                 className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
               />
             </div>
-            {addError && (
-              <p className="text-xs text-red-600">{addError}</p>
-            )}
+            {addError && <p className="text-xs text-red-600">{addError}</p>}
           </div>
           <DialogFooter>
             <button
@@ -960,39 +882,26 @@ export function ContactsScreen() {
           </DialogHeader>
           <div className="space-y-4 text-sm">
             <div className="flex items-center justify-between rounded border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
-              <span className="text-xs text-gray-600">
-                Use o modelo para evitar erros de cabeçalho.
-              </span>
-              <button
-                onClick={downloadTemplate}
-                className="text-xs font-medium text-primary hover:underline"
-              >
+              <span className="text-xs text-gray-600">Use o modelo para evitar erros de cabeçalho.</span>
+              <button onClick={downloadTemplate} className="text-xs font-medium text-primary hover:underline">
                 Baixar modelo
               </button>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-600">
-                Completar com país
-              </label>
+              <label className="text-xs font-medium text-gray-600">Completar com país</label>
               <select
                 value={importCountry}
-                onChange={(e) =>
-                  reprocessWithCountry(e.target.value as "NONE" | "BR")
-                }
+                onChange={(e) => reprocessWithCountry(e.target.value as "NONE" | "BR")}
                 className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
               >
-                <option value="NONE">
-                  Nenhum — os números já têm o código do país
-                </option>
+                <option value="NONE">Nenhum — os números já têm o código do país</option>
                 <option value="BR">Brasil (+55)</option>
               </select>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-600">
-                Arquivo (.csv, .xlsx, .xls)
-              </label>
+              <label className="text-xs font-medium text-gray-600">Arquivo (.csv, .xlsx, .xls)</label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1003,39 +912,24 @@ export function ContactsScreen() {
                 }}
                 className="mt-1 w-full text-xs"
               />
-              {importFileName && (
-                <p className="mt-1 text-[11px] text-gray-500">
-                  Arquivo: {importFileName}
-                </p>
-              )}
+              {importFileName && <p className="mt-1 text-[11px] text-gray-500">Arquivo: {importFileName}</p>}
             </div>
 
-            {importBusy && (
-              <p className="text-xs text-gray-500">Processando…</p>
-            )}
+            {importBusy && <p className="text-xs text-gray-500">Processando…</p>}
 
-            {(previewValid.length > 0 ||
-              previewSuspect.length > 0 ||
-              previewInvalid.length > 0) && (
+            {(previewValid.length > 0 || previewSuspect.length > 0 || previewInvalid.length > 0) && (
               <div className="space-y-3 rounded border border-gray-200 bg-gray-50 p-3">
                 <p className="text-xs text-gray-700">
                   <strong>{importStats.novos}</strong> serão adicionados (novos),{" "}
-                  <strong>{importStats.jaExistem}</strong> já existem,{" "}
-                  <strong>{importStats.invalidos}</strong> com número inválido/suspeito.
+                  <strong>{importStats.jaExistem}</strong> já existem, <strong>{importStats.invalidos}</strong> com
+                  número inválido/suspeito.
                 </p>
 
                 {importStats.jaExistem > 0 && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-gray-700">
-                      Como tratar os números já existentes?
-                    </p>
+                    <p className="text-xs font-medium text-gray-700">Como tratar os números já existentes?</p>
                     <label className="flex items-center gap-2 text-xs text-gray-700">
-                      <input
-                        type="radio"
-                        name="dup"
-                        checked={dupMode === "keep"}
-                        onChange={() => setDupMode("keep")}
-                      />
+                      <input type="radio" name="dup" checked={dupMode === "keep"} onChange={() => setDupMode("keep")} />
                       Manter os dados atuais
                     </label>
                     <label className="flex items-center gap-2 text-xs text-gray-700">
@@ -1052,9 +946,7 @@ export function ContactsScreen() {
 
                 {(previewSuspect.length > 0 || previewInvalid.length > 0) && (
                   <details className="text-xs">
-                    <summary className="cursor-pointer text-gray-600">
-                      Ver números suspeitos/inválidos
-                    </summary>
+                    <summary className="cursor-pointer text-gray-600">Ver números suspeitos/inválidos</summary>
                     <div className="mt-2 max-h-40 overflow-auto rounded border border-gray-200 bg-white p-2">
                       {previewSuspect.map((r, i) => (
                         <div key={`s-${i}`} className="text-amber-700">
@@ -1072,12 +964,8 @@ export function ContactsScreen() {
               </div>
             )}
 
-            {importError && (
-              <p className="text-xs text-red-600">{importError}</p>
-            )}
-            {importResult && (
-              <p className="text-xs text-green-700">{importResult}</p>
-            )}
+            {importError && <p className="text-xs text-red-600">{importError}</p>}
+            {importResult && <p className="text-xs text-green-700">{importResult}</p>}
           </div>
           <DialogFooter>
             <button
@@ -1092,11 +980,7 @@ export function ContactsScreen() {
             </button>
             <button
               onClick={confirmImport}
-              disabled={
-                importBusy ||
-                !!importResult ||
-                previewValid.length + previewSuspect.length === 0
-              }
+              disabled={importBusy || !!importResult || previewValid.length + previewSuspect.length === 0}
               className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {importBusy ? "Importando…" : "Confirmar importação"}
@@ -1105,21 +989,13 @@ export function ContactsScreen() {
         </DialogContent>
       </Dialog>
 
-
-
       {/* Edit drawer */}
       {editing && (
         <div className="fixed inset-0 z-50 flex">
-          <button
-            className="flex-1 bg-black/30"
-            onClick={() => setEditing(null)}
-            aria-label="Fechar"
-          />
+          <button className="flex-1 bg-black/30" onClick={() => setEditing(null)} aria-label="Fechar" />
           <aside className="flex w-[380px] flex-col overflow-hidden border-l border-gray-200 bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-900">
-                Dados do contato
-              </h3>
+              <h3 className="text-sm font-semibold text-gray-900">Dados do contato</h3>
               <button
                 onClick={() => setEditing(null)}
                 className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
@@ -1175,17 +1051,9 @@ export function ContactsScreen() {
                   <div key={f.id}>
                     <label className="text-xs font-medium text-gray-500">{f.name}</label>
                     <input
-                      type={
-                        f.field_type === "number"
-                          ? "number"
-                          : f.field_type === "date"
-                          ? "date"
-                          : "text"
-                      }
+                      type={f.field_type === "number" ? "number" : f.field_type === "date" ? "date" : "text"}
                       value={eCustom[f.id] ?? ""}
-                      onChange={(e) =>
-                        setECustom((prev) => ({ ...prev, [f.id]: e.target.value }))
-                      }
+                      onChange={(e) => setECustom((prev) => ({ ...prev, [f.id]: e.target.value }))}
                       className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
                     />
                   </div>
@@ -1209,17 +1077,11 @@ export function ContactsScreen() {
               </div>
 
               <div className="mt-6 border-t border-gray-200 pt-4">
-                <ContactTagsSection
-                  contactId={editing.id}
-                  orgId={orgId}
-                  onChange={reloadAll}
-                />
+                <ContactTagsSection contactId={editing.id} orgId={orgId} onChange={reloadAll} />
               </div>
 
               <div className="mt-6 border-t border-gray-200 pt-4">
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Observações
-                </h4>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Observações</h4>
                 <textarea
                   value={eNotes}
                   onChange={(e) => setENotes(e.target.value)}
@@ -1249,37 +1111,17 @@ export function ContactsScreen() {
         </div>
       )}
 
-      <TagsManagerDialog
-        open={tagsManagerOpen}
-        onOpenChange={setTagsManagerOpen}
-        orgId={orgId}
-        onChanged={reloadAll}
-      />
+      <TagsManagerDialog open={tagsManagerOpen} onOpenChange={setTagsManagerOpen} orgId={orgId} onChanged={reloadAll} />
     </div>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | undefined;
-  tone?: "green" | "red";
-}) {
-  const color =
-    tone === "green"
-      ? "text-green-600"
-      : tone === "red"
-      ? "text-red-600"
-      : "text-gray-900";
+function StatCard({ label, value, tone }: { label: string; value: number | undefined; tone?: "green" | "red" }) {
+  const color = tone === "green" ? "text-green-600" : tone === "red" ? "text-red-600" : "text-gray-900";
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
       <p className="text-xs font-medium text-gray-500">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${color}`}>
-        {value ?? "—"}
-      </p>
+      <p className={`mt-1 text-2xl font-semibold ${color}`}>{value ?? "—"}</p>
     </div>
   );
 }

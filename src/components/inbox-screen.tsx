@@ -613,6 +613,11 @@ export function InboxScreen() {
                       <div
                         className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                       >
+                        {!out && selected.contact?.is_group && m.sender_name && (
+                          <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">
+                            {m.sender_name}
+                          </p>
+                        )}
                         {m.media_url && ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
                           <>
                             <MessageMedia

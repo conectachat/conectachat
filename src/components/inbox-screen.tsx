@@ -185,7 +185,7 @@ export function InboxScreen() {
   useEffect(() => {
     const channel = supabase
       .channel("inbox-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
         const convId = (payload.new as { conversation_id?: string })?.conversation_id;
         queryClient.invalidateQueries({ queryKey: ["conversations"] });
         if (convId) queryClient.invalidateQueries({ queryKey: ["messages", convId] });
@@ -608,6 +608,13 @@ export function InboxScreen() {
               {!loadingMsgs &&
                 (messages ?? []).map((m) => {
                   const out = m.direction === "outbound";
+                  const reactionCounts = m.reactions
+                    ? Object.values(m.reactions).reduce<Record<string, number>>((acc, e) => {
+                        if (e) acc[e] = (acc[e] || 0) + 1;
+                        return acc;
+                      }, {})
+                    : {};
+                  const reactionList = Object.entries(reactionCounts);
                   return (
                     <div key={m.id} className={`mb-2 flex ${out ? "justify-end" : "justify-start"}`}>
                       <div
@@ -634,6 +641,19 @@ export function InboxScreen() {
                         <p className={`mt-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}>
                           {hhmm(m.created_at)}
                         </p>
+                        {reactionList.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {reactionList.map(([emoji, count]) => (
+                              <span
+                                key={emoji}
+                                className="inline-flex items-center gap-0.5 rounded-full border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-800 shadow-sm"
+                              >
+                                <span>{emoji}</span>
+                                {count > 1 && <span className="text-[10px] text-gray-500">{count}</span>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

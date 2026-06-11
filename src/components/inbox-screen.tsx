@@ -530,6 +530,11 @@ export function InboxScreen() {
                         >
                           {statusLabel[c.status] ?? c.status}
                         </span>
+                        {c.contact?.is_group && (
+                          <span className="rounded bg-brand-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-blue">
+                            Grupo
+                          </span>
+                        )}
                         <span className="truncate text-[11px] text-gray-500">{c.channel?.name ?? ""}</span>
                       </div>
                       {unread && (
@@ -570,7 +575,14 @@ export function InboxScreen() {
                   >
                     {displayName(selected.contact)}
                   </button>
-                  <p className="truncate text-xs text-gray-500">{selected.channel?.name ?? ""}</p>
+                  <p className="truncate text-xs text-gray-500">
+                    {selected.contact?.is_group && (
+                      <span className="mr-1.5 rounded bg-brand-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-blue">
+                        Grupo
+                      </span>
+                    )}
+                    {selected.channel?.name ?? ""}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

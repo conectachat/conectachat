@@ -420,6 +420,7 @@ export type Database = {
           reply_to_preview: string | null;
           deleted_at: string | null;
           pinned_at: string | null;
+          starred_at: string | null;
           sender_external_id: string | null;
           sender_name: string | null;
           sender_user_id: string | null;
@@ -442,6 +443,7 @@ export type Database = {
           reply_to_preview?: string | null;
           deleted_at?: string | null;
           pinned_at?: string | null;
+          starred_at?: string | null;
           sender_external_id?: string | null;
           sender_name?: string | null;
           sender_user_id?: string | null;
@@ -464,6 +466,7 @@ export type Database = {
           reply_to_preview?: string | null;
           deleted_at?: string | null;
           pinned_at?: string | null;
+          starred_at?: string | null;
           sender_external_id?: string | null;
           sender_name?: string | null;
           sender_user_id?: string | null;

@@ -7,7 +7,20 @@ import { useMessages } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
-import { Paperclip, Mic, Square, X, Pencil, Copy, Smile, Eye, CalendarClock, ChevronDown, Plus } from "lucide-react";
+import {
+  Paperclip,
+  Mic,
+  Square,
+  X,
+  Pencil,
+  Copy,
+  Smile,
+  Eye,
+  CalendarClock,
+  ChevronDown,
+  Plus,
+  Reply,
+} from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
@@ -161,14 +174,18 @@ function MessageActions({
   mine,
   canReact,
   canCopy,
+  canReply,
   onReact,
   onCopy,
+  onReply,
 }: {
   mine: string | null;
   canReact: boolean;
   canCopy: boolean;
+  canReply: boolean;
   onReact: (emoji: string) => void;
   onCopy: () => void;
+  onReply: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(false);
@@ -229,6 +246,17 @@ function MessageActions({
               </button>
             </div>
             <div className="mt-1 border-t border-gray-100 pt-1">
+              <button
+                type="button"
+                disabled={!canReply}
+                onClick={() => {
+                  onReply();
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+              >
+                <Reply size={14} /> Responder
+              </button>
               <button
                 type="button"
                 disabled={!canCopy}
@@ -312,6 +340,7 @@ export function InboxScreen() {
   }, [selectedId, queryClient]);
 
   const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState<{ id: string; preview: string; sender: string } | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -321,7 +350,11 @@ export function InboxScreen() {
     setError(null);
     const text = draft.trim();
     const { data, error: invokeErr } = await supabase.functions.invoke("send-message", {
-      body: { conversationId: selectedId, text },
+      body: {
+        conversationId: selectedId,
+        text,
+        replyTo: replyTo ? { externalId: replyTo.id, preview: replyTo.preview } : undefined,
+      },
     });
     setSending(false);
     if (invokeErr || (data as any)?.error) {
@@ -329,6 +362,7 @@ export function InboxScreen() {
       return;
     }
     setDraft("");
+    setReplyTo(null);
     queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
@@ -359,9 +393,11 @@ export function InboxScreen() {
           mimetype: file.type || "application/octet-stream",
           fileName: file.name,
           caption: "",
+          replyTo: replyTo ? { externalId: replyTo.id, preview: replyTo.preview } : undefined,
         },
       });
       if (error) alert("Não foi possível enviar o arquivo.");
+      else setReplyTo(null);
     } finally {
       setSendingMedia(false);
     }
@@ -395,9 +431,14 @@ export function InboxScreen() {
             reader.readAsDataURL(blob);
           });
           const { error } = await supabase.functions.invoke("send-audio", {
-            body: { conversationId: selectedId, base64 },
+            body: {
+              conversationId: selectedId,
+              base64,
+              replyTo: replyTo ? { externalId: replyTo.id, preview: replyTo.preview } : undefined,
+            },
           });
           if (error) alert("Não foi possível enviar o áudio.");
+          else setReplyTo(null);
         } finally {
           setSendingAudio(false);
         }
@@ -761,8 +802,17 @@ export function InboxScreen() {
                           mine={m.reactions?.["me"] ?? null}
                           canReact={!!m.external_message_id}
                           canCopy={!!m.content}
+                          canReply={!!m.external_message_id}
                           onReact={(e) => reactToMessage(m.id, e)}
                           onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
+                          onReply={() =>
+                            setReplyTo({
+                              id: m.external_message_id!,
+                              preview:
+                                m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
+                              sender: out ? "Você" : m.sender_name || displayName(selected.contact),
+                            })
+                          }
                         />
                       )}
                       <div
@@ -818,8 +868,17 @@ export function InboxScreen() {
                           mine={m.reactions?.["me"] ?? null}
                           canReact={!!m.external_message_id}
                           canCopy={!!m.content}
+                          canReply={!!m.external_message_id}
                           onReact={(e) => reactToMessage(m.id, e)}
                           onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
+                          onReply={() =>
+                            setReplyTo({
+                              id: m.external_message_id!,
+                              preview:
+                                m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
+                              sender: out ? "Você" : m.sender_name || displayName(selected.contact),
+                            })
+                          }
                         />
                       )}
                     </div>
@@ -828,6 +887,22 @@ export function InboxScreen() {
             </div>
 
             <div className="relative border-t border-gray-200 bg-white px-4 py-3">
+              {replyTo && (
+                <div className="mb-2 flex items-start gap-2 rounded-md border-l-2 border-brand-blue/60 bg-gray-50 px-2 py-1.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold text-brand-blue">Respondendo {replyTo.sender}</p>
+                    <p className="truncate text-xs text-gray-600">{replyTo.preview}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyTo(null)}
+                    className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                    title="Cancelar resposta"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               {qrMenuVisible && (
                 <div className="absolute bottom-full left-4 right-4 mb-2 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-20">
                   {filteredQr.map((q, i) => (

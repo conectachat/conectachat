@@ -7,7 +7,7 @@ import { useMessages } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
-import { Paperclip, Mic, Square, X, Pencil, Copy, Smile, Eye, CalendarClock } from "lucide-react";
+import { Paperclip, Mic, Square, X, Pencil, Copy, Smile, Eye, CalendarClock, ChevronDown, Plus } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
@@ -151,6 +151,101 @@ function MessageMedia({
       </a>
     );
   })();
+}
+
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+// Menu do balão (estilo WhatsApp): setinha que abre a barra de emojis + Copiar.
+// (Responder / Apagar / Encaminhar entram nos próximos passos do Bloco F.)
+function MessageActions({
+  mine,
+  canReact,
+  canCopy,
+  onReact,
+  onCopy,
+}: {
+  mine: string | null;
+  canReact: boolean;
+  canCopy: boolean;
+  onReact: (emoji: string) => void;
+  onCopy: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [full, setFull] = useState(false);
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setFull(false);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title="Mais"
+          className="shrink-0 rounded-full p-1 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100 data-[state=open]:opacity-100"
+        >
+          <ChevronDown size={16} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="center" className="w-auto p-2">
+        {full ? (
+          <EmojiPicker
+            onEmojiClick={(d: EmojiClickData) => {
+              onReact(d.emoji);
+              setOpen(false);
+            }}
+            height={350}
+            width={300}
+            lazyLoadEmojis
+            previewConfig={{ showPreview: false }}
+          />
+        ) : (
+          <>
+            <div className="flex items-center gap-1">
+              {QUICK_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  disabled={!canReact}
+                  onClick={() => {
+                    onReact(mine === e ? "" : e);
+                    setOpen(false);
+                  }}
+                  className={`rounded-full p-1 text-lg transition-colors hover:bg-gray-100 disabled:opacity-30 ${mine === e ? "bg-gray-100" : ""}`}
+                >
+                  {e}
+                </button>
+              ))}
+              <button
+                type="button"
+                disabled={!canReact}
+                onClick={() => setFull(true)}
+                title="Mais emojis"
+                className="rounded-full p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            <div className="mt-1 border-t border-gray-100 pt-1">
+              <button
+                type="button"
+                disabled={!canCopy}
+                onClick={() => {
+                  onCopy();
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+              >
+                <Copy size={14} /> Copiar
+              </button>
+            </div>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function InboxScreen() {
@@ -467,6 +562,14 @@ export function InboxScreen() {
     navigate({ to: "/schedules" });
   }
 
+  async function reactToMessage(messageId: string, emoji: string) {
+    try {
+      await supabase.functions.invoke("send-reaction", { body: { messageId, emoji } });
+    } catch (e) {
+      console.error("Erro ao reagir:", e);
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
@@ -635,7 +738,19 @@ export function InboxScreen() {
                     : {};
                   const reactionList = Object.entries(reactionCounts);
                   return (
-                    <div key={m.id} className={`mb-2 flex ${out ? "justify-end" : "justify-start"}`}>
+                    <div
+                      key={m.id}
+                      className={`group mb-2 flex items-center gap-1 ${out ? "justify-end" : "justify-start"}`}
+                    >
+                      {out && (
+                        <MessageActions
+                          mine={m.reactions?.["me"] ?? null}
+                          canReact={!!m.external_message_id}
+                          canCopy={!!m.content}
+                          onReact={(e) => reactToMessage(m.id, e)}
+                          onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
+                        />
+                      )}
                       <div
                         className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                       >
@@ -672,6 +787,15 @@ export function InboxScreen() {
                           </div>
                         )}
                       </div>
+                      {!out && (
+                        <MessageActions
+                          mine={m.reactions?.["me"] ?? null}
+                          canReact={!!m.external_message_id}
+                          canCopy={!!m.content}
+                          onReact={(e) => reactToMessage(m.id, e)}
+                          onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
+                        />
+                      )}
                     </div>
                   );
                 })}

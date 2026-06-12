@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug } from "lucide-react";
+import { Inbox, LogOut, Contact, Settings, CalendarClock } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 import {
@@ -25,7 +25,6 @@ const items = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },
-  { title: "Conexões", url: "/connections", icon: Plug },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
@@ -72,7 +71,6 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Atendimento</SidebarGroupLabel>
@@ -98,9 +96,7 @@ export function AppSidebar() {
           <div className="flex items-center gap-2 px-2 py-2">
             <Avatar className="h-8 w-8">
               <AvatarImage src={profile?.avatar_url ?? undefined} alt={displayName} />
-              <AvatarFallback className="text-xs">
-                {initials(profile?.full_name, user.email)}
-              </AvatarFallback>
+              <AvatarFallback className="text-xs">{initials(profile?.full_name, user.email)}</AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-foreground">{displayName}</p>

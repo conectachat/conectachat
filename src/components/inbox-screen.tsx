@@ -737,6 +737,20 @@ export function InboxScreen() {
                       }, {})
                     : {};
                   const reactionList = Object.entries(reactionCounts);
+                  // F.2a: se esta mensagem responde a outra, monta a prévia citada.
+                  const quotedMsg = m.reply_to_external_id
+                    ? (messages ?? []).find((x) => x.external_message_id === m.reply_to_external_id)
+                    : undefined;
+                  const quotedSender = quotedMsg
+                    ? quotedMsg.direction === "outbound"
+                      ? "Você"
+                      : quotedMsg.sender_name || displayName(selected.contact)
+                    : "";
+                  const quotedText = quotedMsg
+                    ? quotedMsg.content && quotedMsg.content.trim()
+                      ? quotedMsg.content
+                      : contentLabel(quotedMsg.content_type, quotedMsg.content)
+                    : m.reply_to_preview || "Mensagem";
                   return (
                     <div
                       key={m.id}
@@ -754,6 +768,18 @@ export function InboxScreen() {
                       <div
                         className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                       >
+                        {m.reply_to_external_id && (
+                          <div
+                            className={`mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] ${out ? "border-white/60 bg-white/15" : "border-brand-blue/50 bg-gray-50"}`}
+                          >
+                            {quotedSender && (
+                              <p className={`font-semibold ${out ? "text-white/90" : "text-brand-blue"}`}>
+                                {quotedSender}
+                              </p>
+                            )}
+                            <p className="truncate opacity-80">{quotedText}</p>
+                          </div>
+                        )}
                         {!out && selected.contact?.is_group && m.sender_name && (
                           <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">{m.sender_name}</p>
                         )}

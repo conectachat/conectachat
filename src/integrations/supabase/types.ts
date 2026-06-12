@@ -691,6 +691,99 @@ export type Database = {
           },
         ];
       };
+      scheduled_messages: {
+        Row: {
+          channel_id: string;
+          contact_id: string;
+          content: string | null;
+          conversation_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          error: string | null;
+          id: string;
+          media_mime: string | null;
+          media_name: string | null;
+          media_path: string | null;
+          media_type: string | null;
+          org_id: string;
+          scheduled_at: string;
+          sent_at: string | null;
+          status: string;
+        };
+        Insert: {
+          channel_id: string;
+          contact_id: string;
+          content?: string | null;
+          conversation_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          error?: string | null;
+          id?: string;
+          media_mime?: string | null;
+          media_name?: string | null;
+          media_path?: string | null;
+          media_type?: string | null;
+          org_id: string;
+          scheduled_at: string;
+          sent_at?: string | null;
+          status?: string;
+        };
+        Update: {
+          channel_id?: string;
+          contact_id?: string;
+          content?: string | null;
+          conversation_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          error?: string | null;
+          id?: string;
+          media_mime?: string | null;
+          media_name?: string | null;
+          media_path?: string | null;
+          media_type?: string | null;
+          org_id?: string;
+          scheduled_at?: string;
+          sent_at?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_messages_channel_id_fkey";
+            columns: ["channel_id"];
+            isOneToOne: false;
+            referencedRelation: "channels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "scheduled_messages_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "scheduled_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "scheduled_messages_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "scheduled_messages_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       subscriptions: {
         Row: {
           created_at: string;

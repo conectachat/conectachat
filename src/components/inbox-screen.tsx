@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
-import { Paperclip, Mic, Square, X, Pencil, Copy, Smile, Eye } from "lucide-react";
+import { Paperclip, Mic, Square, X, Pencil, Copy, Smile, Eye, CalendarClock } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
@@ -174,6 +175,7 @@ export function InboxScreen() {
   const { data: messages, isLoading: loadingMsgs } = useMessages(selectedId);
 
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id ?? null;
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -448,6 +450,23 @@ export function InboxScreen() {
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
+  function scheduleForContact() {
+    if (!contact) return;
+    try {
+      sessionStorage.setItem(
+        "scheduleForContact",
+        JSON.stringify({
+          id: contact.id,
+          name: contact.name ?? null,
+          external_id: contact.external_id,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+    navigate({ to: "/schedules" });
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
@@ -621,9 +640,7 @@ export function InboxScreen() {
                         className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                       >
                         {!out && selected.contact?.is_group && m.sender_name && (
-                          <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">
-                            {m.sender_name}
-                          </p>
+                          <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">{m.sender_name}</p>
                         )}
                         {m.media_url && ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
                           <>
@@ -841,6 +858,16 @@ export function InboxScreen() {
               />
               {!editingContact && <p className="text-base font-semibold text-gray-900">{displayName(contact)}</p>}
             </div>
+
+            {!editingContact && (
+              <button
+                onClick={scheduleForContact}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <CalendarClock size={16} />
+                Agendar mensagem
+              </button>
+            )}
 
             {!editingContact ? (
               <dl className="mt-5 space-y-3 text-sm">

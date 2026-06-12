@@ -422,6 +422,8 @@ export type Database = {
           media_url: string | null
           org_id: string
           reactions: Json
+          reply_to_external_id: string | null
+          reply_to_preview: string | null
           sender_external_id: string | null
           sender_name: string | null
           sender_user_id: string | null
@@ -440,6 +442,8 @@ export type Database = {
           media_url?: string | null
           org_id: string
           reactions?: Json
+          reply_to_external_id?: string | null
+          reply_to_preview?: string | null
           sender_external_id?: string | null
           sender_name?: string | null
           sender_user_id?: string | null
@@ -458,6 +462,8 @@ export type Database = {
           media_url?: string | null
           org_id?: string
           reactions?: Json
+          reply_to_external_id?: string | null
+          reply_to_preview?: string | null
           sender_external_id?: string | null
           sender_name?: string | null
           sender_user_id?: string | null

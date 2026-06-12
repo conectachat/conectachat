@@ -21,6 +21,7 @@ import {
   Plus,
   Reply,
   Trash2,
+  Forward,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -176,20 +177,24 @@ function MessageActions({
   canReact,
   canCopy,
   canReply,
+  canForward,
   canDelete,
   onReact,
   onCopy,
   onReply,
+  onForward,
   onDelete,
 }: {
   mine: string | null;
   canReact: boolean;
   canCopy: boolean;
   canReply: boolean;
+  canForward: boolean;
   canDelete: boolean;
   onReact: (emoji: string) => void;
   onCopy: () => void;
   onReply: () => void;
+  onForward: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -273,6 +278,18 @@ function MessageActions({
               >
                 <Copy size={14} /> Copiar
               </button>
+              {canForward && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onForward();
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <Forward size={14} /> Encaminhar
+                </button>
+              )}
               {canDelete && (
                 <button
                   type="button"
@@ -640,6 +657,123 @@ export function InboxScreen() {
     if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
   }
 
+  // ----- Encaminhar (F.4a) -----
+  const [forwardMsg, setForwardMsg] = useState<Message | null>(null);
+  const [fwdSearch, setFwdSearch] = useState("");
+  const [fwdResults, setFwdResults] = useState<{ id: string; name: string | null; external_id: string }[]>([]);
+  const [forwarding, setForwarding] = useState(false);
+
+  useEffect(() => {
+    if (!forwardMsg || !orgId) return;
+    let active = true;
+    const t = setTimeout(async () => {
+      let q = supabase
+        .from("contacts")
+        .select("id, name, external_id")
+        .eq("is_group", false)
+        .order("name", { ascending: true })
+        .limit(20);
+      const term = fwdSearch.trim();
+      if (term) q = q.or(`name.ilike.%${term}%,external_id.ilike.%${term}%`);
+      const { data } = await q;
+      if (active) setFwdResults((data ?? []) as { id: string; name: string | null; external_id: string }[]);
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [fwdSearch, forwardMsg, orgId]);
+
+  async function resolveConversation(contactId: string): Promise<string | null> {
+    if (!orgId) return null;
+    const { data: canal } = await supabase
+      .from("channels")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("type", "whatsapp_baileys")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!canal) return null;
+    let { data: conv } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("contact_id", contactId)
+      .eq("channel_id", canal.id)
+      .neq("status", "closed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!conv) {
+      const { data: nova } = await supabase
+        .from("conversations")
+        .insert({
+          org_id: orgId,
+          contact_id: contactId,
+          channel_id: canal.id,
+          status: "open",
+          last_message_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      conv = nova ?? null;
+    }
+    return conv?.id ?? null;
+  }
+
+  async function doForward(contact: { id: string; name: string | null; external_id: string }) {
+    if (!forwardMsg) return;
+    setForwarding(true);
+    try {
+      const convId = await resolveConversation(contact.id);
+      if (!convId) {
+        alert("Nenhum canal WhatsApp conectado.");
+        return;
+      }
+      const m = forwardMsg;
+      if (m.media_url) {
+        const { data: blob, error: dErr } = await supabase.storage.from("media").download(m.media_url);
+        if (dErr || !blob) {
+          alert("Não foi possível baixar o anexo para encaminhar.");
+          return;
+        }
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        const { error: sErr } = await supabase.functions.invoke("send-media", {
+          body: {
+            conversationId: convId,
+            base64,
+            mimetype: blob.type || "application/octet-stream",
+            fileName: m.media_name || "arquivo",
+            caption: m.content ?? "",
+          },
+        });
+        if (sErr) {
+          alert("Não foi possível encaminhar o anexo.");
+          return;
+        }
+      } else if (m.content) {
+        const { error: sErr } = await supabase.functions.invoke("send-message", {
+          body: { conversationId: convId, text: m.content },
+        });
+        if (sErr) {
+          alert("Não foi possível encaminhar.");
+          return;
+        }
+      }
+      setForwardMsg(null);
+      setFwdSearch("");
+      if (convId === selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    } finally {
+      setForwarding(false);
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
@@ -833,6 +967,7 @@ export function InboxScreen() {
                           canCopy={!!m.content}
                           canReply={!!m.external_message_id}
                           canDelete={out && !!m.external_message_id}
+                          canForward={!!(m.content || m.media_url)}
                           onReact={(e) => reactToMessage(m.id, e)}
                           onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
                           onReply={() =>
@@ -844,6 +979,7 @@ export function InboxScreen() {
                             })
                           }
                           onDelete={() => deleteMessage(m.id)}
+                          onForward={() => setForwardMsg(m)}
                         />
                       )}
                       <div
@@ -906,6 +1042,7 @@ export function InboxScreen() {
                           canCopy={!!m.content}
                           canReply={!!m.external_message_id}
                           canDelete={out && !!m.external_message_id}
+                          canForward={!!(m.content || m.media_url)}
                           onReact={(e) => reactToMessage(m.id, e)}
                           onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
                           onReply={() =>
@@ -917,6 +1054,7 @@ export function InboxScreen() {
                             })
                           }
                           onDelete={() => deleteMessage(m.id)}
+                          onForward={() => setForwardMsg(m)}
                         />
                       )}
                     </div>
@@ -1258,6 +1396,63 @@ export function InboxScreen() {
             </div>
           </div>
         </aside>
+      )}
+
+      {/* F.4a — Modal de Encaminhar */}
+      {forwardMsg && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !forwarding && setForwardMsg(null)}
+        >
+          <div
+            className="flex max-h-[80vh] w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">Encaminhar para…</h3>
+              <button
+                onClick={() => !forwarding && setForwardMsg(null)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="border-b border-gray-100 p-3">
+              <input
+                value={fwdSearch}
+                onChange={(e) => setFwdSearch(e.target.value)}
+                placeholder="Buscar contato…"
+                autoFocus
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+              />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+              {fwdResults.length === 0 ? (
+                <p className="px-2 py-4 text-center text-sm text-gray-400">Nenhum contato.</p>
+              ) : (
+                fwdResults.map((c) => (
+                  <button
+                    key={c.id}
+                    disabled={forwarding}
+                    onClick={() => doForward(c)}
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      {initials(c.name || c.external_id)}
+                    </span>
+                    <span className="truncate text-sm text-gray-900">
+                      {c.name?.trim() || formatPhone(c.external_id) || c.external_id}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+            {forwarding && (
+              <div className="border-t border-gray-100 px-4 py-2 text-center text-xs text-gray-500">Encaminhando…</div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

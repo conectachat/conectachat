@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Plus,
   Reply,
+  Trash2,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -175,17 +176,21 @@ function MessageActions({
   canReact,
   canCopy,
   canReply,
+  canDelete,
   onReact,
   onCopy,
   onReply,
+  onDelete,
 }: {
   mine: string | null;
   canReact: boolean;
   canCopy: boolean;
   canReply: boolean;
+  canDelete: boolean;
   onReact: (emoji: string) => void;
   onCopy: () => void;
   onReply: () => void;
+  onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(false);
@@ -268,6 +273,18 @@ function MessageActions({
               >
                 <Copy size={14} /> Copiar
               </button>
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDelete();
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 size={14} /> Apagar
+                </button>
+              )}
             </div>
           </>
         )}
@@ -611,6 +628,18 @@ export function InboxScreen() {
     }
   }
 
+  async function deleteMessage(messageId: string) {
+    if (!window.confirm("Apagar esta mensagem para todos? Isso não pode ser desfeito.")) return;
+    const { data, error: invokeErr } = await supabase.functions.invoke("delete-message", {
+      body: { messageId },
+    });
+    if (invokeErr || (data as any)?.error) {
+      alert((data as any)?.error || "Não foi possível apagar. O tempo permitido pode ter passado.");
+      return;
+    }
+    if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
@@ -797,12 +826,13 @@ export function InboxScreen() {
                       key={m.id}
                       className={`group mb-2 flex items-center gap-1 ${out ? "justify-end" : "justify-start"}`}
                     >
-                      {out && (
+                      {out && !m.deleted_at && (
                         <MessageActions
                           mine={m.reactions?.["me"] ?? null}
                           canReact={!!m.external_message_id}
                           canCopy={!!m.content}
                           canReply={!!m.external_message_id}
+                          canDelete={out && !!m.external_message_id}
                           onReact={(e) => reactToMessage(m.id, e)}
                           onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
                           onReply={() =>
@@ -813,12 +843,13 @@ export function InboxScreen() {
                               sender: out ? "Você" : m.sender_name || displayName(selected.contact),
                             })
                           }
+                          onDelete={() => deleteMessage(m.id)}
                         />
                       )}
                       <div
                         className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                       >
-                        {m.reply_to_external_id && (
+                        {!m.deleted_at && m.reply_to_external_id && (
                           <div
                             className={`mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] ${out ? "border-white/60 bg-white/15" : "border-brand-blue/50 bg-gray-50"}`}
                           >
@@ -830,10 +861,15 @@ export function InboxScreen() {
                             <p className="truncate opacity-80">{quotedText}</p>
                           </div>
                         )}
-                        {!out && selected.contact?.is_group && m.sender_name && (
+                        {!m.deleted_at && !out && selected.contact?.is_group && m.sender_name && (
                           <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">{m.sender_name}</p>
                         )}
-                        {m.media_url && ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
+                        {m.deleted_at ? (
+                          <p className={`italic ${out ? "text-primary-foreground/70" : "text-gray-400"}`}>
+                            🚫 Mensagem apagada
+                          </p>
+                        ) : m.media_url &&
+                          ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
                           <>
                             <MessageMedia
                               path={m.media_url}
@@ -849,7 +885,7 @@ export function InboxScreen() {
                         <p className={`mt-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}>
                           {hhmm(m.created_at)}
                         </p>
-                        {reactionList.length > 0 && (
+                        {!m.deleted_at && reactionList.length > 0 && (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {reactionList.map(([emoji, count]) => (
                               <span
@@ -863,12 +899,13 @@ export function InboxScreen() {
                           </div>
                         )}
                       </div>
-                      {!out && (
+                      {!out && !m.deleted_at && (
                         <MessageActions
                           mine={m.reactions?.["me"] ?? null}
                           canReact={!!m.external_message_id}
                           canCopy={!!m.content}
                           canReply={!!m.external_message_id}
+                          canDelete={out && !!m.external_message_id}
                           onReact={(e) => reactToMessage(m.id, e)}
                           onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
                           onReply={() =>
@@ -879,6 +916,7 @@ export function InboxScreen() {
                               sender: out ? "Você" : m.sender_name || displayName(selected.contact),
                             })
                           }
+                          onDelete={() => deleteMessage(m.id)}
                         />
                       )}
                     </div>

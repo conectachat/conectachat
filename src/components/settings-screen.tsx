@@ -7,24 +7,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  TAG_PALETTE,
-  ColorPicker,
-  type Tag as TagType,
-} from "@/components/contact-tags";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TAG_PALETTE, ColorPicker, type Tag as TagType } from "@/components/contact-tags";
 
 type FieldType = "text" | "number" | "date";
 type CustomField = {
@@ -47,6 +32,71 @@ type QuickReply = {
   active: boolean;
 };
 
+// --- Bloco E.0: fuso horário + idioma -------------------------------------
+// Lista completa de fusos do navegador (cobre qualquer país). Se o navegador
+// for antigo e não tiver a função, caímos numa lista curada de fallback.
+const TIMEZONE_LIST: string[] = (() => {
+  try {
+    const list = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone");
+    if (Array.isArray(list) && list.length) return list;
+  } catch {
+    /* navegador antigo: usa o fallback abaixo */
+  }
+  return [
+    "America/Sao_Paulo",
+    "America/Bahia",
+    "America/Fortaleza",
+    "America/Manaus",
+    "America/Rio_Branco",
+    "America/Argentina/Buenos_Aires",
+    "America/Montevideo",
+    "America/Santiago",
+    "America/Asuncion",
+    "America/La_Paz",
+    "America/Lima",
+    "America/Bogota",
+    "America/Caracas",
+    "America/Mexico_City",
+    "America/Cancun",
+    "America/Monterrey",
+    "America/Guatemala",
+    "America/Costa_Rica",
+    "America/Panama",
+    "America/Santo_Domingo",
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "Europe/Lisbon",
+    "Europe/Madrid",
+    "Europe/London",
+    "Atlantic/Cape_Verde",
+    "UTC",
+  ];
+})();
+
+// Mostra o fuso com o deslocamento atual, ex.: "America/Sao_Paulo (GMT-3)".
+function tzLabel(tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      timeZoneName: "shortOffset",
+    }).formatToParts(new Date());
+    const off = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+    return off ? `${tz} (${off})` : tz;
+  } catch {
+    return tz;
+  }
+}
+
+const LANGUAGES: Array<{ value: string; label: string }> = [
+  { value: "pt-BR", label: "Português (Brasil)" },
+  { value: "es", label: "Español" },
+  { value: "en", label: "English" },
+];
+
+// Radix Select não aceita value="" — usamos este código para "herdar da empresa".
+const TZ_INHERIT = "__inherit__";
 
 function Placeholder({ message }: { message: string }) {
   return (
@@ -62,11 +112,25 @@ function Placeholder({ message }: { message: string }) {
 export function SettingsScreen() {
   const { user, activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id ?? null;
+  const isOrgAdmin = activeMembership?.role === "owner" || activeMembership?.role === "admin";
   const qc = useQueryClient();
+
+  // Opções de fuso (rótulo com deslocamento), montadas uma única vez.
+  const tzOptions = useMemo(() => TIMEZONE_LIST.map((tz) => ({ value: tz, label: tzLabel(tz) })), []);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // Bloco E.0 — preferências do usuário (fuso + idioma)
+  const [userTimezone, setUserTimezone] = useState<string>(""); // "" = herda da empresa
+  const [userLanguage, setUserLanguage] = useState<string>("pt-BR");
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  // Bloco E.0 — dados da empresa (nome + fuso); só dono/admin edita
+  const [orgName, setOrgName] = useState("");
+  const [orgTimezone, setOrgTimezone] = useState("America/Sao_Paulo");
+  const [savingOrg, setSavingOrg] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -102,12 +166,11 @@ export function SettingsScreen() {
   const [qrBusy, setQrBusy] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
 
-
   useEffect(() => {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("full_name, email")
+      .select("full_name, email, timezone, language")
       .eq("id", user.id)
       .single()
       .then(({ data, error }) => {
@@ -117,20 +180,64 @@ export function SettingsScreen() {
         }
         setFullName(data?.full_name ?? "");
         setEmail(data?.email ?? user.email ?? "");
+        setUserTimezone(data?.timezone ?? "");
+        setUserLanguage(data?.language ?? "pt-BR");
       });
   }, [user]);
+
+  // Bloco E.0 — carrega nome e fuso da empresa.
+  useEffect(() => {
+    if (!orgId) return;
+    supabase
+      .from("organizations")
+      .select("name, timezone")
+      .eq("id", orgId)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Erro ao carregar empresa:", error);
+          return;
+        }
+        setOrgName(data?.name ?? "");
+        setOrgTimezone(data?.timezone ?? "America/Sao_Paulo");
+      });
+  }, [orgId]);
 
   const handleSaveProfile = async () => {
     if (!user) return;
     setSavingProfile(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ full_name: fullName.trim() })
-      .eq("id", user.id);
+    const { error } = await supabase.from("profiles").update({ full_name: fullName.trim() }).eq("id", user.id);
     if (error) {
       console.error("Erro ao salvar perfil:", error);
     }
     setSavingProfile(false);
+  };
+
+  // Bloco E.0 — salva fuso (vazio = NULL = herda da empresa) e idioma.
+  const handleSaveUserPrefs = async () => {
+    if (!user) return;
+    setSavingPrefs(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        timezone: userTimezone.trim() ? userTimezone.trim() : null,
+        language: userLanguage,
+      })
+      .eq("id", user.id);
+    if (error) console.error("Erro ao salvar preferências:", error);
+    setSavingPrefs(false);
+  };
+
+  // Bloco E.0 — salva nome e fuso da empresa (a RLS garante: só dono/admin).
+  const handleSaveOrg = async () => {
+    if (!orgId) return;
+    setSavingOrg(true);
+    const { error } = await supabase
+      .from("organizations")
+      .update({ name: orgName.trim(), timezone: orgTimezone })
+      .eq("id", orgId);
+    if (error) console.error("Erro ao salvar empresa:", error);
+    setSavingOrg(false);
   };
 
   const handleChangePassword = async () => {
@@ -175,10 +282,7 @@ export function SettingsScreen() {
     queryKey: ["settings-tags", orgId],
     enabled: !!orgId,
     queryFn: async (): Promise<Array<TagType & { contact_count: number }>> => {
-      const { data, error } = await supabase
-        .from("tags")
-        .select("id, name, color, contact_tags(count)")
-        .order("name");
+      const { data, error } = await supabase.from("tags").select("id, name, color, contact_tags(count)").order("name");
       if (error) throw error;
       return (data ?? []).map((t: any) => ({
         id: t.id,
@@ -240,10 +344,7 @@ export function SettingsScreen() {
     }
     setTagBusy(true);
     if (editingTag) {
-      const { error } = await supabase
-        .from("tags")
-        .update({ name: n, color: tagColor })
-        .eq("id", editingTag.id);
+      const { error } = await supabase.from("tags").update({ name: n, color: tagColor }).eq("id", editingTag.id);
       setTagBusy(false);
       if (error) {
         if ((error as { code?: string }).code === "23505") {
@@ -431,7 +532,10 @@ export function SettingsScreen() {
   }
   async function saveQuickReply() {
     setQrError(null);
-    const atalho = qrShortcut.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    const atalho = qrShortcut
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
     const conteudo = qrContent.trim();
     if (!atalho) {
       setQrError("Informe um atalho (ex.: saudacao).");
@@ -494,10 +598,7 @@ export function SettingsScreen() {
     invalidateQuickReplies();
   }
   async function toggleQuickReply(q: QuickReply) {
-    const { error } = await supabase
-      .from("quick_replies")
-      .update({ active: !q.active })
-      .eq("id", q.id);
+    const { error } = await supabase.from("quick_replies").update({ active: !q.active }).eq("id", q.id);
     if (error) {
       console.error("Erro ao alterar status da resposta:", error);
       return;
@@ -505,19 +606,17 @@ export function SettingsScreen() {
     invalidateQuickReplies();
   }
 
-
-
   return (
     <div className="h-full overflow-auto p-6">
       <div className="mx-auto max-w-4xl">
         <h1 className="text-lg font-semibold text-foreground">Configurações</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Gerencie as configurações do sistema
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Gerencie as configurações do sistema</p>
 
         <Tabs defaultValue="geral" className="mt-6">
           <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="geral">Geral</TabsTrigger>
+            {isOrgAdmin && <TabsTrigger value="empresa">Empresa</TabsTrigger>}
+            <TabsTrigger value="usuario">Usuário</TabsTrigger>
             <TabsTrigger value="tags">Tags</TabsTrigger>
             <TabsTrigger value="campos">Campos</TabsTrigger>
             <TabsTrigger value="departamentos">Departamentos</TabsTrigger>
@@ -589,22 +688,110 @@ export function SettingsScreen() {
               </div>
 
               {(passwordError || passwordSuccess) && (
-                <p
-                  className={`mt-3 text-sm ${
-                    passwordError ? "text-destructive" : "text-green-600"
-                  }`}
-                >
+                <p className={`mt-3 text-sm ${passwordError ? "text-destructive" : "text-green-600"}`}>
                   {passwordError ?? passwordSuccess}
                 </p>
               )}
 
               <div className="mt-4 flex justify-end">
-                <Button
-                  onClick={handleChangePassword}
-                  disabled={changingPassword}
-                  size="sm"
-                >
+                <Button onClick={handleChangePassword} disabled={changingPassword} size="sm">
                   {changingPassword ? "Alterando..." : "Alterar senha"}
+                </Button>
+              </div>
+            </section>
+          </TabsContent>
+
+          {/* Bloco E.0 — Empresa (só dono/admin) */}
+          {isOrgAdmin && (
+            <TabsContent value="empresa" className="mt-4 space-y-6">
+              <section className="rounded-lg border border-border bg-card p-5">
+                <h2 className="text-sm font-medium text-foreground">Dados da Empresa</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Visível apenas para o dono e administradores da empresa.
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="org-nome">Nome da empresa</Label>
+                    <Input
+                      id="org-nome"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="Nome da empresa"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="org-fuso">Fuso horário da empresa</Label>
+                    <Select value={orgTimezone} onValueChange={setOrgTimezone}>
+                      <SelectTrigger id="org-fuso">
+                        <SelectValue placeholder="Selecione o fuso" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {tzOptions.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Usado como padrão para novos usuários e relatórios.</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleSaveOrg} disabled={savingOrg} size="sm">
+                    {savingOrg ? "Salvando..." : "Salvar"}
+                  </Button>
+                </div>
+              </section>
+            </TabsContent>
+          )}
+
+          {/* Bloco E.0 — Usuário (fuso + idioma) */}
+          <TabsContent value="usuario" className="mt-4 space-y-6">
+            <section className="rounded-lg border border-border bg-card p-5">
+              <h2 className="text-sm font-medium text-foreground">Preferências do Usuário</h2>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="user-fuso">Meu fuso horário</Label>
+                  <Select
+                    value={userTimezone ? userTimezone : TZ_INHERIT}
+                    onValueChange={(v) => setUserTimezone(v === TZ_INHERIT ? "" : v)}
+                  >
+                    <SelectTrigger id="user-fuso">
+                      <SelectValue placeholder="Selecione o fuso" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      <SelectItem value={TZ_INHERIT}>Usar o fuso da empresa ({orgTimezone})</SelectItem>
+                      {tzOptions.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">É este fuso que vale na hora de agendar mensagens.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="user-idioma">Idioma</Label>
+                  <Select value={userLanguage} onValueChange={setUserLanguage}>
+                    <SelectTrigger id="user-idioma">
+                      <SelectValue placeholder="Selecione o idioma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LANGUAGES.map((l) => (
+                        <SelectItem key={l.value} value={l.value}>
+                          {l.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    O app ainda está em português; a tradução será ativada em breve.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button onClick={handleSaveUserPrefs} disabled={savingPrefs} size="sm">
+                  {savingPrefs ? "Salvando..." : "Salvar"}
                 </Button>
               </div>
             </section>
@@ -650,22 +837,14 @@ export function SettingsScreen() {
                   {filteredTags.map((t) => (
                     <li key={t.id} className="flex items-center justify-between px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span
-                          className="inline-block h-3 w-3 rounded-full"
-                          style={{ backgroundColor: t.color }}
-                        />
+                        <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: t.color }} />
                         <span className="text-sm font-medium text-foreground">{t.name}</span>
                         <span className="text-xs text-muted-foreground">
                           {t.contact_count} {t.contact_count === 1 ? "contato" : "contatos"}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEditTag(t)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditTag(t)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
@@ -705,11 +884,7 @@ export function SettingsScreen() {
                   </div>
                   {tagError && <p className="text-sm text-destructive">{tagError}</p>}
                   <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setTagModalOpen(false)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setTagModalOpen(false)}>
                       Cancelar
                     </Button>
                     <Button size="sm" onClick={saveTag} disabled={tagBusy || !tagName.trim()}>
@@ -735,9 +910,7 @@ export function SettingsScreen() {
               {fieldsList.length === 0 ? (
                 <div className="flex h-40 flex-col items-center justify-center text-center text-sm">
                   <p className="font-medium text-foreground">Nenhum campo criado</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Crie campos como CPF, Empresa, Cargo, etc.
-                  </p>
+                  <p className="mt-1 text-muted-foreground">Crie campos como CPF, Empresa, Cargo, etc.</p>
                 </div>
               ) : (
                 <ul className="divide-y divide-border">
@@ -750,12 +923,7 @@ export function SettingsScreen() {
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEditField(f)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditField(f)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
@@ -776,9 +944,7 @@ export function SettingsScreen() {
             <Dialog open={fieldModalOpen} onOpenChange={setFieldModalOpen}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>
-                    {editingField ? "Editar campo" : "Novo campo"}
-                  </DialogTitle>
+                  <DialogTitle>{editingField ? "Editar campo" : "Novo campo"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -792,10 +958,7 @@ export function SettingsScreen() {
                   </div>
                   <div className="space-y-2">
                     <Label>Tipo</Label>
-                    <Select
-                      value={fieldType}
-                      onValueChange={(v) => setFieldType(v as FieldType)}
-                    >
+                    <Select value={fieldType} onValueChange={(v) => setFieldType(v as FieldType)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -806,22 +969,12 @@ export function SettingsScreen() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {fieldError && (
-                    <p className="text-sm text-destructive">{fieldError}</p>
-                  )}
+                  {fieldError && <p className="text-sm text-destructive">{fieldError}</p>}
                   <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFieldModalOpen(false)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setFieldModalOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={saveField}
-                      disabled={fieldBusy || !fieldName.trim()}
-                    >
+                    <Button size="sm" onClick={saveField} disabled={fieldBusy || !fieldName.trim()}>
                       {fieldBusy ? "Salvando…" : editingField ? "Salvar" : "Criar"}
                     </Button>
                   </div>
@@ -875,9 +1028,7 @@ export function SettingsScreen() {
                     <li key={q.id} className="flex items-center justify-between gap-3 px-4 py-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">
-                            {q.title?.trim() || q.shortcut}
-                          </span>
+                          <span className="text-sm font-medium text-foreground">{q.title?.trim() || q.shortcut}</span>
                           <span className="text-xs text-muted-foreground">/{q.shortcut}</span>
                         </div>
                         <p className="mt-0.5 truncate text-sm text-muted-foreground">{q.content}</p>
@@ -887,19 +1038,12 @@ export function SettingsScreen() {
                           type="button"
                           onClick={() => toggleQuickReply(q)}
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            q.active
-                              ? "bg-green-100 text-green-700"
-                              : "bg-muted text-muted-foreground"
+                            q.active ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"
                           }`}
                         >
                           {q.active ? "Ativa" : "Inativa"}
                         </button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEditQuickReply(q)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditQuickReply(q)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
@@ -921,9 +1065,7 @@ export function SettingsScreen() {
             <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>
-                    {editingQr ? "Editar resposta rápida" : "Nova resposta rápida"}
-                  </DialogTitle>
+                  <DialogTitle>{editingQr ? "Editar resposta rápida" : "Nova resposta rápida"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -939,7 +1081,10 @@ export function SettingsScreen() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Sem espaços. No campo de mensagem você usa digitando /
-                      {qrShortcut.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") || "atalho"}
+                      {qrShortcut
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_-]/g, "") || "atalho"}
                     </p>
                   </div>
                   <div className="space-y-2">

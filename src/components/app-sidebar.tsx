@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut, Contact, Settings, CalendarClock } from "lucide-react";
+import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 import {
@@ -25,6 +25,7 @@ const items = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },
+  { title: "Conexões", url: "/connections", icon: Plug },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 

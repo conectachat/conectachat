@@ -531,6 +531,7 @@ export type Database = {
           plan_id: string | null;
           slug: string;
           stripe_customer_id: string | null;
+          timezone: string;
         };
         Insert: {
           created_at?: string;
@@ -539,6 +540,7 @@ export type Database = {
           plan_id?: string | null;
           slug: string;
           stripe_customer_id?: string | null;
+          timezone?: string;
         };
         Update: {
           created_at?: string;
@@ -547,6 +549,7 @@ export type Database = {
           plan_id?: string | null;
           slug?: string;
           stripe_customer_id?: string | null;
+          timezone?: string;
         };
         Relationships: [
           {
@@ -636,6 +639,8 @@ export type Database = {
           email: string | null;
           full_name: string | null;
           id: string;
+          language: string;
+          timezone: string | null;
         };
         Insert: {
           avatar_url?: string | null;
@@ -643,6 +648,8 @@ export type Database = {
           email?: string | null;
           full_name?: string | null;
           id: string;
+          language?: string;
+          timezone?: string | null;
         };
         Update: {
           avatar_url?: string | null;
@@ -650,6 +657,8 @@ export type Database = {
           email?: string | null;
           full_name?: string | null;
           id?: string;
+          language?: string;
+          timezone?: string | null;
         };
         Relationships: [];
       };
@@ -867,6 +876,7 @@ export type Database = {
     };
     Functions: {
       is_member_of: { Args: { p_org_id: string }; Returns: boolean };
+      is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
       is_platform_staff: { Args: never; Returns: boolean };
       is_super_admin: { Args: never; Returns: boolean };
     };

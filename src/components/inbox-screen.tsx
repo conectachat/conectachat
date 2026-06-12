@@ -22,6 +22,8 @@ import {
   Reply,
   Trash2,
   Forward,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -179,11 +181,13 @@ function MessageActions({
   canReply,
   canForward,
   canDelete,
+  pinned,
   onReact,
   onCopy,
   onReply,
   onForward,
   onDelete,
+  onPin,
 }: {
   mine: string | null;
   canReact: boolean;
@@ -191,11 +195,13 @@ function MessageActions({
   canReply: boolean;
   canForward: boolean;
   canDelete: boolean;
+  pinned: boolean;
   onReact: (emoji: string) => void;
   onCopy: () => void;
   onReply: () => void;
   onForward: () => void;
   onDelete: () => void;
+  onPin: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(false);
@@ -290,6 +296,16 @@ function MessageActions({
                   <Forward size={14} /> Encaminhar
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  onPin();
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                {pinned ? <PinOff size={14} /> : <Pin size={14} />} {pinned ? "Desafixar" : "Fixar"}
+              </button>
               {canDelete && (
                 <button
                   type="button"
@@ -657,6 +673,22 @@ export function InboxScreen() {
     if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
   }
 
+  async function togglePin(m: Message) {
+    const { error } = await supabase
+      .from("messages")
+      .update({ pinned_at: m.pinned_at ? null : new Date().toISOString() })
+      .eq("id", m.id);
+    if (error) {
+      alert("Não foi possível fixar/desafixar.");
+      return;
+    }
+    if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+  }
+
+  function scrollToMessage(id: string) {
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   // ----- Encaminhar (F.4a) -----
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null);
   const [fwdSearch, setFwdSearch] = useState("");
@@ -929,6 +961,33 @@ export function InboxScreen() {
               </div>
             </header>
 
+            {(messages ?? []).some((x) => x.pinned_at && !x.deleted_at) && (
+              <div className="border-b border-amber-200 bg-amber-50 px-4 py-1.5">
+                {(messages ?? [])
+                  .filter((x) => x.pinned_at && !x.deleted_at)
+                  .map((x) => (
+                    <div key={x.id} className="flex items-center gap-2 py-0.5">
+                      <Pin size={13} className="shrink-0 text-amber-600" />
+                      <button
+                        onClick={() => scrollToMessage(x.id)}
+                        className="min-w-0 flex-1 truncate text-left text-xs text-gray-700 hover:underline"
+                        title="Ir até a mensagem"
+                      >
+                        {x.direction === "outbound" ? "Você: " : ""}
+                        {contentLabel(x.content_type, x.content)}
+                      </button>
+                      <button
+                        onClick={() => togglePin(x)}
+                        className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-amber-100 hover:text-gray-600"
+                        title="Desafixar"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
+
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               {loadingMsgs && <p className="text-center text-sm text-gray-500">Carregando…</p>}
               {!loadingMsgs &&
@@ -958,6 +1017,7 @@ export function InboxScreen() {
                   return (
                     <div
                       key={m.id}
+                      id={`msg-${m.id}`}
                       className={`group mb-2 flex items-center gap-1 ${out ? "justify-end" : "justify-start"}`}
                     >
                       {out && !m.deleted_at && (
@@ -968,6 +1028,7 @@ export function InboxScreen() {
                           canReply={!!m.external_message_id}
                           canDelete={out && !!m.external_message_id}
                           canForward={!!(m.content || m.media_url)}
+                          pinned={!!m.pinned_at}
                           onReact={(e) => reactToMessage(m.id, e)}
                           onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
                           onReply={() =>
@@ -980,6 +1041,7 @@ export function InboxScreen() {
                           }
                           onDelete={() => deleteMessage(m.id)}
                           onForward={() => setForwardMsg(m)}
+                          onPin={() => togglePin(m)}
                         />
                       )}
                       <div
@@ -1043,6 +1105,7 @@ export function InboxScreen() {
                           canReply={!!m.external_message_id}
                           canDelete={out && !!m.external_message_id}
                           canForward={!!(m.content || m.media_url)}
+                          pinned={!!m.pinned_at}
                           onReact={(e) => reactToMessage(m.id, e)}
                           onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
                           onReply={() =>
@@ -1055,6 +1118,7 @@ export function InboxScreen() {
                           }
                           onDelete={() => deleteMessage(m.id)}
                           onForward={() => setForwardMsg(m)}
+                          onPin={() => togglePin(m)}
                         />
                       )}
                     </div>

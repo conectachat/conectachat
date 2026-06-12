@@ -24,6 +24,8 @@ import {
   Forward,
   Pin,
   PinOff,
+  Star,
+  StarOff,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -182,12 +184,14 @@ function MessageActions({
   canForward,
   canDelete,
   pinned,
+  starred,
   onReact,
   onCopy,
   onReply,
   onForward,
   onDelete,
   onPin,
+  onStar,
 }: {
   mine: string | null;
   canReact: boolean;
@@ -196,12 +200,14 @@ function MessageActions({
   canForward: boolean;
   canDelete: boolean;
   pinned: boolean;
+  starred: boolean;
   onReact: (emoji: string) => void;
   onCopy: () => void;
   onReply: () => void;
   onForward: () => void;
   onDelete: () => void;
   onPin: () => void;
+  onStar: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(false);
@@ -306,6 +312,16 @@ function MessageActions({
               >
                 {pinned ? <PinOff size={14} /> : <Pin size={14} />} {pinned ? "Desafixar" : "Fixar"}
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onStar();
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                {starred ? <StarOff size={14} /> : <Star size={14} />} {starred ? "Desfavoritar" : "Favoritar"}
+              </button>
               {canDelete && (
                 <button
                   type="button"
@@ -390,6 +406,7 @@ export function InboxScreen() {
   }, [selectedId, queryClient]);
 
   const [draft, setDraft] = useState("");
+  const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; preview: string; sender: string } | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -582,6 +599,7 @@ export function InboxScreen() {
   useEffect(() => {
     setShowContactPanel(false);
     setEditingContact(false);
+    setShowStarredOnly(false);
   }, [selectedId]);
 
   useEffect(() => {
@@ -680,6 +698,18 @@ export function InboxScreen() {
       .eq("id", m.id);
     if (error) {
       alert("Não foi possível fixar/desafixar.");
+      return;
+    }
+    if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+  }
+
+  async function toggleStar(m: Message) {
+    const { error } = await supabase
+      .from("messages")
+      .update({ starred_at: m.starred_at ? null : new Date().toISOString() })
+      .eq("id", m.id);
+    if (error) {
+      alert("Não foi possível favoritar/desfavoritar.");
       return;
     }
     if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
@@ -945,6 +975,13 @@ export function InboxScreen() {
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setShowStarredOnly((v) => !v)}
+                  title={showStarredOnly ? "Mostrar todas" : "Mostrar só favoritas"}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg border ${showStarredOnly ? "border-amber-300 bg-amber-50 text-amber-600" : "border-gray-300 text-gray-500 hover:bg-gray-50"}`}
+                >
+                  <Star size={16} className={showStarredOnly ? "fill-amber-400 text-amber-400" : ""} />
+                </button>
+                <button
                   onClick={async () => {
                     if (!selectedId) return;
                     await supabase.from("conversations").update({ unread_count: 1 }).eq("id", selectedId);
@@ -991,139 +1028,153 @@ export function InboxScreen() {
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               {loadingMsgs && <p className="text-center text-sm text-gray-500">Carregando…</p>}
               {!loadingMsgs &&
-                (messages ?? []).map((m) => {
-                  const out = m.direction === "outbound";
-                  const reactionCounts = m.reactions
-                    ? Object.values(m.reactions).reduce<Record<string, number>>((acc, e) => {
-                        if (e) acc[e] = (acc[e] || 0) + 1;
-                        return acc;
-                      }, {})
-                    : {};
-                  const reactionList = Object.entries(reactionCounts);
-                  // F.2a: se esta mensagem responde a outra, monta a prévia citada.
-                  const quotedMsg = m.reply_to_external_id
-                    ? (messages ?? []).find((x) => x.external_message_id === m.reply_to_external_id)
-                    : undefined;
-                  const quotedSender = quotedMsg
-                    ? quotedMsg.direction === "outbound"
-                      ? "Você"
-                      : quotedMsg.sender_name || displayName(selected.contact)
-                    : "";
-                  const quotedText = quotedMsg
-                    ? quotedMsg.content && quotedMsg.content.trim()
-                      ? quotedMsg.content
-                      : contentLabel(quotedMsg.content_type, quotedMsg.content)
-                    : m.reply_to_preview || "Mensagem";
-                  return (
-                    <div
-                      key={m.id}
-                      id={`msg-${m.id}`}
-                      className={`group mb-2 flex items-center gap-1 ${out ? "justify-end" : "justify-start"}`}
-                    >
-                      {out && !m.deleted_at && (
-                        <MessageActions
-                          mine={m.reactions?.["me"] ?? null}
-                          canReact={!!m.external_message_id}
-                          canCopy={!!m.content}
-                          canReply={!!m.external_message_id}
-                          canDelete={out && !!m.external_message_id}
-                          canForward={!!(m.content || m.media_url)}
-                          pinned={!!m.pinned_at}
-                          onReact={(e) => reactToMessage(m.id, e)}
-                          onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
-                          onReply={() =>
-                            setReplyTo({
-                              id: m.external_message_id!,
-                              preview:
-                                m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
-                              sender: out ? "Você" : m.sender_name || displayName(selected.contact),
-                            })
-                          }
-                          onDelete={() => deleteMessage(m.id)}
-                          onForward={() => setForwardMsg(m)}
-                          onPin={() => togglePin(m)}
-                        />
-                      )}
+                (messages ?? [])
+                  .filter((m) => !showStarredOnly || m.starred_at)
+                  .map((m) => {
+                    const out = m.direction === "outbound";
+                    const reactionCounts = m.reactions
+                      ? Object.values(m.reactions).reduce<Record<string, number>>((acc, e) => {
+                          if (e) acc[e] = (acc[e] || 0) + 1;
+                          return acc;
+                        }, {})
+                      : {};
+                    const reactionList = Object.entries(reactionCounts);
+                    // F.2a: se esta mensagem responde a outra, monta a prévia citada.
+                    const quotedMsg = m.reply_to_external_id
+                      ? (messages ?? []).find((x) => x.external_message_id === m.reply_to_external_id)
+                      : undefined;
+                    const quotedSender = quotedMsg
+                      ? quotedMsg.direction === "outbound"
+                        ? "Você"
+                        : quotedMsg.sender_name || displayName(selected.contact)
+                      : "";
+                    const quotedText = quotedMsg
+                      ? quotedMsg.content && quotedMsg.content.trim()
+                        ? quotedMsg.content
+                        : contentLabel(quotedMsg.content_type, quotedMsg.content)
+                      : m.reply_to_preview || "Mensagem";
+                    return (
                       <div
-                        className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
+                        key={m.id}
+                        id={`msg-${m.id}`}
+                        className={`group mb-2 flex items-center gap-1 ${out ? "justify-end" : "justify-start"}`}
                       >
-                        {!m.deleted_at && m.reply_to_external_id && (
-                          <div
-                            className={`mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] ${out ? "border-white/60 bg-white/15" : "border-brand-blue/50 bg-gray-50"}`}
+                        {out && !m.deleted_at && (
+                          <MessageActions
+                            mine={m.reactions?.["me"] ?? null}
+                            canReact={!!m.external_message_id}
+                            canCopy={!!m.content}
+                            canReply={!!m.external_message_id}
+                            canDelete={out && !!m.external_message_id}
+                            canForward={!!(m.content || m.media_url)}
+                            pinned={!!m.pinned_at}
+                            starred={!!m.starred_at}
+                            onReact={(e) => reactToMessage(m.id, e)}
+                            onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
+                            onReply={() =>
+                              setReplyTo({
+                                id: m.external_message_id!,
+                                preview:
+                                  m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
+                                sender: out ? "Você" : m.sender_name || displayName(selected.contact),
+                              })
+                            }
+                            onDelete={() => deleteMessage(m.id)}
+                            onForward={() => setForwardMsg(m)}
+                            onPin={() => togglePin(m)}
+                            onStar={() => toggleStar(m)}
+                          />
+                        )}
+                        <div
+                          className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
+                        >
+                          {!m.deleted_at && m.reply_to_external_id && (
+                            <div
+                              className={`mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] ${out ? "border-white/60 bg-white/15" : "border-brand-blue/50 bg-gray-50"}`}
+                            >
+                              {quotedSender && (
+                                <p className={`font-semibold ${out ? "text-white/90" : "text-brand-blue"}`}>
+                                  {quotedSender}
+                                </p>
+                              )}
+                              <p className="truncate opacity-80">{quotedText}</p>
+                            </div>
+                          )}
+                          {!m.deleted_at && !out && selected.contact?.is_group && m.sender_name && (
+                            <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">{m.sender_name}</p>
+                          )}
+                          {m.deleted_at ? (
+                            <p className={`italic ${out ? "text-primary-foreground/70" : "text-gray-400"}`}>
+                              🚫 Mensagem apagada
+                            </p>
+                          ) : m.media_url &&
+                            ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
+                            <>
+                              <MessageMedia
+                                path={m.media_url}
+                                contentType={m.content_type}
+                                name={m.media_name}
+                                size={m.media_size}
+                              />
+                              {m.content && <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>}
+                            </>
+                          ) : (
+                            <p className="whitespace-pre-wrap break-words">{contentLabel(m.content_type, m.content)}</p>
+                          )}
+                          <p
+                            className={`mt-1 flex items-center gap-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}
                           >
-                            {quotedSender && (
-                              <p className={`font-semibold ${out ? "text-white/90" : "text-brand-blue"}`}>
-                                {quotedSender}
-                              </p>
+                            {!m.deleted_at && m.starred_at && (
+                              <Star size={11} className="fill-amber-400 text-amber-400" />
                             )}
-                            <p className="truncate opacity-80">{quotedText}</p>
-                          </div>
-                        )}
-                        {!m.deleted_at && !out && selected.contact?.is_group && m.sender_name && (
-                          <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">{m.sender_name}</p>
-                        )}
-                        {m.deleted_at ? (
-                          <p className={`italic ${out ? "text-primary-foreground/70" : "text-gray-400"}`}>
-                            🚫 Mensagem apagada
+                            {hhmm(m.created_at)}
                           </p>
-                        ) : m.media_url &&
-                          ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
-                          <>
-                            <MessageMedia
-                              path={m.media_url}
-                              contentType={m.content_type}
-                              name={m.media_name}
-                              size={m.media_size}
-                            />
-                            {m.content && <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>}
-                          </>
-                        ) : (
-                          <p className="whitespace-pre-wrap break-words">{contentLabel(m.content_type, m.content)}</p>
-                        )}
-                        <p className={`mt-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}>
-                          {hhmm(m.created_at)}
-                        </p>
-                        {!m.deleted_at && reactionList.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {reactionList.map(([emoji, count]) => (
-                              <span
-                                key={emoji}
-                                className="inline-flex items-center gap-0.5 rounded-full border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-800 shadow-sm"
-                              >
-                                <span>{emoji}</span>
-                                {count > 1 && <span className="text-[10px] text-gray-500">{count}</span>}
-                              </span>
-                            ))}
-                          </div>
+                          {!m.deleted_at && reactionList.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {reactionList.map(([emoji, count]) => (
+                                <span
+                                  key={emoji}
+                                  className="inline-flex items-center gap-0.5 rounded-full border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-800 shadow-sm"
+                                >
+                                  <span>{emoji}</span>
+                                  {count > 1 && <span className="text-[10px] text-gray-500">{count}</span>}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {!out && !m.deleted_at && (
+                          <MessageActions
+                            mine={m.reactions?.["me"] ?? null}
+                            canReact={!!m.external_message_id}
+                            canCopy={!!m.content}
+                            canReply={!!m.external_message_id}
+                            canDelete={out && !!m.external_message_id}
+                            canForward={!!(m.content || m.media_url)}
+                            pinned={!!m.pinned_at}
+                            starred={!!m.starred_at}
+                            onReact={(e) => reactToMessage(m.id, e)}
+                            onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
+                            onReply={() =>
+                              setReplyTo({
+                                id: m.external_message_id!,
+                                preview:
+                                  m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
+                                sender: out ? "Você" : m.sender_name || displayName(selected.contact),
+                              })
+                            }
+                            onDelete={() => deleteMessage(m.id)}
+                            onForward={() => setForwardMsg(m)}
+                            onPin={() => togglePin(m)}
+                            onStar={() => toggleStar(m)}
+                          />
                         )}
                       </div>
-                      {!out && !m.deleted_at && (
-                        <MessageActions
-                          mine={m.reactions?.["me"] ?? null}
-                          canReact={!!m.external_message_id}
-                          canCopy={!!m.content}
-                          canReply={!!m.external_message_id}
-                          canDelete={out && !!m.external_message_id}
-                          canForward={!!(m.content || m.media_url)}
-                          pinned={!!m.pinned_at}
-                          onReact={(e) => reactToMessage(m.id, e)}
-                          onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
-                          onReply={() =>
-                            setReplyTo({
-                              id: m.external_message_id!,
-                              preview:
-                                m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
-                              sender: out ? "Você" : m.sender_name || displayName(selected.contact),
-                            })
-                          }
-                          onDelete={() => deleteMessage(m.id)}
-                          onForward={() => setForwardMsg(m)}
-                          onPin={() => togglePin(m)}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+              {!loadingMsgs && showStarredOnly && (messages ?? []).filter((m) => m.starred_at).length === 0 && (
+                <p className="mt-6 text-center text-sm text-gray-400">Nenhuma mensagem favoritada nesta conversa.</p>
+              )}
             </div>
 
             <div className="relative border-t border-gray-200 bg-white px-4 py-3">

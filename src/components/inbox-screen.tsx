@@ -839,9 +839,9 @@ export function InboxScreen() {
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
-      <aside className="flex w-[320px] shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-900">Conversas</h2>
+      <aside className="flex w-[320px] shrink-0 flex-col overflow-hidden border-r border-border bg-card">
+        <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
+          <h2 className="text-base font-semibold text-foreground">Conversas</h2>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading && (
@@ -947,7 +947,7 @@ export function InboxScreen() {
           </div>
         ) : (
           <>
-            <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+            <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <ContactAvatar
                   path={selected.contact?.avatar_url}
@@ -1340,7 +1340,7 @@ export function InboxScreen() {
       </section>
 
       {selected && showContactPanel && contact && (
-        <aside className="flex w-[340px] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
+        <aside className="flex w-[340px] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-900">Dados do contato</h3>
             <div className="flex items-center gap-1">

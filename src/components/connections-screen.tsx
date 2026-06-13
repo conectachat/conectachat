@@ -19,6 +19,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -71,13 +72,11 @@ function catalogFor(type: string) {
   return CHANNEL_CATALOG.find((c) => c.type === type);
 }
 
-// Garante que o QR vire uma imagem exibível.
 function qrSrc(qr: string | null): string | null {
   if (!qr) return null;
   return qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`;
 }
 
-// Lê uma mensagem de erro amigável do retorno da função.
 function fnError(data: any, error: any): string | undefined {
   return data?.error ?? error?.message;
 }
@@ -192,46 +191,45 @@ export function ConnectionsScreen() {
     setCreateOpen(true);
   }
 
-  // Canal "ao vivo" correspondente ao QR aberto (para renovar o QR e fechar ao conectar).
   const qrLiveChannel = qrTarget ? channels.find((c) => c.id === qrTarget.channelId) ?? null : null;
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Conexões</h2>
-          <p className="text-sm text-muted-foreground">Gerencie suas conexões de WhatsApp.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={refetch} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-            <span className="ml-1 hidden sm:inline">Atualizar</span>
-          </Button>
-          <Button size="sm" onClick={() => setPickerOpen(true)}>
-            <Plus className="h-4 w-4" />
-            <span className="ml-1">Nova conexão</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Corpo */}
-      <div className="min-h-0 flex-1 overflow-auto p-6">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Carregando…</p>
-        ) : channels.length === 0 ? (
-          <EmptyState onChoose={chooseChannel} />
-        ) : (
-          <ChannelList
-            channels={channels}
-            busyId={busyId}
-            onRefresh={handleRefresh}
-            onReconnect={handleReconnect}
-            onDisconnect={handleDisconnect}
-            onEdit={setEditing}
-            onDelete={setConfirmDelete}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-muted/30">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="mx-auto max-w-6xl">
+          <PageHeader
+            title="Conexões"
+            subtitle="Gerencie suas conexões de WhatsApp."
+            actions={
+              <>
+                <Button variant="outline" size="sm" onClick={refetch} disabled={isLoading}>
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                  <span className="ml-1 hidden sm:inline">Atualizar</span>
+                </Button>
+                <Button size="sm" onClick={() => setPickerOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  <span className="ml-1">Nova conexão</span>
+                </Button>
+              </>
+            }
           />
-        )}
+
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          ) : channels.length === 0 ? (
+            <EmptyState onChoose={chooseChannel} />
+          ) : (
+            <ChannelList
+              channels={channels}
+              busyId={busyId}
+              onRefresh={handleRefresh}
+              onReconnect={handleReconnect}
+              onDisconnect={handleDisconnect}
+              onEdit={setEditing}
+              onDelete={setConfirmDelete}
+            />
+          )}
+        </div>
       </div>
 
       {/* Escolher canal */}
@@ -257,7 +255,7 @@ export function ConnectionsScreen() {
         }}
       />
 
-      {/* QR Code (criar/reconectar) — renova e fecha sozinho */}
+      {/* QR Code (criar/reconectar) */}
       <QrDialog
         target={qrTarget}
         liveChannel={qrLiveChannel}
@@ -315,7 +313,7 @@ function ChannelList({
         const busy = busyId === ch.id;
 
         return (
-          <div key={ch.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-4">
+          <div key={ch.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
             <div
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
               style={{ backgroundColor: `${color}1A`, color }}
@@ -394,7 +392,7 @@ function ChannelGrid({ onChoose }: { onChoose: (type: string) => void }) {
             key={c.type}
             type="button"
             onClick={() => onChoose(c.type)}
-            className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${
+            className={`flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition ${
               c.available ? "border-border hover:border-foreground/30 hover:bg-muted/50" : "border-dashed border-border opacity-70"
             }`}
           >
@@ -524,13 +522,11 @@ function QrDialog({
     onConnectedRef.current();
   }
 
-  // 1) Ao vivo: se o canal já consta conectado, fecha.
   useEffect(() => {
     if (liveChannel?.status === "connected") finish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveChannel?.status]);
 
-  // 2) Rede de segurança: pergunta o status a cada 3s.
   useEffect(() => {
     if (!channelId) return;
     let active = true;
@@ -566,7 +562,6 @@ function QrDialog({
     setLocalPairing(data?.pairingCode ?? null);
   }
 
-  // QR mais recente: o que o webhook guardou (ao vivo) tem prioridade.
   const liveQr = (liveChannel?.credentials as Credentials)?.qr ?? null;
   const src = qrSrc(liveQr ?? localQr);
 

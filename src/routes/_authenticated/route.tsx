@@ -25,9 +25,10 @@ function AuthenticatedLayout() {
       <div className="flex h-screen w-full overflow-hidden bg-background">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {/* Barra superior mínima: só o botão de recolher o menu
-              (sem título nem borda — cada página já tem seu próprio cabeçalho). */}
-          <div className="flex h-10 shrink-0 items-center px-2">
+          {/* Só no celular: um botão para abrir o menu lateral.
+              No computador o menu fica sempre visível, então esta barra some
+              (md:hidden) e a página começa direto no próprio título. */}
+          <div className="flex h-12 shrink-0 items-center px-2 md:hidden">
             <SidebarTrigger />
           </div>
           {!isLoading && !hasNoOrg && <ConnectionBanner />}

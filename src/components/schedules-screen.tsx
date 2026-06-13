@@ -1,15 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  CalendarClock,
-  Plus,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Paperclip,
-  X,
-  Pencil,
-  Ban,
-} from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight, Paperclip, X, Pencil, Ban } from "lucide-react";
 import {
   startOfMonth,
   endOfMonth,
@@ -29,38 +19,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 // ===================================================================
 //  TIPOS
@@ -103,14 +71,7 @@ function tzOffsetMs(timeZone: string, date: Date): number {
   });
   const p: Record<string, string> = {};
   for (const part of dtf.formatToParts(date)) p[part.type] = part.value;
-  const asWallUTC = Date.UTC(
-    +p.year,
-    +p.month - 1,
-    +p.day,
-    +p.hour,
-    +p.minute,
-    +p.second,
-  );
+  const asWallUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
   return asWallUTC - date.getTime();
 }
 
@@ -222,11 +183,7 @@ export function SchedulesScreen() {
         supabase.from("organizations").select("timezone").eq("id", orgId!).maybeSingle(),
       ]);
       return {
-        tz:
-          prof?.timezone ||
-          org?.timezone ||
-          Intl.DateTimeFormat().resolvedOptions().timeZone ||
-          "America/Sao_Paulo",
+        tz: prof?.timezone || org?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo",
       };
     },
   });
@@ -275,10 +232,8 @@ export function SchedulesScreen() {
     if (!orgId) return;
     const ch = supabase
       .channel("schedules-rt")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "scheduled_messages" },
-        () => qc.invalidateQueries({ queryKey: ["schedules"] }),
+      .on("postgres_changes", { event: "*", schema: "public", table: "scheduled_messages" }, () =>
+        qc.invalidateQueries({ queryKey: ["schedules"] }),
       )
       .subscribe();
     return () => {
@@ -292,9 +247,7 @@ export function SchedulesScreen() {
     const term = search.trim().toLowerCase();
     if (!term) return all;
     return all.filter(
-      (s) =>
-        contactLabel(s.contact).toLowerCase().includes(term) ||
-        (s.content ?? "").toLowerCase().includes(term),
+      (s) => contactLabel(s.contact).toLowerCase().includes(term) || (s.content ?? "").toLowerCase().includes(term),
     );
   }, [listQuery.data, search]);
 
@@ -460,9 +413,7 @@ export function SchedulesScreen() {
         const mime = fFile.type || "application/octet-stream";
         const ext = fFile.name.includes(".") ? fFile.name.split(".").pop() : "bin";
         const path = `${orgId}/scheduled/${crypto.randomUUID()}.${ext}`;
-        const up = await supabase.storage
-          .from("media")
-          .upload(path, fFile, { contentType: mime, upsert: false });
+        const up = await supabase.storage.from("media").upload(path, fFile, { contentType: mime, upsert: false });
         if (up.error) throw up.error;
         mediaPatch = {
           media_path: path,
@@ -567,33 +518,28 @@ export function SchedulesScreen() {
   //  RENDER
   // ===================================================================
   return (
-    <div className="flex h-full flex-col p-4 md:p-6">
-      {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarClock className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-semibold text-foreground">
-            Agendamentos
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              ({items.length})
-            </span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Pesquisar..."
-              className="w-48 pl-8"
-            />
-          </div>
-          <Button onClick={() => openNew()} size="sm">
-            <Plus className="mr-1 h-4 w-4" /> Novo Agendamento
-          </Button>
-        </div>
-      </div>
+    <div className="flex h-full min-h-0 flex-col bg-gray-50 p-4 md:p-6">
+      {/* Cabeçalho (padrão) */}
+      <PageHeader
+        title="Agendamentos"
+        subtitle="Agende o envio de mensagens."
+        actions={
+          <>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Pesquisar..."
+                className="w-48 pl-8"
+              />
+            </div>
+            <Button onClick={() => openNew()} size="sm">
+              <Plus className="mr-1 h-4 w-4" /> Novo Agendamento
+            </Button>
+          </>
+        }
+      />
 
       {/* Barra de navegação e visões */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
@@ -611,9 +557,7 @@ export function SchedulesScreen() {
               </Button>
             </>
           )}
-          <span className="ml-1 text-sm font-medium capitalize text-foreground">
-            {periodLabel}
-          </span>
+          <span className="ml-1 text-sm font-medium capitalize text-foreground">{periodLabel}</span>
         </div>
         <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
           {(["month", "week", "day", "agenda"] as ViewMode[]).map((v) => (
@@ -621,9 +565,7 @@ export function SchedulesScreen() {
               key={v}
               onClick={() => setView(v)}
               className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-                view === v
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted"
+                view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
               }`}
             >
               {v === "month" ? "Mês" : v === "week" ? "Semana" : v === "day" ? "Dia" : "Agenda"}
@@ -707,12 +649,7 @@ export function SchedulesScreen() {
 
               <div className="space-y-2">
                 <Label htmlFor="sched-when">Data e hora do envio</Label>
-                <Input
-                  id="sched-when"
-                  type="datetime-local"
-                  value={fWhen}
-                  onChange={(e) => setFWhen(e.target.value)}
-                />
+                <Input id="sched-when" type="datetime-local" value={fWhen} onChange={(e) => setFWhen(e.target.value)} />
                 <p className="text-[11px] text-muted-foreground">Fuso: {tz}</p>
               </div>
             </div>
@@ -738,11 +675,7 @@ export function SchedulesScreen() {
                 >
                   Primeiro Nome
                 </Badge>
-                <Badge
-                  variant="secondary"
-                  className="cursor-pointer"
-                  onClick={() => insertAtCursor("{{nome}}")}
-                >
+                <Badge variant="secondary" className="cursor-pointer" onClick={() => insertAtCursor("{{nome}}")}>
                   Nome
                 </Badge>
               </div>
@@ -861,7 +794,7 @@ function MonthGrid({
     end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 0 }),
   });
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="grid grid-cols-7 border-b border-border bg-muted/40">
         {weekdayNames.map((w) => (
           <div key={w} className="px-2 py-1.5 text-center text-[11px] font-medium capitalize text-muted-foreground">
@@ -966,24 +899,15 @@ function GroupedList({
           </h3>
           <div className="space-y-2">
             {rows.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-start gap-3 rounded-lg border border-border bg-card p-3"
-              >
-                <div className="w-12 shrink-0 text-sm font-medium text-foreground">
-                  {timeInTz(s.scheduled_at, tz)}
-                </div>
+              <div key={s.id} className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
+                <div className="w-12 shrink-0 text-sm font-medium text-foreground">{timeInTz(s.scheduled_at, tz)}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {contactLabel(s.contact)}
-                    </span>
+                    <span className="truncate text-sm font-medium text-foreground">{contactLabel(s.contact)}</span>
                     <Badge variant="outline" className={`h-5 ${STATUS_CLASS[s.status] ?? ""}`}>
                       {STATUS_LABEL[s.status] ?? s.status}
                     </Badge>
-                    {s.channel && (
-                      <span className="text-[11px] text-muted-foreground">{s.channel.name}</span>
-                    )}
+                    {s.channel && <span className="text-[11px] text-muted-foreground">{s.channel.name}</span>}
                   </div>
                   <p className="mt-0.5 truncate text-sm text-muted-foreground">
                     {s.media_name ? `📎 ${s.media_name} ` : ""}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plug,
   Plus,
@@ -23,12 +23,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // ===================================================================
 //  TIPOS
 // ===================================================================
-type Credentials = { number?: string } | null;
+type Credentials = { number?: string; qr?: string } | null;
 
 type ChannelRow = {
   id: string;
@@ -47,39 +53,11 @@ type QrTarget = { channelId: string; qr: string | null; pairingCode: string | nu
 //  CATÁLOGO DE CANAIS
 // ===================================================================
 const CHANNEL_CATALOG = [
-  {
-    type: "whatsapp_baileys",
-    label: "WhatsApp",
-    sub: "Conecta lendo o QR Code (não-oficial)",
-    icon: MessageCircle,
-    color: "#25D366",
-    available: true,
-  },
-  {
-    type: "whatsapp_cloud",
-    label: "WhatsApp Oficial",
-    sub: "API oficial da Meta",
-    icon: ShieldCheck,
-    color: "#0055A6",
-    available: false,
-  },
+  { type: "whatsapp_baileys", label: "WhatsApp", sub: "Conecta lendo o QR Code (não-oficial)", icon: MessageCircle, color: "#25D366", available: true },
+  { type: "whatsapp_cloud", label: "WhatsApp Oficial", sub: "API oficial da Meta", icon: ShieldCheck, color: "#0055A6", available: false },
   { type: "telegram", label: "Telegram", sub: "Bot do Telegram", icon: Send, color: "#229ED9", available: false },
-  {
-    type: "instagram",
-    label: "Instagram",
-    sub: "Mensagens diretas",
-    icon: Instagram,
-    color: "#E1306C",
-    available: false,
-  },
-  {
-    type: "messenger",
-    label: "Messenger",
-    sub: "Facebook Messenger",
-    icon: Facebook,
-    color: "#0084FF",
-    available: false,
-  },
+  { type: "instagram", label: "Instagram", sub: "Mensagens diretas", icon: Instagram, color: "#E1306C", available: false },
+  { type: "messenger", label: "Messenger", sub: "Facebook Messenger", icon: Facebook, color: "#0084FF", available: false },
 ];
 
 const STATUS_META: Record<string, { label: string; dot: string; badge: string }> = {
@@ -110,6 +88,7 @@ function fnError(data: any, error: any): string | undefined {
 export function ConnectionsScreen() {
   const { activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id;
+  const queryClient = useQueryClient();
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -131,6 +110,22 @@ export function ConnectionsScreen() {
       return (data ?? []) as ChannelRow[];
     },
   });
+
+  // Tempo real: a lista reage sozinha quando o status/QR muda no banco.
+  useEffect(() => {
+    if (!orgId) return;
+    const sub = supabase
+      .channel(`connections-${orgId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "channels", filter: `org_id=eq.${orgId}` },
+        () => queryClient.invalidateQueries({ queryKey: ["channels", orgId] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, [orgId, queryClient]);
 
   const channels = channelsQuery.data ?? [];
   const isLoading = channelsQuery.isLoading;
@@ -190,14 +185,15 @@ export function ConnectionsScreen() {
   function chooseChannel(type: string) {
     const c = catalogFor(type);
     if (!c?.available) {
-      toast.info("Em breve", {
-        description: `${c?.label ?? "Esse canal"} ainda não está disponível. Por enquanto, só WhatsApp (QR Code).`,
-      });
+      toast.info("Em breve", { description: `${c?.label ?? "Esse canal"} ainda não está disponível. Por enquanto, só WhatsApp (QR Code).` });
       return;
     }
     setPickerOpen(false);
     setCreateOpen(true);
   }
+
+  // Canal "ao vivo" correspondente ao QR aberto (para renovar o QR e fechar ao conectar).
+  const qrLiveChannel = qrTarget ? channels.find((c) => c.id === qrTarget.channelId) ?? null : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -261,28 +257,19 @@ export function ConnectionsScreen() {
         }}
       />
 
-      {/* QR Code (criar/reconectar) */}
+      {/* QR Code (criar/reconectar) — renova e fecha sozinho */}
       <QrDialog
         target={qrTarget}
-        onClose={() => {
-          setQrTarget(null);
-          refetch();
-        }}
-        onConnected={() => {
-          setQrTarget(null);
-          toast.success("WhatsApp conectado!");
-          refetch();
-        }}
+        liveChannel={qrLiveChannel}
+        onClose={() => { setQrTarget(null); refetch(); }}
+        onConnected={() => { setQrTarget(null); toast.success("WhatsApp conectado!"); refetch(); }}
       />
 
       {/* Renomear */}
       <EditNameDialog
         channel={editing}
         onClose={() => setEditing(null)}
-        onSaved={() => {
-          setEditing(null);
-          refetch();
-        }}
+        onSaved={() => { setEditing(null); refetch(); }}
       />
 
       {/* Confirmar exclusão */}
@@ -297,7 +284,7 @@ export function ConnectionsScreen() {
 }
 
 // ===================================================================
-//  LISTA (largura total, estilo do PDF)
+//  LISTA (largura total)
 // ===================================================================
 function ChannelList({
   channels,
@@ -342,9 +329,7 @@ function ChannelList({
                 <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
                   {cat?.label ?? ch.type}
                 </Badge>
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${st.badge}`}
-                >
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${st.badge}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
                   {st.label}
                 </span>
@@ -355,57 +340,22 @@ function ChannelList({
             </div>
 
             <div className="ml-auto flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                title="Atualizar status"
-                onClick={() => onRefresh(ch)}
-                disabled={busy}
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8" title="Atualizar status" onClick={() => onRefresh(ch)} disabled={busy}>
                 <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
               </Button>
               {connected ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  title="Desligar"
-                  onClick={() => onDisconnect(ch)}
-                  disabled={busy}
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="Desligar" onClick={() => onDisconnect(ch)} disabled={busy}>
                   <PowerOff className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  title="Ligar / reconectar"
-                  onClick={() => onReconnect(ch)}
-                  disabled={busy}
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="Ligar / reconectar" onClick={() => onReconnect(ch)} disabled={busy}>
                   <Power className="h-4 w-4 text-green-600" />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                title="Renomear"
-                onClick={() => onEdit(ch)}
-                disabled={busy}
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8" title="Renomear" onClick={() => onEdit(ch)} disabled={busy}>
                 <Pencil className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                title="Excluir"
-                onClick={() => onDelete(ch)}
-                disabled={busy}
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8" title="Excluir" onClick={() => onDelete(ch)} disabled={busy}>
                 <Trash2 className="h-4 w-4 text-red-600" />
               </Button>
             </div>
@@ -423,10 +373,7 @@ function EmptyState({ onChoose }: { onChoose: (type: string) => void }) {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-6 text-center">
-        <div
-          className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
-          style={{ backgroundColor: "#8FC54920" }}
-        >
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: "#8FC54920" }}>
           <Plug className="h-5 w-5" style={{ color: "#0055A6" }} />
         </div>
         <h3 className="text-base font-semibold text-foreground">Nenhum canal conectado ainda</h3>
@@ -448,25 +395,16 @@ function ChannelGrid({ onChoose }: { onChoose: (type: string) => void }) {
             type="button"
             onClick={() => onChoose(c.type)}
             className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${
-              c.available
-                ? "border-border hover:border-foreground/30 hover:bg-muted/50"
-                : "border-dashed border-border opacity-70"
+              c.available ? "border-border hover:border-foreground/30 hover:bg-muted/50" : "border-dashed border-border opacity-70"
             }`}
           >
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
-              style={{ backgroundColor: `${c.color}1A`, color: c.color }}
-            >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: `${c.color}1A`, color: c.color }}>
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">{c.label}</span>
-                {!c.available && (
-                  <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                    Em breve
-                  </Badge>
-                )}
+                {!c.available && <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Em breve</Badge>}
               </div>
               <p className="truncate text-xs text-muted-foreground">{c.sub}</p>
             </div>
@@ -518,12 +456,7 @@ function NewConnectionForm({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Nova conexão de WhatsApp</DialogTitle>
@@ -541,19 +474,12 @@ function NewConnectionForm({
             />
           </div>
           <label className="flex items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={receiveGroups}
-              onChange={(e) => setReceiveGroups(e.target.checked)}
-              className="h-4 w-4"
-            />
+            <input type="checkbox" checked={receiveGroups} onChange={(e) => setReceiveGroups(e.target.checked)} className="h-4 w-4" />
             Receber mensagens de grupos
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={creating}>
-            Cancelar
-          </Button>
+          <Button variant="outline" onClick={onClose} disabled={creating}>Cancelar</Button>
           <Button onClick={criar} disabled={creating || !name.trim()}>
             {creating ? "Criando…" : "Criar e mostrar QR"}
           </Button>
@@ -564,34 +490,47 @@ function NewConnectionForm({
 }
 
 // ===================================================================
-//  MODAL: QR CODE (criar/reconectar) — fecha sozinho ao conectar
+//  MODAL: QR CODE — renova sozinho (via tempo real) e fecha ao conectar
 // ===================================================================
 function QrDialog({
   target,
+  liveChannel,
   onClose,
   onConnected,
 }: {
   target: QrTarget | null;
+  liveChannel: ChannelRow | null;
   onClose: () => void;
   onConnected: () => void;
 }) {
-  const [qr, setQr] = useState<string | null>(null);
-  const [pairing, setPairing] = useState<string | null>(null);
+  const [localQr, setLocalQr] = useState<string | null>(null);
+  const [localPairing, setLocalPairing] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const channelId = target?.channelId ?? null;
 
-  // Mantém a função onConnected sempre atual sem reiniciar o "relógio".
   const onConnectedRef = useRef(onConnected);
-  useEffect(() => {
-    onConnectedRef.current = onConnected;
-  }, [onConnected]);
+  useEffect(() => { onConnectedRef.current = onConnected; }, [onConnected]);
+  const doneRef = useRef(false);
 
   useEffect(() => {
-    setQr(target?.qr ?? null);
-    setPairing(target?.pairingCode ?? null);
+    doneRef.current = false;
+    setLocalQr(target?.qr ?? null);
+    setLocalPairing(target?.pairingCode ?? null);
   }, [target]);
 
-  // Pergunta o status a cada 3s; quando conectar, fecha.
+  function finish() {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    onConnectedRef.current();
+  }
+
+  // 1) Ao vivo: se o canal já consta conectado, fecha.
+  useEffect(() => {
+    if (liveChannel?.status === "connected") finish();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveChannel?.status]);
+
+  // 2) Rede de segurança: pergunta o status a cada 3s.
   useEffect(() => {
     if (!channelId) return;
     let active = true;
@@ -602,13 +541,14 @@ function QrDialog({
       if (!active) return;
       if (data?.status === "connected") {
         clearInterval(id);
-        onConnectedRef.current();
+        finish();
       }
     }, 3000);
     return () => {
       active = false;
       clearInterval(id);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
   async function gerarNovo() {
@@ -622,19 +562,16 @@ function QrDialog({
       toast.error("Não foi possível gerar um novo QR", { description: fnError(data, error) });
       return;
     }
-    setQr(data?.qr ?? null);
-    setPairing(data?.pairingCode ?? null);
+    setLocalQr(data?.qr ?? null);
+    setLocalPairing(data?.pairingCode ?? null);
   }
 
-  const src = qrSrc(qr);
+  // QR mais recente: o que o webhook guardou (ao vivo) tem prioridade.
+  const liveQr = (liveChannel?.credentials as Credentials)?.qr ?? null;
+  const src = qrSrc(liveQr ?? localQr);
 
   return (
-    <Dialog
-      open={!!target}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
+    <Dialog open={!!target} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Conectar WhatsApp</DialogTitle>
@@ -650,9 +587,9 @@ function QrDialog({
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           )}
-          {pairing && (
+          {localPairing && (
             <p className="text-xs text-muted-foreground">
-              Ou use o código: <span className="font-mono font-medium text-foreground">{pairing}</span>
+              Ou use o código: <span className="font-mono font-medium text-foreground">{localPairing}</span>
             </p>
           )}
           <Button variant="outline" size="sm" onClick={gerarNovo} disabled={refreshing}>
@@ -681,9 +618,7 @@ function EditNameDialog({
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    setName(channel?.name ?? "");
-  }, [channel]);
+  useEffect(() => { setName(channel?.name ?? ""); }, [channel]);
 
   async function handleSave() {
     const trimmed = name.trim();
@@ -700,12 +635,7 @@ function EditNameDialog({
   }
 
   return (
-    <Dialog
-      open={!!channel}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
+    <Dialog open={!!channel} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Renomear conexão</DialogTitle>
@@ -719,16 +649,12 @@ function EditNameDialog({
             placeholder="Ex.: WhatsApp Vendas"
             maxLength={60}
             autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-            }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
           />
           <p className="text-xs text-muted-foreground">Esse nome é só interno, para sua equipe identificar o canal.</p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>
-            Cancelar
-          </Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={handleSave} disabled={saving || !name.trim() || name.trim() === channel?.name}>
             {saving ? "Salvando…" : "Salvar"}
           </Button>
@@ -753,26 +679,17 @@ function ConfirmDeleteDialog({
   onConfirm: () => void;
 }) {
   return (
-    <Dialog
-      open={!!channel}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
+    <Dialog open={!!channel} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Excluir conexão</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Tem certeza que deseja excluir <span className="font-medium text-foreground">{channel?.name}</span>? Isso
-          remove a conexão e{" "}
-          <span className="font-medium text-foreground">apaga também todas as conversas e mensagens</span> deste canal.
-          Esta ação não pode ser desfeita.
+          Tem certeza que deseja excluir <span className="font-medium text-foreground">{channel?.name}</span>? Isso remove a conexão e{" "}
+          <span className="font-medium text-foreground">apaga também todas as conversas e mensagens</span> deste canal. Esta ação não pode ser desfeita.
         </p>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>
-            Cancelar
-          </Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
           <Button variant="destructive" onClick={onConfirm} disabled={busy}>
             {busy ? "Excluindo…" : "Excluir definitivamente"}
           </Button>

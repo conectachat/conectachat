@@ -3,6 +3,7 @@ import { Building2 } from "lucide-react";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ConnectionBanner } from "@/components/connection-banner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
@@ -19,6 +20,8 @@ export const Route = createFileRoute("/_authenticated")({
 const TITLES: Record<string, string> = {
   "/inbox": "Caixa de entrada",
   "/contacts": "Contatos",
+  "/schedules": "Agendamentos",
+  "/connections": "Conexões",
   "/settings": "Configurações",
 };
 
@@ -36,6 +39,7 @@ function AuthenticatedLayout() {
             <SidebarTrigger />
             <h1 className="text-sm font-medium text-foreground">{title}</h1>
           </header>
+          {!isLoading && !hasNoOrg && <ConnectionBanner />}
           <main className="min-h-0 flex-1 overflow-hidden">
             {!isLoading && hasNoOrg ? <NoOrgScreen /> : <Outlet />}
           </main>

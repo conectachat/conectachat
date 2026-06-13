@@ -1,27 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Plug,
-  Plus,
-  MessageCircle,
-  Send,
-  Instagram,
-  Facebook,
-  RefreshCw,
-  ShieldCheck,
-} from "lucide-react";
+import { Plug, Plus, MessageCircle, Send, Instagram, Facebook, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ===================================================================
 //  TIPOS
@@ -84,10 +70,7 @@ const CHANNEL_CATALOG = [
 ];
 
 // Status do canal -> rótulo + cores
-const STATUS_META: Record
-  string,
-  { label: string; dot: string; badge: string }
-> = {
+const STATUS_META: Record<string, { label: string; dot: string; badge: string }> = {
   connected: {
     label: "Conectado",
     dot: "bg-green-500",
@@ -128,9 +111,7 @@ export function ConnectionsScreen() {
     queryFn: async (): Promise<ChannelRow[]> => {
       const { data, error } = await supabase
         .from("channels")
-        .select(
-          "id, name, type, status, external_instance_id, receive_groups, created_at",
-        )
+        .select("id, name, type, status, external_instance_id, receive_groups, created_at")
         .eq("org_id", orgId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -152,8 +133,7 @@ export function ConnectionsScreen() {
     }
     setPickerOpen(false);
     toast.info("Quase lá!", {
-      description:
-        "A criação da conexão WhatsApp por QR Code chega no próximo passo (G.2).",
+      description: "A criação da conexão WhatsApp por QR Code chega no próximo passo (G.2).",
     });
   }
 
@@ -163,17 +143,10 @@ export function ConnectionsScreen() {
       <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
         <div>
           <h2 className="text-base font-semibold text-foreground">Conexões</h2>
-          <p className="text-sm text-muted-foreground">
-            Conecte seus canais de atendimento.
-          </p>
+          <p className="text-sm text-muted-foreground">Conecte seus canais de atendimento.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => channelsQuery.refetch()}
-            disabled={isLoading}
-          >
+          <Button variant="outline" size="sm" onClick={() => channelsQuery.refetch()} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
             <span className="ml-1 hidden sm:inline">Atualizar</span>
           </Button>
@@ -203,9 +176,7 @@ export function ConnectionsScreen() {
           <DialogHeader>
             <DialogTitle>Nova conexão</DialogTitle>
           </DialogHeader>
-          <p className="mb-1 text-sm text-muted-foreground">
-            Escolha o canal que deseja conectar.
-          </p>
+          <p className="mb-1 text-sm text-muted-foreground">Escolha o canal que deseja conectar.</p>
           <ChannelGrid onChoose={handleChooseChannel} />
         </DialogContent>
       </Dialog>
@@ -226,12 +197,8 @@ function EmptyState({ onChoose }: { onChoose: (type: string) => void }) {
         >
           <Plug className="h-5 w-5" style={{ color: "#0055A6" }} />
         </div>
-        <h3 className="text-base font-semibold text-foreground">
-          Nenhum canal conectado ainda
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Escolha um canal abaixo para começar a atender.
-        </p>
+        <h3 className="text-base font-semibold text-foreground">Nenhum canal conectado ainda</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Escolha um canal abaixo para começar a atender.</p>
       </div>
       <ChannelGrid onChoose={onChoose} />
     </div>
@@ -265,14 +232,9 @@ function ChannelGrid({ onChoose }: { onChoose: (type: string) => void }) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground">
-                  {c.label}
-                </span>
+                <span className="text-sm font-medium text-foreground">{c.label}</span>
                 {!c.available && (
-                  <Badge
-                    variant="secondary"
-                    className="h-4 px-1.5 text-[10px]"
-                  >
+                  <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
                     Em breve
                   </Badge>
                 )}
@@ -298,10 +260,7 @@ function ChannelList({ channels }: { channels: ChannelRow[] }) {
         const st = STATUS_META[ch.status] ?? STATUS_META.disconnected;
         const color = cat?.color ?? "#0055A6";
         return (
-          <div
-            key={ch.id}
-            className="flex items-center gap-3 rounded-lg border border-border p-4"
-          >
+          <div key={ch.id} className="flex items-center gap-3 rounded-lg border border-border p-4">
             <div
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
               style={{ backgroundColor: `${color}1A`, color }}
@@ -309,20 +268,12 @@ function ChannelList({ channels }: { channels: ChannelRow[] }) {
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground">
-                {ch.name}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {cat?.label ?? ch.type}
-              </p>
+              <p className="truncate text-sm font-medium text-foreground">{ch.name}</p>
+              <p className="truncate text-xs text-muted-foreground">{cat?.label ?? ch.type}</p>
             </div>
             <div className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${st.dot}`} />
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${st.badge}`}
-              >
-                {st.label}
-              </span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${st.badge}`}>{st.label}</span>
             </div>
           </div>
         );

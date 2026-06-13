@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -607,10 +608,9 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="h-full overflow-auto p-6">
+    <div className="h-full overflow-auto bg-gray-50 p-6">
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-lg font-semibold text-foreground">Configurações</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Gerencie as configurações do sistema</p>
+        <PageHeader title="Configurações" subtitle="Gerencie as configurações do sistema." />
 
         <Tabs defaultValue="geral" className="mt-6">
           <TabsList className="w-full justify-start overflow-x-auto">

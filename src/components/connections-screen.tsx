@@ -1,6 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plug, Plus, Pencil, MessageCircle, Send, Instagram, Facebook, RefreshCw, ShieldCheck } from "lucide-react";
+import {
+  Plug,
+  Plus,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  Power,
+  PowerOff,
+  MessageCircle,
+  Send,
+  Instagram,
+  Facebook,
+  ShieldCheck,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +28,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 // ===================================================================
 //  TIPOS
 // ===================================================================
+type Credentials = { number?: string } | null;
+
 type ChannelRow = {
   id: string;
   name: string;
@@ -21,12 +37,14 @@ type ChannelRow = {
   status: string;
   external_instance_id: string | null;
   receive_groups: boolean;
+  credentials: Credentials;
   created_at: string;
 };
 
+type QrTarget = { channelId: string; qr: string | null; pairingCode: string | null };
+
 // ===================================================================
-//  CATÁLOGO DE CANAIS (o que aparece em "escolher canal")
-//  available=false -> botão "Em breve" (entra nas próximas fases).
+//  CATÁLOGO DE CANAIS
 // ===================================================================
 const CHANNEL_CATALOG = [
   {
@@ -45,14 +63,7 @@ const CHANNEL_CATALOG = [
     color: "#0055A6",
     available: false,
   },
-  {
-    type: "telegram",
-    label: "Telegram",
-    sub: "Bot do Telegram",
-    icon: Send,
-    color: "#229ED9",
-    available: false,
-  },
+  { type: "telegram", label: "Telegram", sub: "Bot do Telegram", icon: Send, color: "#229ED9", available: false },
   {
     type: "instagram",
     label: "Instagram",
@@ -71,32 +82,26 @@ const CHANNEL_CATALOG = [
   },
 ];
 
-// Status do canal -> rótulo + cores
 const STATUS_META: Record<string, { label: string; dot: string; badge: string }> = {
-  connected: {
-    label: "Conectado",
-    dot: "bg-green-500",
-    badge: "bg-green-100 text-green-700",
-  },
-  connecting: {
-    label: "Conectando…",
-    dot: "bg-amber-500",
-    badge: "bg-amber-100 text-amber-700",
-  },
-  disconnected: {
-    label: "Desconectado",
-    dot: "bg-gray-400",
-    badge: "bg-gray-100 text-gray-600",
-  },
-  error: {
-    label: "Erro",
-    dot: "bg-red-500",
-    badge: "bg-red-100 text-red-700",
-  },
+  connected: { label: "Conectado", dot: "bg-green-500", badge: "bg-green-100 text-green-700" },
+  connecting: { label: "Conectando…", dot: "bg-amber-500", badge: "bg-amber-100 text-amber-700" },
+  disconnected: { label: "Desconectado", dot: "bg-gray-400", badge: "bg-gray-100 text-gray-600" },
+  error: { label: "Erro", dot: "bg-red-500", badge: "bg-red-100 text-red-700" },
 };
 
 function catalogFor(type: string) {
   return CHANNEL_CATALOG.find((c) => c.type === type);
+}
+
+// Garante que o QR vire uma imagem exibível.
+function qrSrc(qr: string | null): string | null {
+  if (!qr) return null;
+  return qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`;
+}
+
+// Lê uma mensagem de erro amigável do retorno da função.
+function fnError(data: any, error: any): string | undefined {
+  return data?.error ?? error?.message;
 }
 
 // ===================================================================
@@ -105,8 +110,13 @@ function catalogFor(type: string) {
 export function ConnectionsScreen() {
   const { activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id;
+
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ChannelRow | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ChannelRow | null>(null);
+  const [qrTarget, setQrTarget] = useState<QrTarget | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const channelsQuery = useQuery({
     queryKey: ["channels", orgId],
@@ -114,7 +124,7 @@ export function ConnectionsScreen() {
     queryFn: async (): Promise<ChannelRow[]> => {
       const { data, error } = await supabase
         .from("channels")
-        .select("id, name, type, status, external_instance_id, receive_groups, created_at")
+        .select("id, name, type, status, external_instance_id, receive_groups, credentials, created_at")
         .eq("org_id", orgId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -124,9 +134,60 @@ export function ConnectionsScreen() {
 
   const channels = channelsQuery.data ?? [];
   const isLoading = channelsQuery.isLoading;
+  const refetch = () => channelsQuery.refetch();
 
-  // No G.1 os botões ainda não criam de verdade (isso é o G.2).
-  function handleChooseChannel(type: string) {
+  async function callFn(body: Record<string, unknown>) {
+    return supabase.functions.invoke("manage-channels", { body });
+  }
+
+  async function handleRefresh(ch: ChannelRow) {
+    setBusyId(ch.id);
+    const { data, error } = await callFn({ action: "status", channelId: ch.id });
+    setBusyId(null);
+    if (error || data?.error) {
+      toast.error("Não foi possível atualizar o status", { description: fnError(data, error) });
+      return;
+    }
+    refetch();
+  }
+
+  async function handleDisconnect(ch: ChannelRow) {
+    setBusyId(ch.id);
+    const { data, error } = await callFn({ action: "disconnect", channelId: ch.id });
+    setBusyId(null);
+    if (error || data?.error) {
+      toast.error("Não foi possível desligar", { description: fnError(data, error) });
+      return;
+    }
+    toast.success("Conexão desligada");
+    refetch();
+  }
+
+  async function handleReconnect(ch: ChannelRow) {
+    setBusyId(ch.id);
+    const { data, error } = await callFn({ action: "qr", channelId: ch.id });
+    setBusyId(null);
+    if (error || data?.error) {
+      toast.error("Não foi possível gerar o QR", { description: fnError(data, error) });
+      return;
+    }
+    setQrTarget({ channelId: ch.id, qr: data?.qr ?? null, pairingCode: data?.pairingCode ?? null });
+  }
+
+  async function handleDelete(ch: ChannelRow) {
+    setBusyId(ch.id);
+    const { data, error } = await callFn({ action: "delete", channelId: ch.id });
+    setBusyId(null);
+    setConfirmDelete(null);
+    if (error || data?.error) {
+      toast.error("Não foi possível excluir", { description: fnError(data, error) });
+      return;
+    }
+    toast.success("Conexão excluída");
+    refetch();
+  }
+
+  function chooseChannel(type: string) {
     const c = catalogFor(type);
     if (!c?.available) {
       toast.info("Em breve", {
@@ -135,9 +196,7 @@ export function ConnectionsScreen() {
       return;
     }
     setPickerOpen(false);
-    toast.info("Quase lá!", {
-      description: "A criação da conexão WhatsApp por QR Code chega no próximo passo (G.2).",
-    });
+    setCreateOpen(true);
   }
 
   return (
@@ -146,19 +205,17 @@ export function ConnectionsScreen() {
       <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
         <div>
           <h2 className="text-base font-semibold text-foreground">Conexões</h2>
-          <p className="text-sm text-muted-foreground">Conecte seus canais de atendimento.</p>
+          <p className="text-sm text-muted-foreground">Gerencie suas conexões de WhatsApp.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => channelsQuery.refetch()} disabled={isLoading}>
+          <Button variant="outline" size="sm" onClick={refetch} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
             <span className="ml-1 hidden sm:inline">Atualizar</span>
           </Button>
-          {channels.length > 0 && (
-            <Button size="sm" onClick={() => setPickerOpen(true)}>
-              <Plus className="h-4 w-4" />
-              <span className="ml-1">Nova conexão</span>
-            </Button>
-          )}
+          <Button size="sm" onClick={() => setPickerOpen(true)}>
+            <Plus className="h-4 w-4" />
+            <span className="ml-1">Nova conexão</span>
+          </Button>
         </div>
       </div>
 
@@ -167,38 +224,200 @@ export function ConnectionsScreen() {
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
         ) : channels.length === 0 ? (
-          <EmptyState onChoose={handleChooseChannel} />
+          <EmptyState onChoose={chooseChannel} />
         ) : (
-          <ChannelList channels={channels} onEdit={setEditing} />
+          <ChannelList
+            channels={channels}
+            busyId={busyId}
+            onRefresh={handleRefresh}
+            onReconnect={handleReconnect}
+            onDisconnect={handleDisconnect}
+            onEdit={setEditing}
+            onDelete={setConfirmDelete}
+          />
         )}
       </div>
 
-      {/* Modal "Nova conexão" (escolher canal) */}
+      {/* Escolher canal */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Nova conexão</DialogTitle>
           </DialogHeader>
           <p className="mb-1 text-sm text-muted-foreground">Escolha o canal que deseja conectar.</p>
-          <ChannelGrid onChoose={handleChooseChannel} />
+          <ChannelGrid onChoose={chooseChannel} />
         </DialogContent>
       </Dialog>
 
-      {/* Modal "Renomear conexão" */}
+      {/* Criar conexão WhatsApp */}
+      <NewConnectionForm
+        open={createOpen}
+        orgId={orgId}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(t) => {
+          setCreateOpen(false);
+          refetch();
+          setQrTarget(t);
+        }}
+      />
+
+      {/* QR Code (criar/reconectar) */}
+      <QrDialog
+        target={qrTarget}
+        onClose={() => {
+          setQrTarget(null);
+          refetch();
+        }}
+        onConnected={() => {
+          setQrTarget(null);
+          toast.success("WhatsApp conectado!");
+          refetch();
+        }}
+      />
+
+      {/* Renomear */}
       <EditNameDialog
         channel={editing}
         onClose={() => setEditing(null)}
         onSaved={() => {
           setEditing(null);
-          channelsQuery.refetch();
+          refetch();
         }}
+      />
+
+      {/* Confirmar exclusão */}
+      <ConfirmDeleteDialog
+        channel={confirmDelete}
+        busy={busyId === confirmDelete?.id}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
       />
     </div>
   );
 }
 
 // ===================================================================
-//  ESTADO VAZIO (nenhum canal): convite + grade de canais
+//  LISTA (largura total, estilo do PDF)
+// ===================================================================
+function ChannelList({
+  channels,
+  busyId,
+  onRefresh,
+  onReconnect,
+  onDisconnect,
+  onEdit,
+  onDelete,
+}: {
+  channels: ChannelRow[];
+  busyId: string | null;
+  onRefresh: (ch: ChannelRow) => void;
+  onReconnect: (ch: ChannelRow) => void;
+  onDisconnect: (ch: ChannelRow) => void;
+  onEdit: (ch: ChannelRow) => void;
+  onDelete: (ch: ChannelRow) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {channels.map((ch) => {
+        const cat = catalogFor(ch.type);
+        const Icon = cat?.icon ?? MessageCircle;
+        const st = STATUS_META[ch.status] ?? STATUS_META.disconnected;
+        const color = cat?.color ?? "#0055A6";
+        const number = (ch.credentials as Credentials)?.number;
+        const connected = ch.status === "connected";
+        const busy = busyId === ch.id;
+
+        return (
+          <div key={ch.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-4">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
+              style={{ backgroundColor: `${color}1A`, color }}
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-foreground">{ch.name}</span>
+                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                  {cat?.label ?? ch.type}
+                </Badge>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${st.badge}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
+                  {st.label}
+                </span>
+              </div>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {number ? `+${number}` : "O número aparece após conectar"}
+              </p>
+            </div>
+
+            <div className="ml-auto flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title="Atualizar status"
+                onClick={() => onRefresh(ch)}
+                disabled={busy}
+              >
+                <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
+              </Button>
+              {connected ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  title="Desligar"
+                  onClick={() => onDisconnect(ch)}
+                  disabled={busy}
+                >
+                  <PowerOff className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  title="Ligar / reconectar"
+                  onClick={() => onReconnect(ch)}
+                  disabled={busy}
+                >
+                  <Power className="h-4 w-4 text-green-600" />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title="Renomear"
+                onClick={() => onEdit(ch)}
+                disabled={busy}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title="Excluir"
+                onClick={() => onDelete(ch)}
+                disabled={busy}
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ===================================================================
+//  ESTADO VAZIO + GRADE DE CANAIS
 // ===================================================================
 function EmptyState({ onChoose }: { onChoose: (type: string) => void }) {
   return (
@@ -218,9 +437,6 @@ function EmptyState({ onChoose }: { onChoose: (type: string) => void }) {
   );
 }
 
-// ===================================================================
-//  GRADE DE CANAIS (usada no estado vazio e no modal)
-// ===================================================================
 function ChannelGrid({ onChoose }: { onChoose: (type: string) => void }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -262,53 +478,196 @@ function ChannelGrid({ onChoose }: { onChoose: (type: string) => void }) {
 }
 
 // ===================================================================
-//  ESTADO COM LISTA: cartões dos canais já criados
-//  (cada cartão tem o lápis para renomear)
+//  MODAL: NOVA CONEXÃO (nome + grupos)
 // ===================================================================
-function ChannelList({ channels, onEdit }: { channels: ChannelRow[]; onEdit: (ch: ChannelRow) => void }) {
+function NewConnectionForm({
+  open,
+  orgId,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  orgId: string | undefined;
+  onClose: () => void;
+  onCreated: (t: QrTarget) => void;
+}) {
+  const [name, setName] = useState("");
+  const [receiveGroups, setReceiveGroups] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setReceiveGroups(false);
+    }
+  }, [open]);
+
+  async function criar() {
+    const trimmed = name.trim();
+    if (!orgId || !trimmed) return;
+    setCreating(true);
+    const { data, error } = await supabase.functions.invoke("manage-channels", {
+      body: { action: "create", orgId, name: trimmed, receiveGroups },
+    });
+    setCreating(false);
+    if (error || data?.error) {
+      toast.error("Não foi possível criar a conexão", { description: fnError(data, error) });
+      return;
+    }
+    onCreated({ channelId: data.channelId, qr: data.qr ?? null, pairingCode: data.pairingCode ?? null });
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-      {channels.map((ch) => {
-        const cat = catalogFor(ch.type);
-        const Icon = cat?.icon ?? MessageCircle;
-        const st = STATUS_META[ch.status] ?? STATUS_META.disconnected;
-        const color = cat?.color ?? "#0055A6";
-        return (
-          <div key={ch.id} className="flex items-center gap-3 rounded-lg border border-border p-4">
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
-              style={{ backgroundColor: `${color}1A`, color }}
-            >
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground">{ch.name}</p>
-              <p className="truncate text-xs text-muted-foreground">{cat?.label ?? ch.type}</p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-full ${st.dot}`} />
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${st.badge}`}>{st.label}</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={() => onEdit(ch)}
-              title="Renomear"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nova conexão de WhatsApp</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-1">
+          <div className="space-y-1.5">
+            <Label htmlFor="conn-name">Nome da conexão</Label>
+            <Input
+              id="conn-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex.: WhatsApp Vendas"
+              maxLength={60}
+              autoFocus
+            />
           </div>
-        );
-      })}
-    </div>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={receiveGroups}
+              onChange={(e) => setReceiveGroups(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Receber mensagens de grupos
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={creating}>
+            Cancelar
+          </Button>
+          <Button onClick={criar} disabled={creating || !name.trim()}>
+            {creating ? "Criando…" : "Criar e mostrar QR"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 // ===================================================================
-//  MODAL: RENOMEAR CONEXÃO
-//  Salva direto na tabela channels (campo name). A regra de segurança
-//  já permite membros da empresa atualizarem seus próprios canais.
+//  MODAL: QR CODE (criar/reconectar) — fecha sozinho ao conectar
+// ===================================================================
+function QrDialog({
+  target,
+  onClose,
+  onConnected,
+}: {
+  target: QrTarget | null;
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const [qr, setQr] = useState<string | null>(null);
+  const [pairing, setPairing] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const channelId = target?.channelId ?? null;
+
+  // Mantém a função onConnected sempre atual sem reiniciar o "relógio".
+  const onConnectedRef = useRef(onConnected);
+  useEffect(() => {
+    onConnectedRef.current = onConnected;
+  }, [onConnected]);
+
+  useEffect(() => {
+    setQr(target?.qr ?? null);
+    setPairing(target?.pairingCode ?? null);
+  }, [target]);
+
+  // Pergunta o status a cada 3s; quando conectar, fecha.
+  useEffect(() => {
+    if (!channelId) return;
+    let active = true;
+    const id = setInterval(async () => {
+      const { data } = await supabase.functions.invoke("manage-channels", {
+        body: { action: "status", channelId },
+      });
+      if (!active) return;
+      if (data?.status === "connected") {
+        clearInterval(id);
+        onConnectedRef.current();
+      }
+    }, 3000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [channelId]);
+
+  async function gerarNovo() {
+    if (!channelId) return;
+    setRefreshing(true);
+    const { data, error } = await supabase.functions.invoke("manage-channels", {
+      body: { action: "qr", channelId },
+    });
+    setRefreshing(false);
+    if (error || data?.error) {
+      toast.error("Não foi possível gerar um novo QR", { description: fnError(data, error) });
+      return;
+    }
+    setQr(data?.qr ?? null);
+    setPairing(data?.pairingCode ?? null);
+  }
+
+  const src = qrSrc(qr);
+
+  return (
+    <Dialog
+      open={!!target}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Conectar WhatsApp</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col items-center gap-3 py-2">
+          <p className="text-center text-sm text-muted-foreground">
+            No celular: WhatsApp → Aparelhos conectados → Conectar um aparelho → aponte para o QR abaixo.
+          </p>
+          {src ? (
+            <img src={src} alt="QR Code" className="h-56 w-56 rounded-lg border border-border" />
+          ) : (
+            <div className="flex h-56 w-56 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          )}
+          {pairing && (
+            <p className="text-xs text-muted-foreground">
+              Ou use o código: <span className="font-mono font-medium text-foreground">{pairing}</span>
+            </p>
+          )}
+          <Button variant="outline" size="sm" onClick={gerarNovo} disabled={refreshing}>
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            <span className="ml-1">Gerar novo QR</span>
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">Esta janela fecha sozinha quando conectar.</p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===================================================================
+//  MODAL: RENOMEAR
 // ===================================================================
 function EditNameDialog({
   channel,
@@ -322,7 +681,6 @@ function EditNameDialog({
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Quando abre o modal, preenche com o nome atual.
   useEffect(() => {
     setName(channel?.name ?? "");
   }, [channel]);
@@ -344,8 +702,8 @@ function EditNameDialog({
   return (
     <Dialog
       open={!!channel}
-      onOpenChange={(open) => {
-        if (!open) onClose();
+      onOpenChange={(o) => {
+        if (!o) onClose();
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -373,6 +731,50 @@ function EditNameDialog({
           </Button>
           <Button onClick={handleSave} disabled={saving || !name.trim() || name.trim() === channel?.name}>
             {saving ? "Salvando…" : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===================================================================
+//  MODAL: CONFIRMAR EXCLUSÃO
+// ===================================================================
+function ConfirmDeleteDialog({
+  channel,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  channel: ChannelRow | null;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog
+      open={!!channel}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Excluir conexão</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Tem certeza que deseja excluir <span className="font-medium text-foreground">{channel?.name}</span>? Isso
+          remove a conexão e{" "}
+          <span className="font-medium text-foreground">apaga também todas as conversas e mensagens</span> deste canal.
+          Esta ação não pode ser desfeita.
+        </p>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button variant="destructive" onClick={onConfirm} disabled={busy}>
+            {busy ? "Excluindo…" : "Excluir definitivamente"}
           </Button>
         </DialogFooter>
       </DialogContent>

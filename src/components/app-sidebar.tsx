@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug } from "lucide-react";
+import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug, ChevronLeft, ChevronRight } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 import {
@@ -14,7 +14,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -44,7 +43,7 @@ function initials(name: string | null | undefined, email: string | null | undefi
 }
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -64,10 +63,33 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className={`flex items-center gap-2 px-2 py-1.5 ${collapsed ? "justify-center" : "justify-between"}`}>
-          {!collapsed && <Logo variant="horizontal" className="h-7 w-auto" />}
-          <SidebarTrigger className="text-muted-foreground" />
-        </div>
+        {collapsed ? (
+          // Recolhida: mantém o logo (ícone) e uma seta para expandir.
+          <div className="flex flex-col items-center gap-1 py-1.5">
+            <Logo variant="icon" className="h-8 w-8" />
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title="Expandir menu"
+              className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          // Expandida: logo completo + seta para recolher.
+          <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+            <Logo variant="horizontal" className="h-7 w-auto" />
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title="Recolher menu"
+              className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent>

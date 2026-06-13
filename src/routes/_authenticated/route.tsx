@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Building2 } from "lucide-react";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -17,17 +17,7 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-const TITLES: Record<string, string> = {
-  "/inbox": "Caixa de entrada",
-  "/contacts": "Contatos",
-  "/schedules": "Agendamentos",
-  "/connections": "Conexões",
-  "/settings": "Configurações",
-};
-
 function AuthenticatedLayout() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const title = TITLES[pathname] ?? "ConectaChat";
   const { hasNoOrg, isLoading } = useCurrentUser();
 
   return (
@@ -35,10 +25,11 @@ function AuthenticatedLayout() {
       <div className="flex h-screen w-full overflow-hidden bg-background">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-4">
+          {/* Barra superior mínima: só o botão de recolher o menu
+              (sem título nem borda — cada página já tem seu próprio cabeçalho). */}
+          <div className="flex h-10 shrink-0 items-center px-2">
             <SidebarTrigger />
-            <h1 className="text-sm font-medium text-foreground">{title}</h1>
-          </header>
+          </div>
           {!isLoading && !hasNoOrg && <ConnectionBanner />}
           <main className="min-h-0 flex-1 overflow-hidden">
             {!isLoading && hasNoOrg ? <NoOrgScreen /> : <Outlet />}
@@ -56,12 +47,9 @@ function NoOrgScreen() {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Building2 className="h-5 w-5" />
         </div>
-        <h2 className="mt-4 text-base font-medium text-foreground">
-          Conta sem empresa vinculada
-        </h2>
+        <h2 className="mt-4 text-base font-medium text-foreground">Conta sem empresa vinculada</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sua conta ainda não está vinculada a nenhuma empresa. Fale com o administrador
-          para receber acesso.
+          Sua conta ainda não está vinculada a nenhuma empresa. Fale com o administrador para receber acesso.
         </p>
       </div>
     </div>

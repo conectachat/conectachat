@@ -14,6 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -63,12 +64,9 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center px-2 py-1.5">
-          {collapsed ? (
-            <Logo variant="icon" className="h-8 w-8" />
-          ) : (
-            <Logo variant="horizontal" className="h-7 w-auto" />
-          )}
+        <div className={`flex items-center gap-2 px-2 py-1.5 ${collapsed ? "justify-center" : "justify-between"}`}>
+          {!collapsed && <Logo variant="horizontal" className="h-7 w-auto" />}
+          <SidebarTrigger className="text-muted-foreground" />
         </div>
       </SidebarHeader>
 

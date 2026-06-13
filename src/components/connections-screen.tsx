@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plug, Plus, MessageCircle, Send, Instagram, Facebook, RefreshCw, ShieldCheck } from "lucide-react";
+import { Plug, Plus, Pencil, MessageCircle, Send, Instagram, Facebook, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 // ===================================================================
 //  TIPOS
@@ -104,6 +106,7 @@ export function ConnectionsScreen() {
   const { activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id;
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [editing, setEditing] = useState<ChannelRow | null>(null);
 
   const channelsQuery = useQuery({
     queryKey: ["channels", orgId],
@@ -166,7 +169,7 @@ export function ConnectionsScreen() {
         ) : channels.length === 0 ? (
           <EmptyState onChoose={handleChooseChannel} />
         ) : (
-          <ChannelList channels={channels} />
+          <ChannelList channels={channels} onEdit={setEditing} />
         )}
       </div>
 
@@ -180,6 +183,16 @@ export function ConnectionsScreen() {
           <ChannelGrid onChoose={handleChooseChannel} />
         </DialogContent>
       </Dialog>
+
+      {/* Modal "Renomear conexão" */}
+      <EditNameDialog
+        channel={editing}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null);
+          channelsQuery.refetch();
+        }}
+      />
     </div>
   );
 }
@@ -250,8 +263,9 @@ function ChannelGrid({ onChoose }: { onChoose: (type: string) => void }) {
 
 // ===================================================================
 //  ESTADO COM LISTA: cartões dos canais já criados
+//  (cada cartão tem o lápis para renomear)
 // ===================================================================
-function ChannelList({ channels }: { channels: ChannelRow[] }) {
+function ChannelList({ channels, onEdit }: { channels: ChannelRow[]; onEdit: (ch: ChannelRow) => void }) {
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       {channels.map((ch) => {
@@ -275,9 +289,93 @@ function ChannelList({ channels }: { channels: ChannelRow[] }) {
               <span className={`h-2 w-2 rounded-full ${st.dot}`} />
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${st.badge}`}>{st.label}</span>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => onEdit(ch)}
+              title="Renomear"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
           </div>
         );
       })}
     </div>
+  );
+}
+
+// ===================================================================
+//  MODAL: RENOMEAR CONEXÃO
+//  Salva direto na tabela channels (campo name). A regra de segurança
+//  já permite membros da empresa atualizarem seus próprios canais.
+// ===================================================================
+function EditNameDialog({
+  channel,
+  onClose,
+  onSaved,
+}: {
+  channel: ChannelRow | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Quando abre o modal, preenche com o nome atual.
+  useEffect(() => {
+    setName(channel?.name ?? "");
+  }, [channel]);
+
+  async function handleSave() {
+    const trimmed = name.trim();
+    if (!channel || !trimmed) return;
+    setSaving(true);
+    const { error } = await supabase.from("channels").update({ name: trimmed }).eq("id", channel.id);
+    setSaving(false);
+    if (error) {
+      toast.error("Não foi possível salvar", { description: error.message });
+      return;
+    }
+    toast.success("Nome atualizado");
+    onSaved();
+  }
+
+  return (
+    <Dialog
+      open={!!channel}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Renomear conexão</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2 py-1">
+          <Label htmlFor="channel-name">Nome da conexão</Label>
+          <Input
+            id="channel-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex.: WhatsApp Vendas"
+            maxLength={60}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+            }}
+          />
+          <p className="text-xs text-muted-foreground">Esse nome é só interno, para sua equipe identificar o canal.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={saving || !name.trim() || name.trim() === channel?.name}>
+            {saving ? "Salvando…" : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

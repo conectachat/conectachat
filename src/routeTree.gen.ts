@@ -16,6 +16,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedSchedulesRouteImport } from './routes/_authenticated/schedules'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
+import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -51,10 +52,17 @@ const AuthenticatedContactsRoute = AuthenticatedContactsRouteImport.update({
   path: '/contacts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedConnectionsRoute =
+  AuthenticatedConnectionsRouteImport.update({
+    id: '/connections',
+    path: '/connections',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
@@ -63,6 +71,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
@@ -73,6 +82,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/connections': typeof AuthenticatedConnectionsRoute
   '/_authenticated/contacts': typeof AuthenticatedContactsRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/schedules': typeof AuthenticatedSchedulesRoute
@@ -83,17 +93,26 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/connections'
     | '/contacts'
     | '/inbox'
     | '/schedules'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/contacts' | '/inbox' | '/schedules' | '/settings'
+  to:
+    | '/'
+    | '/login'
+    | '/connections'
+    | '/contacts'
+    | '/inbox'
+    | '/schedules'
+    | '/settings'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/connections'
     | '/_authenticated/contacts'
     | '/_authenticated/inbox'
     | '/_authenticated/schedules'
@@ -157,10 +176,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedContactsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/connections': {
+      id: '/_authenticated/connections'
+      path: '/connections'
+      fullPath: '/connections'
+      preLoaderRoute: typeof AuthenticatedConnectionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedConnectionsRoute: typeof AuthenticatedConnectionsRoute
   AuthenticatedContactsRoute: typeof AuthenticatedContactsRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedSchedulesRoute: typeof AuthenticatedSchedulesRoute
@@ -168,6 +195,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedConnectionsRoute: AuthenticatedConnectionsRoute,
   AuthenticatedContactsRoute: AuthenticatedContactsRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedSchedulesRoute: AuthenticatedSchedulesRoute,

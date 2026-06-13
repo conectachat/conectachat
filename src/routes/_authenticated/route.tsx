@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useNotifications } from "@/hooks/use-notifications";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -16,6 +17,14 @@ export const Route = createFileRoute("/_authenticated")({
   },
   component: AuthenticatedLayout,
 });
+
+// Componente "invisível": só liga as notificações (som + balão do navegador +
+// contador no título da aba). Fica montado uma vez no layout, então vale para
+// todas as telas do app. Não desenha nada na tela (retorna null).
+function NotificationsManager() {
+  useNotifications();
+  return null;
+}
 
 function AuthenticatedLayout() {
   const { hasNoOrg, isLoading } = useCurrentUser();
@@ -31,6 +40,7 @@ function AuthenticatedLayout() {
           <div className="flex h-12 shrink-0 items-center px-2 md:hidden">
             <SidebarTrigger />
           </div>
+          {!isLoading && !hasNoOrg && <NotificationsManager />}
           {!isLoading && !hasNoOrg && <ConnectionBanner />}
           <main className="min-h-0 flex-1 overflow-hidden">
             {!isLoading && hasNoOrg ? <NoOrgScreen /> : <Outlet />}

@@ -1379,7 +1379,7 @@ export function InboxScreen() {
                             <p className="whitespace-pre-wrap break-words">{contentLabel(m.content_type, m.content)}</p>
                           )}
                           <p
-                            className={`mt-1 flex items-center gap-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}
+                            className={`mt-1 flex items-center gap-1 text-[10px] ${out ? "justify-end text-primary-foreground/70" : "justify-start text-gray-500"}`}
                           >
                             {!m.deleted_at && m.starred_at && (
                               <Star size={11} className="fill-amber-400 text-amber-400" />

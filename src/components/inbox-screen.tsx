@@ -20,6 +20,9 @@ import {
   Eye,
   Search,
   Check,
+  CheckCheck,
+  Clock,
+  AlertCircle,
   File as FileIcon,
   CalendarClock,
   ChevronDown,
@@ -86,6 +89,16 @@ function formatBytes(n: number | null | undefined) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// H.3b-2 — tiquinhos de status (só em mensagens enviadas por nós).
+//  enviado = ✓ | entregue = ✓✓ | lido = ✓✓ azul | falhou = ⚠ | na fila = relógio
+function StatusTicks({ status }: { status: string }) {
+  if (status === "read") return <CheckCheck size={13} className="text-sky-300" aria-label="Lida" />;
+  if (status === "delivered") return <CheckCheck size={13} className="opacity-80" aria-label="Entregue" />;
+  if (status === "sent") return <Check size={13} className="opacity-80" aria-label="Enviada" />;
+  if (status === "failed") return <AlertCircle size={13} className="text-red-300" aria-label="Falha no envio" />;
+  return <Clock size={11} className="opacity-70" aria-label="Enviando" />;
 }
 function contentLabel(type: string, content: string | null) {
   if (content && content.trim()) return content;
@@ -1278,6 +1291,7 @@ export function InboxScreen() {
                                 <Star size={11} className="fill-amber-400 text-amber-400" />
                               )}
                               {hhmm(m.created_at)}
+                              {out && !m.deleted_at && <StatusTicks status={m.status} />}
                             </p>
                             {!m.deleted_at && reactionList.length > 0 && (
                               <div className="mt-1 flex flex-wrap gap-1">

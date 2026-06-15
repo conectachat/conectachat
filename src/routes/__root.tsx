@@ -85,6 +85,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "ConectaChat — atendimento ao cliente" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "ConectaChat" },
+      { name: "twitter:description", content: "ConectaChat — atendimento ao cliente" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ffb18561-b644-457e-b876-d949b67f41d4/id-preview-fb76f02d--d2c4e2b8-d701-43f2-aae2-61d7beedaf5e.lovable.app-1781364408002.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ffb18561-b644-457e-b876-d949b67f41d4/id-preview-fb76f02d--d2c4e2b8-d701-43f2-aae2-61d7beedaf5e.lovable.app-1781364408002.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

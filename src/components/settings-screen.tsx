@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Settings, Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Settings, Plus, Pencil, Trash2, Search, Users, Check } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -33,6 +33,15 @@ type QuickReply = {
   title: string | null;
   content: string;
   active: boolean;
+};
+
+// --- Fase 2 / Passo 1: Departamentos --------------------------------------
+type Department = { id: string; name: string; member_count: number };
+type OrgUser = { user_id: string; role: string; name: string; email: string };
+const ORG_ROLE_LABEL: Record<string, string> = {
+  owner: "Dono",
+  admin: "Admin",
+  agent: "Atendente",
 };
 
 // --- Bloco E.0: fuso horário + idioma -------------------------------------
@@ -169,6 +178,14 @@ export function SettingsScreen() {
   const [qrContent, setQrContent] = useState("");
   const [qrBusy, setQrBusy] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+
+  // Departamentos state (Fase 2 / Passo 1)
+  const [deptModalOpen, setDeptModalOpen] = useState(false);
+  const [editingDept, setEditingDept] = useState<Department | null>(null);
+  const [deptName, setDeptName] = useState("");
+  const [deptBusy, setDeptBusy] = useState(false);
+  const [deptError, setDeptError] = useState<string | null>(null);
+  const [allocDept, setAllocDept] = useState<Department | null>(null); // departamento aberto na alocação
 
   useEffect(() => {
     if (!user) return;
@@ -628,8 +645,156 @@ export function SettingsScreen() {
     invalidateQuickReplies();
   }
 
+  // --- Departamentos (Fase 2 / Passo 1) -----------------------------------
+  // Lista de departamentos da empresa, já com a contagem de atendentes.
+  const departmentsQuery = useQuery({
+    queryKey: ["settings-departments", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<Department[]> => {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("id, name, department_members(count)")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []).map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        member_count: d.department_members?.[0]?.count ?? 0,
+      }));
+    },
+  });
+  const departmentsList = departmentsQuery.data ?? [];
+
+  // Todos os usuários da empresa (para a tela de alocação).
+  const orgUsersQuery = useQuery({
+    queryKey: ["settings-org-users", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<OrgUser[]> => {
+      const { data, error } = await supabase
+        .from("org_members")
+        .select("user_id, role, created_at, profiles(full_name, email)")
+        .eq("org_id", orgId!)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((m: any) => ({
+        user_id: m.user_id,
+        role: (m.role ?? "agent") as string,
+        name: m.profiles?.full_name || m.profiles?.email || "Usuário",
+        email: m.profiles?.email || "",
+      }));
+    },
+  });
+  const orgUsersList = orgUsersQuery.data ?? [];
+
+  // Quem já pertence ao departamento aberto na alocação.
+  const deptMembersQuery = useQuery({
+    queryKey: ["settings-dept-members", allocDept?.id ?? null],
+    enabled: !!allocDept?.id,
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase
+        .from("department_members")
+        .select("user_id")
+        .eq("department_id", allocDept!.id);
+      if (error) throw error;
+      return new Set((data ?? []).map((r: any) => r.user_id as string));
+    },
+  });
+  const deptMemberSet = deptMembersQuery.data ?? new Set<string>();
+
+  function invalidateDepartments() {
+    qc.invalidateQueries({ queryKey: ["settings-departments"] });
+  }
+
+  function openNewDept() {
+    setEditingDept(null);
+    setDeptName("");
+    setDeptError(null);
+    setDeptModalOpen(true);
+  }
+  function openEditDept(d: Department) {
+    setEditingDept(d);
+    setDeptName(d.name);
+    setDeptError(null);
+    setDeptModalOpen(true);
+  }
+  async function saveDept() {
+    setDeptError(null);
+    const n = deptName.trim();
+    if (!n) return;
+    if (!orgId) {
+      setDeptError("Sem empresa vinculada.");
+      return;
+    }
+    setDeptBusy(true);
+    if (editingDept) {
+      const { error } = await supabase.from("departments").update({ name: n }).eq("id", editingDept.id);
+      setDeptBusy(false);
+      if (error) {
+        setDeptError("Não foi possível salvar o departamento.");
+        console.error("Erro ao editar departamento:", error);
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("departments").insert({ org_id: orgId, name: n });
+      setDeptBusy(false);
+      if (error) {
+        setDeptError("Não foi possível criar o departamento.");
+        console.error("Erro ao criar departamento:", error);
+        return;
+      }
+    }
+    setDeptModalOpen(false);
+    setEditingDept(null);
+    setDeptName("");
+    invalidateDepartments();
+  }
+  async function deleteDept(d: Department) {
+    const ok = await confirm({
+      title: "Excluir departamento?",
+      description: `O departamento "${d.name}" será excluído. As conversas atuais não serão apagadas — elas apenas ficarão sem departamento.`,
+      confirmText: "Excluir",
+      danger: true,
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("departments").delete().eq("id", d.id);
+    if (error) {
+      console.error("Erro ao excluir departamento:", error);
+      toast.error("Não foi possível excluir o departamento.");
+      return;
+    }
+    if (allocDept?.id === d.id) setAllocDept(null);
+    invalidateDepartments();
+  }
+  // Marca/desmarca um atendente no departamento aberto. Salva na hora.
+  async function toggleMember(userId: string, isMember: boolean) {
+    if (!allocDept) return;
+    if (isMember) {
+      const { error } = await supabase
+        .from("department_members")
+        .delete()
+        .eq("department_id", allocDept.id)
+        .eq("user_id", userId);
+      if (error) {
+        console.error("Erro ao remover do departamento:", error);
+        toast.error("Não foi possível remover.");
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("department_members")
+        .insert({ department_id: allocDept.id, user_id: userId });
+      if (error) {
+        console.error("Erro ao adicionar ao departamento:", error);
+        toast.error("Não foi possível adicionar.");
+        return;
+      }
+    }
+    qc.invalidateQueries({ queryKey: ["settings-dept-members", allocDept.id] });
+    invalidateDepartments();
+  }
+
   return (
-    <div className="h-full overflow-auto bg-gray-50 p-6">
+    <div className="h-full overflow-auto bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto max-w-4xl">
         <PageHeader title="Configurações" subtitle="Gerencie as configurações do sistema." />
 
@@ -1004,8 +1169,159 @@ export function SettingsScreen() {
             </Dialog>
           </TabsContent>
 
-          <TabsContent value="departamentos" className="mt-4">
-            <Placeholder message="Disponível na fase de múltiplos usuários." />
+          {/* Fase 2 / Passo 1 — Departamentos + alocação de usuários */}
+          <TabsContent value="departamentos" className="mt-4 space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Organize sua equipe em departamentos (ex.: Suporte, Vendas). Um atendente pode estar em vários.
+              </p>
+              {isOrgAdmin ? (
+                <Button onClick={openNewDept} size="sm" className="shrink-0">
+                  <Plus className="mr-1 h-4 w-4" /> Novo Departamento
+                </Button>
+              ) : (
+                <span className="text-xs text-muted-foreground">Somente o dono e administradores podem gerenciar.</span>
+              )}
+            </div>
+
+            {departmentsQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Carregando…</p>
+            ) : departmentsList.length === 0 ? (
+              <div className="flex h-40 flex-col items-center justify-center rounded-lg border border-border bg-card text-center text-sm">
+                <Users className="mb-2 h-6 w-6 text-muted-foreground opacity-50" />
+                <p className="font-medium text-foreground">Nenhum departamento criado</p>
+                <p className="mt-1 text-muted-foreground">
+                  {isOrgAdmin ? "Clique em “Novo Departamento” para começar." : "Peça ao administrador para criar."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {departmentsList.map((d) => (
+                  <div key={d.id} className="rounded-lg border border-border bg-card p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {d.member_count} {d.member_count === 1 ? "atendente" : "atendentes"}
+                        </p>
+                      </div>
+                      {isOrgAdmin && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openEditDept(d)}
+                            title="Renomear"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => deleteDept(d)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    {isOrgAdmin && (
+                      <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setAllocDept(d)}>
+                        <Users className="mr-1 h-4 w-4" /> Atendentes
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Modal: criar / renomear departamento */}
+            <Dialog open={deptModalOpen} onOpenChange={setDeptModalOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{editingDept ? "Renomear departamento" : "Novo departamento"}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dept-name">Nome</Label>
+                    <Input
+                      id="dept-name"
+                      value={deptName}
+                      onChange={(e) => setDeptName(e.target.value)}
+                      placeholder="Ex.: Suporte"
+                    />
+                  </div>
+                  {deptError && <p className="text-sm text-destructive">{deptError}</p>}
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setDeptModalOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button size="sm" onClick={saveDept} disabled={deptBusy || !deptName.trim()}>
+                      {deptBusy ? "Salvando…" : editingDept ? "Salvar" : "Criar"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Modal: alocar atendentes a um departamento */}
+            <Dialog
+              open={!!allocDept}
+              onOpenChange={(o) => {
+                if (!o) setAllocDept(null);
+              }}
+            >
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Atendentes — {allocDept?.name}</DialogTitle>
+                </DialogHeader>
+                <p className="text-xs text-muted-foreground">
+                  Marque quem atende este departamento. As mudanças são salvas na hora.
+                </p>
+                <div className="mt-2 max-h-80 space-y-1 overflow-y-auto">
+                  {orgUsersQuery.isLoading ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Carregando…</p>
+                  ) : orgUsersList.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Nenhum usuário na empresa ainda.</p>
+                  ) : (
+                    orgUsersList.map((u) => {
+                      const isMember = deptMemberSet.has(u.user_id);
+                      return (
+                        <button
+                          key={u.user_id}
+                          type="button"
+                          onClick={() => toggleMember(u.user_id, isMember)}
+                          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted"
+                        >
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                              isMember ? "border-primary bg-primary text-primary-foreground" : "border-input"
+                            }`}
+                          >
+                            {isMember && <Check className="h-3.5 w-3.5" />}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-foreground">{u.name}</span>
+                            {u.email && <span className="block truncate text-xs text-muted-foreground">{u.email}</span>}
+                          </span>
+                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                            {ORG_ROLE_LABEL[u.role] ?? u.role}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setAllocDept(null)}>
+                    Fechar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="respostas" className="mt-4 space-y-4">

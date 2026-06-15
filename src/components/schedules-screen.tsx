@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useConfirm } from "@/components/confirm-dialog";
 
 // ===================================================================
 //  TIPOS
@@ -168,6 +169,7 @@ export function SchedulesScreen() {
   const { user, activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id ?? null;
   const qc = useQueryClient();
+  const confirm = useConfirm();
 
   const [view, setView] = useState<ViewMode>("month");
   const [cursor, setCursor] = useState<Date>(new Date());
@@ -464,7 +466,14 @@ export function SchedulesScreen() {
   }
 
   async function handleCancel(s: ScheduleRow) {
-    if (!window.confirm("Cancelar este agendamento? Ele não será enviado.")) return;
+    const ok = await confirm({
+      title: "Cancelar agendamento?",
+      description: "A mensagem agendada não será enviada.",
+      confirmText: "Cancelar agendamento",
+      cancelText: "Voltar",
+      danger: true,
+    });
+    if (!ok) return;
     await supabase.from("scheduled_messages").update({ status: "cancelled" }).eq("id", s.id);
     qc.invalidateQueries({ queryKey: ["schedules"] });
   }

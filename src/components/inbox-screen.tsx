@@ -19,6 +19,7 @@ import {
   Smile,
   Eye,
   Search,
+  Check,
   File as FileIcon,
   CalendarClock,
   ChevronDown,
@@ -410,8 +411,20 @@ export function InboxScreen() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { activeMembership } = useCurrentUser();
+  const { user, activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id ?? null;
+
+  // H.3b-1 — "Atender": atribui (ou libera) a conversa para o usuário atual.
+  async function assignConversation(uid: string | null) {
+    if (!selectedId) return;
+    const { error } = await supabase.from("conversations").update({ assigned_user_id: uid }).eq("id", selectedId);
+    if (error) {
+      toast.error("Não foi possível atualizar o atendimento.");
+      return;
+    }
+    toast.success(uid ? "Você assumiu o atendimento." : "Atendimento liberado.");
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
@@ -1097,9 +1110,30 @@ export function InboxScreen() {
                 >
                   Marcar como não lida
                 </button>
-                <button className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-brand-green-foreground transition-colors hover:bg-brand-green/90">
-                  Atender
-                </button>
+                {selected.assigned_user_id && selected.assigned_user_id === user?.id ? (
+                  <button
+                    onClick={() => assignConversation(null)}
+                    title="Você está atendendo — clique para liberar"
+                    className="flex items-center gap-1.5 rounded-lg border border-brand-green/40 bg-brand-green/10 px-3 py-1.5 text-sm font-medium text-brand-green hover:bg-brand-green/20"
+                  >
+                    <Check size={15} /> Você está atendendo
+                  </button>
+                ) : selected.assigned_user_id ? (
+                  <button
+                    onClick={() => assignConversation(user?.id ?? null)}
+                    title="Em atendimento por outro usuário — clique para assumir"
+                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+                  >
+                    Assumir atendimento
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => assignConversation(user?.id ?? null)}
+                    className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-brand-green-foreground transition-colors hover:bg-brand-green/90"
+                  >
+                    Atender
+                  </button>
+                )}
               </div>
             </header>
 

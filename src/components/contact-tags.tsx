@@ -1,32 +1,15 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, X, Pencil, Trash2, Check } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { useConfirm } from "@/components/confirm-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export type Tag = { id: string; name: string; color: string };
 
-export const TAG_PALETTE = [
-  "#8FC549",
-  "#0055A6",
-  "#E53935",
-  "#F59E0B",
-  "#8B5CF6",
-  "#EC4899",
-  "#14B8A6",
-  "#6B7280",
-];
+export const TAG_PALETTE = ["#8FC549", "#0055A6", "#E53935", "#F59E0B", "#8B5CF6", "#EC4899", "#14B8A6", "#6B7280"];
 
 // black or white text based on hex luminance
 export function readableText(hex: string): string {
@@ -39,15 +22,7 @@ export function readableText(hex: string): string {
   return yiq >= 150 ? "#111827" : "#ffffff";
 }
 
-export function TagChip({
-  tag,
-  onRemove,
-  size = "sm",
-}: {
-  tag: Tag;
-  onRemove?: () => void;
-  size?: "xs" | "sm";
-}) {
+export function TagChip({ tag, onRemove, size = "sm" }: { tag: Tag; onRemove?: () => void; size?: "xs" | "sm" }) {
   const fg = readableText(tag.color);
   const pad = size === "xs" ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-xs";
   return (
@@ -80,10 +55,7 @@ export function useOrgTags(orgId: string | null) {
     queryKey: ["org-tags", orgId],
     enabled: !!orgId,
     queryFn: async (): Promise<Tag[]> => {
-      const { data, error } = await supabase
-        .from("tags")
-        .select("id, name, color")
-        .order("name");
+      const { data, error } = await supabase.from("tags").select("id, name, color").order("name");
       if (error) throw error;
       return (data ?? []) as Tag[];
     },
@@ -103,6 +75,7 @@ export function TagsManagerDialog({
   onChanged?: () => void;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const { data: tags = [], refetch } = useOrgTags(orgId);
 
   const [name, setName] = useState("");
@@ -160,15 +133,12 @@ export function TagsManagerDialog({
     if (!editingId) return;
     const n = eName.trim();
     if (!n) return;
-    const { error } = await supabase
-      .from("tags")
-      .update({ name: n, color: eColor })
-      .eq("id", editingId);
+    const { error } = await supabase.from("tags").update({ name: n, color: eColor }).eq("id", editingId);
     if (error) {
       if ((error as { code?: string }).code === "23505") {
-        alert("Já existe uma tag com esse nome.");
+        toast.error("Já existe uma tag com esse nome.");
       } else {
-        alert("Não foi possível salvar a tag.");
+        toast.error("Não foi possível salvar a tag.");
       }
       return;
     }
@@ -177,10 +147,16 @@ export function TagsManagerDialog({
   }
 
   async function removeTag(t: Tag) {
-    if (!confirm(`Excluir a tag "${t.name}"? Ela será removida de todos os contatos.`)) return;
+    const ok = await confirm({
+      title: "Excluir tag?",
+      description: `A tag "${t.name}" será removida de todos os contatos.`,
+      confirmText: "Excluir",
+      danger: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("tags").delete().eq("id", t.id);
     if (error) {
-      alert("Não foi possível excluir a tag.");
+      toast.error("Não foi possível excluir a tag.");
       return;
     }
     invalidateAll();
@@ -196,9 +172,7 @@ export function TagsManagerDialog({
         <div className="space-y-4 text-sm">
           {/* Create */}
           <div className="rounded border border-gray-200 bg-gray-50 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Nova tag
-            </p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Nova tag</p>
             <div className="flex items-center gap-2">
               <input
                 value={name}
@@ -220,9 +194,7 @@ export function TagsManagerDialog({
 
           {/* List */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Tags da empresa
-            </p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Tags da empresa</p>
             {tags.length === 0 && (
               <p className="rounded border border-dashed border-gray-300 px-3 py-6 text-center text-xs text-gray-500">
                 Nenhuma tag criada ainda.
@@ -297,13 +269,7 @@ export function TagsManagerDialog({
   );
 }
 
-export function ColorPicker({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+export function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
       {TAG_PALETTE.map((c) => (
@@ -312,9 +278,7 @@ export function ColorPicker({
           type="button"
           onClick={() => onChange(c)}
           className={`h-6 w-6 rounded-full border-2 ${
-            value.toLowerCase() === c.toLowerCase()
-              ? "border-gray-900"
-              : "border-white shadow"
+            value.toLowerCase() === c.toLowerCase() ? "border-gray-900" : "border-white shadow"
           }`}
           style={{ backgroundColor: c }}
           aria-label={c}
@@ -352,9 +316,7 @@ export function ContactTagsSection({
         .select("tag_id, tags(id, name, color)")
         .eq("contact_id", contactId);
       if (error) throw error;
-      return (data ?? [])
-        .map((r: { tags: Tag | null }) => r.tags)
-        .filter((t): t is Tag => !!t);
+      return (data ?? []).map((r: { tags: Tag | null }) => r.tags).filter((t): t is Tag => !!t);
     },
   });
 
@@ -377,12 +339,10 @@ export function ContactTagsSection({
   }
 
   async function attach(tagId: string) {
-    const { error } = await supabase
-      .from("contact_tags")
-      .insert({ contact_id: contactId, tag_id: tagId });
+    const { error } = await supabase.from("contact_tags").insert({ contact_id: contactId, tag_id: tagId });
     if (error && (error as { code?: string }).code !== "23505") {
       console.error("Erro ao colar tag:", error);
-      alert("Não foi possível adicionar a tag.");
+      toast.error("Não foi possível adicionar a tag.");
       return;
     }
     await refresh();
@@ -396,7 +356,7 @@ export function ContactTagsSection({
       .eq("tag_id", tagId);
     if (errDel) {
       console.error("Erro ao remover tag:", errDel);
-      alert("Não foi possível remover a tag.");
+      toast.error("Não foi possível remover a tag.");
       return;
     }
     await refresh();
@@ -415,15 +375,13 @@ export function ContactTagsSection({
       console.error("Erro ao criar tag:", error);
       setCreating(false);
       if ((error as { code?: string }).code === "23505") {
-        alert("Já existe uma tag com esse nome.");
+        toast.error("Já existe uma tag com esse nome.");
       } else {
-        alert("Não foi possível criar a tag.");
+        toast.error("Não foi possível criar a tag.");
       }
       return;
     }
-    const { error: linkErr } = await supabase
-      .from("contact_tags")
-      .insert({ contact_id: contactId, tag_id: data.id });
+    const { error: linkErr } = await supabase.from("contact_tags").insert({ contact_id: contactId, tag_id: data.id });
     if (linkErr && (linkErr as { code?: string }).code !== "23505") {
       console.error("Erro ao colar tag recém-criada:", linkErr);
     }
@@ -441,9 +399,7 @@ export function ContactTagsSection({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Tags
-        </h4>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Tags</h4>
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <button
@@ -462,9 +418,7 @@ export function ContactTagsSection({
             />
             <div className="max-h-40 space-y-1 overflow-y-auto">
               {available.length === 0 && (
-                <p className="px-1 py-2 text-center text-[11px] text-gray-500">
-                  Nenhuma tag disponível.
-                </p>
+                <p className="px-1 py-2 text-center text-[11px] text-gray-500">Nenhuma tag disponível.</p>
               )}
               {available.map((t) => (
                 <button
@@ -501,9 +455,7 @@ export function ContactTagsSection({
         </Popover>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {current.length === 0 && (
-          <p className="text-xs text-gray-400">Sem tags.</p>
-        )}
+        {current.length === 0 && <p className="text-xs text-gray-400">Sem tags.</p>}
         {current.map((t) => (
           <TagChip key={t.id} tag={t} onRemove={() => detach(t.id)} />
         ))}
@@ -538,4 +490,3 @@ export function TagFilterSelect({
     </select>
   );
 }
-

@@ -3,6 +3,8 @@ import { Settings, Plus, Pencil, Trash2, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useConfirm } from "@/components/confirm-dialog";
+import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -115,6 +117,7 @@ export function SettingsScreen() {
   const orgId = activeMembership?.org_id ?? null;
   const isOrgAdmin = activeMembership?.role === "owner" || activeMembership?.role === "admin";
   const qc = useQueryClient();
+  const confirm = useConfirm();
 
   // Opções de fuso (rótulo com deslocamento), montadas uma única vez.
   const tzOptions = useMemo(() => TIMEZONE_LIST.map((tz) => ({ value: tz, label: tzLabel(tz) })), []);
@@ -381,11 +384,17 @@ export function SettingsScreen() {
   }
 
   async function deleteTag(t: TagType) {
-    if (!confirm(`Excluir a tag "${t.name}"? Ela será removida de todos os contatos.`)) return;
+    const ok = await confirm({
+      title: "Excluir tag?",
+      description: `A tag "${t.name}" será removida de todos os contatos.`,
+      confirmText: "Excluir",
+      danger: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("tags").delete().eq("id", t.id);
     if (error) {
       console.error("Erro ao excluir tag:", error);
-      alert("Não foi possível excluir a tag.");
+      toast.error("Não foi possível excluir a tag.");
       return;
     }
     invalidateTags();
@@ -473,11 +482,17 @@ export function SettingsScreen() {
     invalidateFields();
   }
   async function deleteField(f: CustomField) {
-    if (!confirm(`Excluir o campo "${f.name}"?`)) return;
+    const ok = await confirm({
+      title: "Excluir campo?",
+      description: `O campo "${f.name}" será excluído.`,
+      confirmText: "Excluir",
+      danger: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("custom_fields").delete().eq("id", f.id);
     if (error) {
       console.error("Erro ao excluir campo:", error);
-      alert("Não foi possível excluir o campo.");
+      toast.error("Não foi possível excluir o campo.");
       return;
     }
     invalidateFields();
@@ -589,11 +604,17 @@ export function SettingsScreen() {
     invalidateQuickReplies();
   }
   async function deleteQuickReply(q: QuickReply) {
-    if (!confirm(`Excluir a resposta "/${q.shortcut}"?`)) return;
+    const ok = await confirm({
+      title: "Excluir resposta rápida?",
+      description: `A resposta "/${q.shortcut}" será excluída.`,
+      confirmText: "Excluir",
+      danger: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("quick_replies").delete().eq("id", q.id);
     if (error) {
       console.error("Erro ao excluir resposta rápida:", error);
-      alert("Não foi possível excluir a resposta.");
+      toast.error("Não foi possível excluir a resposta.");
       return;
     }
     invalidateQuickReplies();

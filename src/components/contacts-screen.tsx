@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { toast } from "sonner";
 import { TagsManagerDialog, TagFilterSelect, ContactTagsSection, TagChip, type Tag } from "@/components/contact-tags";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -306,7 +307,7 @@ export function ContactsScreen() {
     setSavingEdit(false);
     if (error) {
       console.error("Erro ao salvar contato:", error);
-      alert("Não foi possível salvar o contato.");
+      toast.error("Não foi possível salvar o contato.");
       return;
     }
     reloadAll();
@@ -319,7 +320,7 @@ export function ContactsScreen() {
     const { error } = await supabase.from("contacts").update({ notes: eNotes }).eq("id", editing.id);
     setSavingNotes(false);
     if (error) {
-      alert("Não foi possível salvar as observações.");
+      toast.error("Não foi possível salvar as observações.");
       return;
     }
     reloadAll();
@@ -328,7 +329,7 @@ export function ContactsScreen() {
   async function toggleBlock(c: ContactRow) {
     const { error } = await supabase.from("contacts").update({ blocked: !c.blocked }).eq("id", c.id);
     if (error) {
-      alert("Não foi possível atualizar.");
+      toast.error("Não foi possível atualizar.");
       return;
     }
     reloadAll();
@@ -344,7 +345,7 @@ export function ContactsScreen() {
       .limit(1)
       .maybeSingle();
     if (!canal) {
-      alert("Nenhum canal WhatsApp conectado.");
+      toast.error("Nenhum canal WhatsApp conectado.");
       return;
     }
     let { data: conv } = await supabase
@@ -369,7 +370,7 @@ export function ContactsScreen() {
         .select("id")
         .single();
       if (error || !nova) {
-        alert("Não foi possível abrir a conversa.");
+        toast.error("Não foi possível abrir a conversa.");
         return;
       }
       conv = nova;
@@ -432,7 +433,7 @@ export function ContactsScreen() {
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
-      alert("Não foi possível exportar os contatos.");
+      toast.error("Não foi possível exportar os contatos.");
     } finally {
       setExporting(false);
     }

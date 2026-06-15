@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages, type Message } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
 import {
@@ -365,6 +367,7 @@ export function InboxScreen() {
 
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id ?? null;
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -442,7 +445,7 @@ export function InboxScreen() {
     e.target.value = "";
     if (!file || !selectedId) return;
     if (file.size > 5 * 1024 * 1024) {
-      alert("Por enquanto, envie arquivos de até 5 MB.");
+      toast.error("Arquivo muito grande", { description: "Por enquanto, envie arquivos de até 5 MB." });
       return;
     }
     setSendingMedia(true);
@@ -463,7 +466,7 @@ export function InboxScreen() {
           replyTo: replyTo ? { externalId: replyTo.id, preview: replyTo.preview } : undefined,
         },
       });
-      if (error) alert("Não foi possível enviar o arquivo.");
+      if (error) toast.error("Não foi possível enviar o arquivo.");
       else setReplyTo(null);
     } finally {
       setSendingMedia(false);
@@ -504,7 +507,7 @@ export function InboxScreen() {
               replyTo: replyTo ? { externalId: replyTo.id, preview: replyTo.preview } : undefined,
             },
           });
-          if (error) alert("Não foi possível enviar o áudio.");
+          if (error) toast.error("Não foi possível enviar o áudio.");
           else setReplyTo(null);
         } finally {
           setSendingAudio(false);
@@ -514,7 +517,9 @@ export function InboxScreen() {
       mr.start();
       setRecording(true);
     } catch {
-      alert("Não consegui acessar o microfone. Verifique a permissão do navegador.");
+      toast.error("Não consegui acessar o microfone.", {
+        description: "Verifique a permissão do navegador.",
+      });
     }
   }
   function stopAndSend() {
@@ -635,7 +640,7 @@ export function InboxScreen() {
     const { error } = await supabase.from("contacts").update(patch).eq("id", contatoId);
     setSavingContact(false);
     if (error) {
-      alert("Não foi possível salvar o contato.");
+      toast.error("Não foi possível salvar o contato.");
     }
     setEditingContact(false);
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
@@ -649,7 +654,7 @@ export function InboxScreen() {
     const { error } = await supabase.from("contacts").update({ notes: notesDraft }).eq("id", contatoId);
     setSavingNotes(false);
     if (error) {
-      alert("Não foi possível salvar as observações.");
+      toast.error("Não foi possível salvar as observações.");
     }
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
@@ -680,12 +685,20 @@ export function InboxScreen() {
   }
 
   async function deleteMessage(messageId: string) {
-    if (!window.confirm("Apagar esta mensagem para todos? Isso não pode ser desfeito.")) return;
+    const ok = await confirm({
+      title: "Apagar mensagem?",
+      description: "A mensagem será apagada para todos. Isso não pode ser desfeito.",
+      confirmText: "Apagar",
+      danger: true,
+    });
+    if (!ok) return;
     const { data, error: invokeErr } = await supabase.functions.invoke("delete-message", {
       body: { messageId },
     });
     if (invokeErr || (data as any)?.error) {
-      alert((data as any)?.error || "Não foi possível apagar. O tempo permitido pode ter passado.");
+      toast.error("Não foi possível apagar", {
+        description: (data as any)?.error || "O tempo permitido pode ter passado.",
+      });
       return;
     }
     if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
@@ -697,7 +710,7 @@ export function InboxScreen() {
       .update({ pinned_at: m.pinned_at ? null : new Date().toISOString() })
       .eq("id", m.id);
     if (error) {
-      alert("Não foi possível fixar/desafixar.");
+      toast.error("Não foi possível fixar/desafixar.");
       return;
     }
     if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
@@ -709,7 +722,7 @@ export function InboxScreen() {
       .update({ starred_at: m.starred_at ? null : new Date().toISOString() })
       .eq("id", m.id);
     if (error) {
-      alert("Não foi possível favoritar/desfavoritar.");
+      toast.error("Não foi possível favoritar/desfavoritar.");
       return;
     }
     if (selectedId) queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
@@ -789,14 +802,14 @@ export function InboxScreen() {
     try {
       const convId = await resolveConversation(contact.id);
       if (!convId) {
-        alert("Nenhum canal WhatsApp conectado.");
+        toast.error("Nenhum canal WhatsApp conectado.");
         return;
       }
       const m = forwardMsg;
       if (m.media_url) {
         const { data: blob, error: dErr } = await supabase.storage.from("media").download(m.media_url);
         if (dErr || !blob) {
-          alert("Não foi possível baixar o anexo para encaminhar.");
+          toast.error("Não foi possível baixar o anexo para encaminhar.");
           return;
         }
         const base64 = await new Promise<string>((resolve, reject) => {
@@ -815,7 +828,7 @@ export function InboxScreen() {
           },
         });
         if (sErr) {
-          alert("Não foi possível encaminhar o anexo.");
+          toast.error("Não foi possível encaminhar o anexo.");
           return;
         }
       } else if (m.content) {
@@ -823,7 +836,7 @@ export function InboxScreen() {
           body: { conversationId: convId, text: m.content },
         });
         if (sErr) {
-          alert("Não foi possível encaminhar.");
+          toast.error("Não foi possível encaminhar.");
           return;
         }
       }

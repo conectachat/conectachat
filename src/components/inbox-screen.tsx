@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { Fragment, useState, useRef, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -18,6 +18,8 @@ import {
   Copy,
   Smile,
   Eye,
+  Search,
+  File as FileIcon,
   CalendarClock,
   ChevronDown,
   Plus,
@@ -57,6 +59,32 @@ function timeAgo(iso: string | null) {
 }
 function hhmm(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+// Chave AAAA-M-D para comparar se duas mensagens são do mesmo dia.
+function ymd(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+// Rótulo amigável do separador de data: "Hoje", "Ontem" ou "12 de junho [de 2025]".
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const yest = new Date(now);
+  yest.setDate(now.getDate() - 1);
+  if (ymd(iso) === ymd(now.toISOString())) return "Hoje";
+  if (ymd(iso) === ymd(yest.toISOString())) return "Ontem";
+  return d.toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: d.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  });
+}
+// Tamanho de arquivo legível (KB/MB) para a pré-visualização da mídia.
+function formatBytes(n: number | null | undefined) {
+  if (!n || n <= 0) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 function contentLabel(type: string, content: string | null) {
   if (content && content.trim()) return content;
@@ -347,6 +375,20 @@ function MessageActions({
 export function InboxScreen() {
   const { data: conversations, isLoading } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [convSearch, setConvSearch] = useState("");
+
+  // H.3a — lista de conversas filtrada pela busca (nome, telefone ou e-mail).
+  const filteredConvs = useMemo(() => {
+    const list = conversations ?? [];
+    const term = convSearch.trim().toLowerCase();
+    if (!term) return list;
+    return list.filter((c) => {
+      const name = displayName(c.contact).toLowerCase();
+      const phone = (c.contact?.external_id ?? "").toLowerCase();
+      const email = (c.contact?.email ?? "").toLowerCase();
+      return name.includes(term) || phone.includes(term) || email.includes(term);
+    });
+  }, [conversations, convSearch]);
   const previewRef = useRef(false);
   useEffect(() => {
     try {
@@ -439,8 +481,10 @@ export function InboxScreen() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sendingMedia, setSendingMedia] = useState(false);
+  // H.3a — mídia escolhida aguardando legenda + confirmação de envio.
+  const [pendingMedia, setPendingMedia] = useState<{ file: File; url: string | null; caption: string } | null>(null);
 
-  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !selectedId) return;
@@ -448,6 +492,21 @@ export function InboxScreen() {
       toast.error("Arquivo muito grande", { description: "Por enquanto, envie arquivos de até 5 MB." });
       return;
     }
+    // Em vez de enviar na hora, abre a pré-visualização para você adicionar uma legenda.
+    const url = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+    setPendingMedia({ file, url, caption: "" });
+  }
+
+  function closePendingMedia() {
+    setPendingMedia((p) => {
+      if (p?.url) URL.revokeObjectURL(p.url);
+      return null;
+    });
+  }
+
+  async function confirmSendMedia() {
+    if (!pendingMedia || !selectedId) return;
+    const { file, caption } = pendingMedia;
     setSendingMedia(true);
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -462,12 +521,18 @@ export function InboxScreen() {
           base64,
           mimetype: file.type || "application/octet-stream",
           fileName: file.name,
-          caption: "",
+          caption: caption.trim(),
           replyTo: replyTo ? { externalId: replyTo.id, preview: replyTo.preview } : undefined,
         },
       });
-      if (error) toast.error("Não foi possível enviar o arquivo.");
-      else setReplyTo(null);
+      if (error) {
+        toast.error("Não foi possível enviar o arquivo.");
+        return;
+      }
+      setReplyTo(null);
+      closePendingMedia();
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
     } finally {
       setSendingMedia(false);
     }
@@ -853,8 +918,33 @@ export function InboxScreen() {
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
       <aside className="flex w-[320px] shrink-0 flex-col overflow-hidden border-r border-border bg-card">
-        <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
-          <h2 className="text-base font-semibold text-foreground">Conversas</h2>
+        <div className="shrink-0 border-b border-border">
+          <div className="flex h-14 items-center px-4">
+            <h2 className="text-base font-semibold text-foreground">Conversas</h2>
+          </div>
+          <div className="px-3 pb-3">
+            <div className="relative">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                value={convSearch}
+                onChange={(e) => setConvSearch(e.target.value)}
+                placeholder="Buscar conversa…"
+                className="w-full rounded-lg border border-gray-300 py-2 pl-8 pr-8 text-sm focus:border-brand-blue focus:outline-none"
+              />
+              {convSearch && (
+                <button
+                  onClick={() => setConvSearch("")}
+                  title="Limpar busca"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading && (
@@ -870,11 +960,13 @@ export function InboxScreen() {
               ))}
             </ul>
           )}
-          {!isLoading && (conversations ?? []).length === 0 && (
-            <p className="px-4 py-10 text-center text-sm text-gray-500">Nenhuma conversa ainda</p>
+          {!isLoading && filteredConvs.length === 0 && (
+            <p className="px-4 py-10 text-center text-sm text-gray-500">
+              {convSearch.trim() ? "Nenhuma conversa encontrada" : "Nenhuma conversa ainda"}
+            </p>
           )}
           {!isLoading &&
-            (conversations ?? []).map((c) => {
+            filteredConvs.map((c) => {
               const name = displayName(c.contact);
               const active = c.id === selectedId;
               const unread = (c.unread_count ?? 0) > 0;
@@ -1043,8 +1135,10 @@ export function InboxScreen() {
               {!loadingMsgs &&
                 (messages ?? [])
                   .filter((m) => !showStarredOnly || m.starred_at)
-                  .map((m) => {
+                  .map((m, idx, arr) => {
                     const out = m.direction === "outbound";
+                    // H.3a — separador de data quando muda o dia em relação à mensagem anterior.
+                    const showDateSep = idx === 0 || ymd(arr[idx - 1].created_at) !== ymd(m.created_at);
                     const reactionCounts = m.reactions
                       ? Object.values(m.reactions).reduce<Record<string, number>>((acc, e) => {
                           if (e) acc[e] = (acc[e] || 0) + 1;
@@ -1067,122 +1161,132 @@ export function InboxScreen() {
                         : contentLabel(quotedMsg.content_type, quotedMsg.content)
                       : m.reply_to_preview || "Mensagem";
                     return (
-                      <div
-                        key={m.id}
-                        id={`msg-${m.id}`}
-                        className={`group mb-2 flex items-center gap-1 ${out ? "justify-end" : "justify-start"}`}
-                      >
-                        {out && !m.deleted_at && (
-                          <MessageActions
-                            mine={m.reactions?.["me"] ?? null}
-                            canReact={!!m.external_message_id}
-                            canCopy={!!m.content}
-                            canReply={!!m.external_message_id}
-                            canDelete={out && !!m.external_message_id}
-                            canForward={!!(m.content || m.media_url)}
-                            pinned={!!m.pinned_at}
-                            starred={!!m.starred_at}
-                            onReact={(e) => reactToMessage(m.id, e)}
-                            onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
-                            onReply={() =>
-                              setReplyTo({
-                                id: m.external_message_id!,
-                                preview:
-                                  m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
-                                sender: out ? "Você" : m.sender_name || displayName(selected.contact),
-                              })
-                            }
-                            onDelete={() => deleteMessage(m.id)}
-                            onForward={() => setForwardMsg(m)}
-                            onPin={() => togglePin(m)}
-                            onStar={() => toggleStar(m)}
-                          />
+                      <Fragment key={m.id}>
+                        {showDateSep && (
+                          <div className="my-3 flex justify-center">
+                            <span className="rounded-full bg-gray-200/80 px-3 py-1 text-[11px] font-medium text-gray-600">
+                              {dayLabel(m.created_at)}
+                            </span>
+                          </div>
                         )}
                         <div
-                          className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
+                          id={`msg-${m.id}`}
+                          className={`group mb-2 flex items-center gap-1 ${out ? "justify-end" : "justify-start"}`}
                         >
-                          {!m.deleted_at && m.reply_to_external_id && (
-                            <div
-                              className={`mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] ${out ? "border-white/60 bg-white/15" : "border-brand-blue/50 bg-gray-50"}`}
-                            >
-                              {quotedSender && (
-                                <p className={`font-semibold ${out ? "text-white/90" : "text-brand-blue"}`}>
-                                  {quotedSender}
-                                </p>
-                              )}
-                              <p className="truncate opacity-80">{quotedText}</p>
-                            </div>
+                          {out && !m.deleted_at && (
+                            <MessageActions
+                              mine={m.reactions?.["me"] ?? null}
+                              canReact={!!m.external_message_id}
+                              canCopy={!!m.content}
+                              canReply={!!m.external_message_id}
+                              canDelete={out && !!m.external_message_id}
+                              canForward={!!(m.content || m.media_url)}
+                              pinned={!!m.pinned_at}
+                              starred={!!m.starred_at}
+                              onReact={(e) => reactToMessage(m.id, e)}
+                              onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
+                              onReply={() =>
+                                setReplyTo({
+                                  id: m.external_message_id!,
+                                  preview:
+                                    m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
+                                  sender: out ? "Você" : m.sender_name || displayName(selected.contact),
+                                })
+                              }
+                              onDelete={() => deleteMessage(m.id)}
+                              onForward={() => setForwardMsg(m)}
+                              onPin={() => togglePin(m)}
+                              onStar={() => toggleStar(m)}
+                            />
                           )}
-                          {!m.deleted_at && !out && selected.contact?.is_group && m.sender_name && (
-                            <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">{m.sender_name}</p>
-                          )}
-                          {m.deleted_at ? (
-                            <p className={`italic ${out ? "text-primary-foreground/70" : "text-gray-400"}`}>
-                              🚫 Mensagem apagada
-                            </p>
-                          ) : m.media_url &&
-                            ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
-                            <>
-                              <MessageMedia
-                                path={m.media_url}
-                                contentType={m.content_type}
-                                name={m.media_name}
-                                size={m.media_size}
-                              />
-                              {m.content && <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>}
-                            </>
-                          ) : (
-                            <p className="whitespace-pre-wrap break-words">{contentLabel(m.content_type, m.content)}</p>
-                          )}
-                          <p
-                            className={`mt-1 flex items-center gap-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}
+                          <div
+                            className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${out ? "bg-primary text-primary-foreground" : "border border-gray-200 bg-white text-gray-900"}`}
                           >
-                            {!m.deleted_at && m.starred_at && (
-                              <Star size={11} className="fill-amber-400 text-amber-400" />
+                            {!m.deleted_at && m.reply_to_external_id && (
+                              <div
+                                className={`mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] ${out ? "border-white/60 bg-white/15" : "border-brand-blue/50 bg-gray-50"}`}
+                              >
+                                {quotedSender && (
+                                  <p className={`font-semibold ${out ? "text-white/90" : "text-brand-blue"}`}>
+                                    {quotedSender}
+                                  </p>
+                                )}
+                                <p className="truncate opacity-80">{quotedText}</p>
+                              </div>
                             )}
-                            {hhmm(m.created_at)}
-                          </p>
-                          {!m.deleted_at && reactionList.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {reactionList.map(([emoji, count]) => (
-                                <span
-                                  key={emoji}
-                                  className="inline-flex items-center gap-0.5 rounded-full border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-800 shadow-sm"
-                                >
-                                  <span>{emoji}</span>
-                                  {count > 1 && <span className="text-[10px] text-gray-500">{count}</span>}
-                                </span>
-                              ))}
-                            </div>
+                            {!m.deleted_at && !out && selected.contact?.is_group && m.sender_name && (
+                              <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">{m.sender_name}</p>
+                            )}
+                            {m.deleted_at ? (
+                              <p className={`italic ${out ? "text-primary-foreground/70" : "text-gray-400"}`}>
+                                🚫 Mensagem apagada
+                              </p>
+                            ) : m.media_url &&
+                              ["image", "audio", "video", "document", "sticker"].includes(m.content_type) ? (
+                              <>
+                                <MessageMedia
+                                  path={m.media_url}
+                                  contentType={m.content_type}
+                                  name={m.media_name}
+                                  size={m.media_size}
+                                />
+                                {m.content && <p className="mt-1 whitespace-pre-wrap break-words">{m.content}</p>}
+                              </>
+                            ) : (
+                              <p className="whitespace-pre-wrap break-words">
+                                {contentLabel(m.content_type, m.content)}
+                              </p>
+                            )}
+                            <p
+                              className={`mt-1 flex items-center gap-1 text-[10px] ${out ? "text-primary-foreground/70" : "text-gray-500"}`}
+                            >
+                              {!m.deleted_at && m.starred_at && (
+                                <Star size={11} className="fill-amber-400 text-amber-400" />
+                              )}
+                              {hhmm(m.created_at)}
+                            </p>
+                            {!m.deleted_at && reactionList.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {reactionList.map(([emoji, count]) => (
+                                  <span
+                                    key={emoji}
+                                    className="inline-flex items-center gap-0.5 rounded-full border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-800 shadow-sm"
+                                  >
+                                    <span>{emoji}</span>
+                                    {count > 1 && <span className="text-[10px] text-gray-500">{count}</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {!out && !m.deleted_at && (
+                            <MessageActions
+                              mine={m.reactions?.["me"] ?? null}
+                              canReact={!!m.external_message_id}
+                              canCopy={!!m.content}
+                              canReply={!!m.external_message_id}
+                              canDelete={out && !!m.external_message_id}
+                              canForward={!!(m.content || m.media_url)}
+                              pinned={!!m.pinned_at}
+                              starred={!!m.starred_at}
+                              onReact={(e) => reactToMessage(m.id, e)}
+                              onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
+                              onReply={() =>
+                                setReplyTo({
+                                  id: m.external_message_id!,
+                                  preview:
+                                    m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
+                                  sender: out ? "Você" : m.sender_name || displayName(selected.contact),
+                                })
+                              }
+                              onDelete={() => deleteMessage(m.id)}
+                              onForward={() => setForwardMsg(m)}
+                              onPin={() => togglePin(m)}
+                              onStar={() => toggleStar(m)}
+                            />
                           )}
                         </div>
-                        {!out && !m.deleted_at && (
-                          <MessageActions
-                            mine={m.reactions?.["me"] ?? null}
-                            canReact={!!m.external_message_id}
-                            canCopy={!!m.content}
-                            canReply={!!m.external_message_id}
-                            canDelete={out && !!m.external_message_id}
-                            canForward={!!(m.content || m.media_url)}
-                            pinned={!!m.pinned_at}
-                            starred={!!m.starred_at}
-                            onReact={(e) => reactToMessage(m.id, e)}
-                            onCopy={() => m.content && navigator.clipboard?.writeText(m.content)}
-                            onReply={() =>
-                              setReplyTo({
-                                id: m.external_message_id!,
-                                preview:
-                                  m.content && m.content.trim() ? m.content : contentLabel(m.content_type, m.content),
-                                sender: out ? "Você" : m.sender_name || displayName(selected.contact),
-                              })
-                            }
-                            onDelete={() => deleteMessage(m.id)}
-                            onForward={() => setForwardMsg(m)}
-                            onPin={() => togglePin(m)}
-                            onStar={() => toggleStar(m)}
-                          />
-                        )}
-                      </div>
+                      </Fragment>
                     );
                   })}
               {!loadingMsgs && showStarredOnly && (messages ?? []).filter((m) => m.starred_at).length === 0 && (
@@ -1579,6 +1683,76 @@ export function InboxScreen() {
             {forwarding && (
               <div className="border-t border-gray-100 px-4 py-2 text-center text-xs text-gray-500">Encaminhando…</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* H.3a — Pré-visualização da mídia + legenda antes de enviar */}
+      {pendingMedia && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !sendingMedia && closePendingMedia()}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">Enviar arquivo</h3>
+              <button
+                onClick={() => !sendingMedia && closePendingMedia()}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {pendingMedia.url ? (
+                <img
+                  src={pendingMedia.url}
+                  alt={pendingMedia.file.name}
+                  className="mx-auto max-h-[45vh] rounded-lg object-contain"
+                />
+              ) : (
+                <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-4">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-200 text-gray-600">
+                    <FileIcon size={20} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900">{pendingMedia.file.name}</p>
+                    <p className="text-xs text-gray-500">{formatBytes(pendingMedia.file.size)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="border-t border-gray-100 p-3">
+              <input
+                value={pendingMedia.caption}
+                onChange={(e) => setPendingMedia((p) => (p ? { ...p, caption: e.target.value } : p))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !sendingMedia) confirmSendMedia();
+                }}
+                placeholder="Adicionar uma legenda…"
+                autoFocus
+                className="mb-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => !sendingMedia && closePendingMedia()}
+                  className="rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmSendMedia}
+                  disabled={sendingMedia}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {sendingMedia ? "Enviando…" : "Enviar"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

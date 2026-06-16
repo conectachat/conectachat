@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug, ChevronLeft, ChevronRight, Layers } from "lucide-react";
+import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug, ChevronLeft, ChevronRight, Layers, Building2 } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 import {
@@ -31,7 +31,10 @@ const items = [
 ];
 
 // Itens da ÁREA DA PLATAFORMA (só aparecem para o super_admin da ConectaChat).
-const platformItems = [{ title: "Planos", url: "/platform/plans", icon: Layers }];
+const platformItems = [
+  { title: "Planos", url: "/platform/plans", icon: Layers },
+  { title: "Clientes", url: "/platform/clients", icon: Building2 },
+];
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Proprietário",

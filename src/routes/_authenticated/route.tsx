@@ -1,7 +1,7 @@
-import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Building2 } from "lucide-react";
 
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,23 +28,17 @@ function NotificationsManager() {
 
 function AuthenticatedLayout() {
   const { hasNoOrg, isLoading } = useCurrentUser();
-  // Bloco O — na Caixa de entrada o próprio componente desenha o botão de menu
-  // (ao lado de "Conversas", no celular), então escondemos a barra de menu
-  // genérica do layout SÓ nessa tela. Nas demais telas, nada muda.
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isInbox = pathname.endsWith("/inbox");
 
+  // Observação (Bloco O / mobile): o botão do menu lateral (☰) do celular agora
+  // vive DENTRO de cada página — no PageHeader (todas as telas) e no cabeçalho
+  // próprio da Caixa de entrada. Por isso o layout NÃO desenha mais a barra de
+  // menu solta no topo (que gerava a "fileira dupla"). No computador o menu já
+  // é coluna fixa, então nada muda lá.
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full overflow-hidden bg-background">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {/* Só no celular e fora da inbox: um botão para abrir o menu lateral.
-              No computador o menu fica sempre visível, então esta barra some
-              (md:hidden); na inbox ela some sempre (a inbox tem o próprio). */}
-          <div className={`${isInbox ? "hidden" : "flex md:hidden"} h-12 shrink-0 items-center px-2`}>
-            <SidebarTrigger />
-          </div>
           {!isLoading && !hasNoOrg && <NotificationsManager />}
           {!isLoading && !hasNoOrg && <ConnectionBanner />}
           <main className="min-h-0 flex-1 overflow-hidden">

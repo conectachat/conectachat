@@ -184,11 +184,12 @@ export function SettingsScreen() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
-  // Alterar e-mail de acesso (Bloco P / setup)
+  // Editar perfil (nome + e-mail com confirmação de e-mail digitado 2x)
+  const [editingProfile, setEditingProfile] = useState(false);
   const [newEmail, setNewEmail] = useState("");
-  const [changingEmail, setChangingEmail] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
 
   // Tags state
   const [tagSearch, setTagSearch] = useState("");
@@ -276,12 +277,53 @@ export function SettingsScreen() {
 
   const handleSaveProfile = async () => {
     if (!user) return;
-    setSavingProfile(true);
-    const { error } = await supabase.from("profiles").update({ full_name: fullName.trim() }).eq("id", user.id);
-    if (error) {
-      console.error("Erro ao salvar perfil:", error);
+    setProfileError(null);
+    setProfileSuccess(null);
+    if (!fullName.trim()) {
+      setProfileError("Informe o nome.");
+      return;
     }
+    setSavingProfile(true);
+
+    // 1) Salva o nome.
+    const { error: nameErr } = await supabase.from("profiles").update({ full_name: fullName.trim() }).eq("id", user.id);
+    if (nameErr) {
+      setSavingProfile(false);
+      setProfileError("Não foi possível salvar o perfil.");
+      return;
+    }
+
+    // 2) Se preencheu um novo e-mail, confere a confirmação e troca no
+    //    servidor (Edge Function update-email — sem depender de SMTP).
+    //    Campos de e-mail em branco = manter o atual.
+    const e = newEmail.trim().toLowerCase();
+    if (e) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        setSavingProfile(false);
+        setProfileError("E-mail inválido.");
+        return;
+      }
+      if (e !== confirmEmail.trim().toLowerCase()) {
+        setSavingProfile(false);
+        setProfileError("Os e-mails não coincidem.");
+        return;
+      }
+      if (e !== (email || "").toLowerCase()) {
+        const { data, error } = await supabase.functions.invoke("update-email", { body: { newEmail: e } });
+        if (error || !data?.ok) {
+          setSavingProfile(false);
+          setProfileError(data?.error || "Não foi possível alterar o e-mail.");
+          return;
+        }
+        setEmail(e);
+      }
+    }
+
     setSavingProfile(false);
+    setEditingProfile(false);
+    setNewEmail("");
+    setConfirmEmail("");
+    setProfileSuccess("Perfil atualizado!");
   };
 
   // Bloco E.0 — salva fuso (vazio = NULL = herda da empresa) e idioma.
@@ -346,33 +388,6 @@ export function SettingsScreen() {
       setConfirmPassword("");
     }
     setChangingPassword(false);
-  };
-
-  // Alterar e-mail de acesso. A troca é feita no servidor pela Edge Function
-  // "update-email" (service role) — assim não depende de SMTP/confirmação por
-  // e-mail. O usuário só altera o PRÓPRIO e-mail (a função usa o id de quem chama).
-  const handleChangeEmail = async () => {
-    setEmailError(null);
-    setEmailSuccess(null);
-    const e = newEmail.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-      setEmailError("E-mail inválido.");
-      return;
-    }
-    if (e === (email || "").toLowerCase()) {
-      setEmailError("Esse já é o seu e-mail atual.");
-      return;
-    }
-    setChangingEmail(true);
-    const { data, error } = await supabase.functions.invoke("update-email", { body: { newEmail: e } });
-    setChangingEmail(false);
-    if (error || !data?.ok) {
-      setEmailError(data?.error || "Não foi possível alterar o e-mail.");
-      return;
-    }
-    setEmail(e);
-    setNewEmail("");
-    setEmailSuccess("E-mail alterado! Use o novo e-mail no próximo login.");
   };
 
   // Tags queries
@@ -1034,27 +1049,113 @@ export function SettingsScreen() {
             <TabsContent value="geral" className="mt-4 space-y-6">
               {/* Meu Perfil */}
               <section className="rounded-lg border border-border bg-card p-5">
-                <h2 className="text-sm font-medium text-foreground">Meu Perfil</h2>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="nome">Nome</Label>
-                    <Input
-                      id="nome"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Seu nome"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">E-mail</Label>
-                    <Input id="email" value={email} readOnly disabled className="bg-muted/50" />
-                  </div>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-medium text-foreground">Meu Perfil</h2>
+                  {!editingProfile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setProfileError(null);
+                        setProfileSuccess(null);
+                        setNewEmail("");
+                        setConfirmEmail("");
+                        setEditingProfile(true);
+                      }}
+                    >
+                      Editar perfil
+                    </Button>
+                  )}
                 </div>
-                <div className="mt-4 flex justify-end">
-                  <Button onClick={handleSaveProfile} disabled={savingProfile} size="sm">
-                    {savingProfile ? "Salvando..." : "Salvar"}
-                  </Button>
-                </div>
+
+                {!editingProfile ? (
+                  // Modo visualização
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Nome</Label>
+                      <Input value={fullName} readOnly disabled className="bg-muted/50" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>E-mail</Label>
+                      <Input value={email} readOnly disabled className="bg-muted/50" />
+                    </div>
+                  </div>
+                ) : (
+                  // Modo edição
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="nome">Nome</Label>
+                        <Input
+                          id="nome"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="Seu nome"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>E-mail atual</Label>
+                        <Input value={email} readOnly disabled className="bg-muted/50" />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-dashed border-gray-300 p-4">
+                      <p className="text-xs text-muted-foreground">
+                        Para trocar o e-mail de acesso, digite o novo e-mail <strong>duas vezes</strong>. Deixe em
+                        branco para manter o atual. A troca é imediata; use o novo e-mail no próximo login.
+                      </p>
+                      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="novo-email">Novo e-mail</Label>
+                          <Input
+                            id="novo-email"
+                            type="email"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            placeholder="voce@empresa.com"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmar-email">Confirmar novo e-mail</Label>
+                          <Input
+                            id="confirmar-email"
+                            type="email"
+                            value={confirmEmail}
+                            onChange={(e) => setConfirmEmail(e.target.value)}
+                            placeholder="Repita o novo e-mail"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {(profileError || profileSuccess) && (
+                  <p className={`mt-3 text-sm ${profileError ? "text-destructive" : "text-green-600"}`}>
+                    {profileError ?? profileSuccess}
+                  </p>
+                )}
+
+                {editingProfile && (
+                  <div className="mt-4 flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={savingProfile}
+                      onClick={() => {
+                        setEditingProfile(false);
+                        setNewEmail("");
+                        setConfirmEmail("");
+                        setProfileError(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleSaveProfile} disabled={savingProfile} size="sm">
+                      {savingProfile ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                )}
               </section>
 
               {/* Alterar Senha */}
@@ -1102,43 +1203,6 @@ export function SettingsScreen() {
                 <div className="mt-4 flex justify-end">
                   <Button onClick={handleChangePassword} disabled={changingPassword} size="sm">
                     {changingPassword ? "Alterando..." : "Alterar senha"}
-                  </Button>
-                </div>
-              </section>
-
-              {/* Alterar E-mail de acesso */}
-              <section className="rounded-lg border border-border bg-card p-5">
-                <h2 className="text-sm font-medium text-foreground">Alterar e-mail de acesso</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Troca o e-mail usado para entrar no app. A alteração é imediata; use o novo e-mail no próximo login.
-                  Sua sessão atual continua aberta normalmente.
-                </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="email-atual-ro">E-mail atual</Label>
-                    <Input id="email-atual-ro" value={email} readOnly disabled className="bg-muted/50" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="novo-email">Novo e-mail</Label>
-                    <Input
-                      id="novo-email"
-                      type="email"
-                      value={newEmail}
-                      onChange={(e) => setNewEmail(e.target.value)}
-                      placeholder="voce@empresa.com"
-                    />
-                  </div>
-                </div>
-
-                {(emailError || emailSuccess) && (
-                  <p className={`mt-3 text-sm ${emailError ? "text-destructive" : "text-green-600"}`}>
-                    {emailError ?? emailSuccess}
-                  </p>
-                )}
-
-                <div className="mt-4 flex justify-end">
-                  <Button onClick={handleChangeEmail} disabled={changingEmail} size="sm">
-                    {changingEmail ? "Alterando..." : "Alterar e-mail"}
                   </Button>
                 </div>
               </section>

@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ import {
   PinOff,
   Star,
   StarOff,
+  Download,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -170,6 +172,29 @@ function formatSize(bytes?: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Baixa um arquivo do Storage de forma confiável (independe do tipo): pega o
+// blob, cria um link temporário e dispara o "salvar" com o nome certo. Resolve
+// o caso em que o link assinado só ABRE o arquivo (PDF/imagem) em vez de baixar.
+async function downloadFromStorage(path: string, name?: string | null) {
+  try {
+    const { data, error } = await supabase.storage.from("media").download(path);
+    if (error || !data) {
+      toast.error("Não foi possível baixar o arquivo.");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = name || "arquivo";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    toast.error("Não foi possível baixar o arquivo.");
+  }
+}
+
 function MessageMedia({
   path,
   contentType,
@@ -194,19 +219,61 @@ function MessageMedia({
       active = false;
     };
   }, [path]);
+  const [zoom, setZoom] = useState(false);
   if (!url) return <span className="text-xs opacity-60">Carregando mídia…</span>;
   if (contentType === "image" || contentType === "sticker")
-    return <img src={url} alt="" className="max-w-[240px] rounded-lg" />;
+    return (
+      <>
+        <button type="button" onClick={() => setZoom(true)} className="block cursor-zoom-in" title="Ampliar imagem">
+          <img src={url} alt={name || ""} className="max-w-[240px] rounded-lg" />
+        </button>
+        {zoom &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+              onClick={() => setZoom(false)}
+            >
+              <div className="absolute right-3 top-3 flex gap-2">
+                <button
+                  type="button"
+                  title="Baixar"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    downloadFromStorage(path, name);
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+                >
+                  <Download className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  title="Fechar"
+                  onClick={() => setZoom(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <img
+                src={url}
+                alt={name || ""}
+                className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>,
+            document.body,
+          )}
+      </>
+    );
   if (contentType === "audio") return <audio controls src={url} className="max-w-[260px]" />;
   if (contentType === "video") return <video controls src={url} className="max-w-[240px] rounded-lg" />;
   return (() => {
     const ext = (name?.split(".").pop() || "FILE").toUpperCase();
     return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 max-w-[280px] no-underline hover:bg-gray-50"
+      <button
+        type="button"
+        onClick={() => downloadFromStorage(path, name)}
+        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 max-w-[280px] text-left hover:bg-gray-50"
       >
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-600 text-[10px] font-bold">
           {ext}
@@ -215,7 +282,8 @@ function MessageMedia({
           <div className="truncate text-sm font-medium text-gray-800">{name || "Documento"}</div>
           <div className="text-xs text-gray-500">{size ? formatSize(size) + " · " : ""}Clique para baixar</div>
         </div>
-      </a>
+        <Download className="h-4 w-4 shrink-0 text-gray-400" />
+      </button>
     );
   })();
 }

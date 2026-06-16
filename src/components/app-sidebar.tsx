@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug, ChevronLeft, ChevronRight } from "lucide-react";
+import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug, ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 import {
@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { usePlatformStaff } from "@/hooks/use-platform-staff";
 
 const items = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
@@ -28,6 +29,9 @@ const items = [
   { title: "Conexões", url: "/connections", icon: Plug },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
+
+// Itens da ÁREA DA PLATAFORMA (só aparecem para o super_admin da ConectaChat).
+const platformItems = [{ title: "Planos", url: "/platform/plans", icon: Layers }];
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Proprietário",
@@ -49,6 +53,7 @@ export function AppSidebar() {
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, profile, activeMembership } = useCurrentUser();
+  const { isSuperAdmin } = usePlatformStaff();
 
   const handleLogout = async () => {
     await queryClient.cancelQueries();
@@ -110,6 +115,27 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Grupo PLATAFORMA — só para a equipe interna da ConectaChat (super_admin). */}
+        {isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {platformItems.map((item) => (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton asChild isActive={pathname === item.url}>
+                      <Link to={item.url} className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter>

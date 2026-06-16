@@ -10,6 +10,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Paperclip,
   Mic,
@@ -37,6 +38,7 @@ import {
   Star,
   StarOff,
   Download,
+  Mail,
   ArrowRightLeft,
   Users,
   Building2,
@@ -1228,16 +1230,19 @@ export function InboxScreen() {
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
-      {/* Bloco O — Mobile: a lista ocupa a tela toda e some quando há uma
-          conversa aberta (navegação em camadas, estilo WhatsApp). No
-          computador (md+) volta a ser a coluna fixa de 320px, sempre visível. */}
+      {/* Bloco O — Camadas (estilo WhatsApp) até 1024px: a lista ocupa a tela
+          toda e some quando há conversa aberta. A partir de 1024px (lg) volta
+          a ser a coluna fixa de 320px, sempre visível ao lado da conversa. */}
       <aside
         className={`${
-          selected ? "hidden md:flex" : "flex"
-        } w-full shrink-0 flex-col overflow-hidden border-r border-border bg-card md:w-[320px]`}
+          selected ? "hidden lg:flex" : "flex"
+        } w-full shrink-0 flex-col overflow-hidden border-r border-border bg-card lg:w-[320px]`}
       >
         <div className="shrink-0 border-b border-border">
-          <div className="flex h-14 items-center px-4">
+          <div className="flex h-14 items-center gap-2 px-3 md:px-4">
+            {/* Bloco O — Mobile (<768px): botão do menu lateral ao lado do título.
+                A partir de 768px o menu já é coluna fixa, então o botão some. */}
+            <SidebarTrigger className="md:hidden" />
             <h2 className="text-base font-semibold text-foreground">Conversas</h2>
           </div>
           <div className="px-3 pb-3">
@@ -1421,10 +1426,10 @@ export function InboxScreen() {
       </aside>
 
       {/* Painel da conversa */}
-      {/* Bloco O — Mobile: o painel da conversa só aparece quando há uma
-          conversa selecionada (senão a lista ocupa a tela). No computador
-          (md+) ele fica sempre visível, ao lado da lista. */}
-      <section className={`${selected ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col overflow-hidden bg-gray-50`}>
+      {/* Bloco O — Camadas até 1024px: o painel da conversa só aparece quando
+          há uma conversa selecionada (senão a lista ocupa a tela). A partir de
+          1024px (lg) ele fica sempre visível, ao lado da lista. */}
+      <section className={`${selected ? "flex" : "hidden lg:flex"} min-w-0 flex-1 flex-col overflow-hidden bg-gray-50`}>
         {!selected ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <Logo variant="horizontal" className="h-14 w-auto opacity-40" />
@@ -1434,12 +1439,12 @@ export function InboxScreen() {
           <>
             <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                {/* Bloco O — Mobile: voltar para a lista de conversas.
-                    Some no computador (md:hidden), onde a lista fica ao lado. */}
+                {/* Bloco O — Camadas (até 1024px): voltar para a lista.
+                    A partir de 1024px (lg) a lista fica ao lado, então some. */}
                 <button
                   type="button"
                   onClick={() => setSelectedId(null)}
-                  className="-ml-1 shrink-0 rounded-lg p-1 text-gray-600 hover:bg-gray-100 md:hidden"
+                  className="-ml-1 shrink-0 rounded-lg p-1 text-gray-600 hover:bg-gray-100 lg:hidden"
                   title="Voltar para a lista"
                   aria-label="Voltar"
                 >
@@ -1484,39 +1489,41 @@ export function InboxScreen() {
                     setSelectedId(null);
                     queryClient.invalidateQueries({ queryKey: ["conversations"] });
                   }}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                  title="Marcar como não lida"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
                 >
-                  Marcar como não lida
+                  <Mail size={16} /> <span className="hidden lg:inline">Marcar como não lida</span>
                 </button>
                 <button
                   onClick={openTransfer}
                   title="Transferir esta conversa para outro atendente ou departamento"
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
                 >
-                  <ArrowRightLeft size={15} /> Transferir
+                  <ArrowRightLeft size={16} /> <span className="hidden lg:inline">Transferir</span>
                 </button>
                 {selected.assigned_user_id && selected.assigned_user_id === user?.id ? (
                   <button
                     onClick={() => assignConversation(null)}
                     title="Você está atendendo — clique para liberar"
-                    className="flex items-center gap-1.5 rounded-lg border border-brand-green/40 bg-brand-green/10 px-3 py-1.5 text-sm font-medium text-brand-green hover:bg-brand-green/20"
+                    className="flex items-center gap-1.5 rounded-lg border border-brand-green/40 bg-brand-green/10 px-2.5 py-1.5 text-sm font-medium text-brand-green hover:bg-brand-green/20"
                   >
-                    <Check size={15} /> Você está atendendo
+                    <Check size={16} /> <span className="hidden lg:inline">Você está atendendo</span>
                   </button>
                 ) : selected.assigned_user_id ? (
                   <button
                     onClick={() => assignConversation(user?.id ?? null)}
                     title="Em atendimento por outro usuário — clique para assumir"
-                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+                    className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
                   >
-                    Assumir atendimento
+                    <Check size={16} /> <span className="hidden lg:inline">Assumir atendimento</span>
                   </button>
                 ) : (
                   <button
                     onClick={() => assignConversation(user?.id ?? null)}
-                    className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-brand-green-foreground transition-colors hover:bg-brand-green/90"
+                    title="Atender esta conversa"
+                    className="flex items-center gap-1.5 rounded-lg bg-brand-green px-2.5 py-1.5 text-sm font-medium text-brand-green-foreground transition-colors hover:bg-brand-green/90"
                   >
-                    Atender
+                    <Check size={16} /> <span className="hidden lg:inline">Atender</span>
                   </button>
                 )}
               </div>
@@ -1889,10 +1896,10 @@ export function InboxScreen() {
       </section>
 
       {selected && showContactPanel && contact && (
-        // Bloco O — Mobile: "Dados do contato" abre em tela cheia por cima
-        // (fixed inset-0), com o X para voltar — estilo WhatsApp. No computador
-        // (md+) volta a ser a coluna lateral de 340px ao lado da conversa.
-        <aside className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-card md:relative md:inset-auto md:z-auto md:w-[340px] md:shrink-0 md:border-l md:border-border">
+        // Bloco O — "Dados do contato": tela cheia por cima (fixed inset-0) com
+        // o X para voltar — estilo WhatsApp — em telas até 1280px. A partir de
+        // 1280px (xl) vira a coluna lateral de 340px ao lado da conversa.
+        <aside className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-card xl:relative xl:inset-auto xl:z-auto xl:w-[340px] xl:shrink-0 xl:border-l xl:border-border">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-900">Dados do contato</h3>
             <div className="flex items-center gap-1">

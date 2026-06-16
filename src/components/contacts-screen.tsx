@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -616,12 +617,15 @@ export function ContactsScreen() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50">
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Contatos</h1>
-              <p className="text-sm text-gray-500">Gerencie sua base de contatos.</p>
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-2">
+              <SidebarTrigger className="mt-0.5 shrink-0 md:hidden" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold text-gray-900">Contatos</h1>
+                <p className="text-sm text-gray-500">Gerencie sua base de contatos.</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleExport}
                 disabled={exporting}

@@ -558,6 +558,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_internal: boolean
           name: string
           plan_id: string | null
           slug: string
@@ -567,6 +568,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_internal?: boolean
           name: string
           plan_id?: string | null
           slug: string
@@ -576,6 +578,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_internal?: boolean
           name?: string
           plan_id?: string | null
           slug?: string

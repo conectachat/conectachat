@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Settings, Plus, Pencil, Trash2, Search, Users, Check, UserPlus, Copy } from "lucide-react";
+import {
+  Settings,
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  Users,
+  Check,
+  UserPlus,
+  Copy,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -128,6 +140,26 @@ export function SettingsScreen() {
   const isOwner = activeMembership?.role === "owner";
   const qc = useQueryClient();
   const confirm = useConfirm();
+
+  // Navegação das Configurações:
+  // - Computador (768px+): abas no topo (TabsList), como sempre.
+  // - Celular (<768px): "lista que entra na seção" (estilo Ajustes do
+  //   iPhone/Android). settingsTab = seção atual; settingsMobileOpen diz se
+  //   estamos vendo a LISTA (false) ou DENTRO de uma seção (true, com Voltar).
+  const [settingsTab, setSettingsTab] = useState("geral");
+  const [settingsMobileOpen, setSettingsMobileOpen] = useState(false);
+  const settingsSections: { value: string; label: string; show: boolean }[] = [
+    { value: "geral", label: "Geral", show: true },
+    { value: "empresa", label: "Empresa", show: isOrgAdmin },
+    { value: "equipe", label: "Equipe", show: isOrgAdmin },
+    { value: "usuario", label: "Usuário", show: true },
+    { value: "tags", label: "Tags", show: true },
+    { value: "campos", label: "Campos", show: true },
+    { value: "departamentos", label: "Departamentos", show: true },
+    { value: "respostas", label: "Respostas Rápidas", show: true },
+    { value: "horarios", label: "Horários", show: true },
+    { value: "distribuicao", label: "Distribuição", show: true },
+  ];
 
   // Opções de fuso (rótulo com deslocamento), montadas uma única vez.
   const tzOptions = useMemo(() => TIMEZONE_LIST.map((tz) => ({ value: tz, label: tzLabel(tz) })), []);
@@ -917,8 +949,9 @@ export function SettingsScreen() {
       <div className="mx-auto max-w-4xl">
         <PageHeader title="Configurações" subtitle="Gerencie as configurações do sistema." />
 
-        <Tabs defaultValue="geral" className="mt-6">
-          <TabsList className="w-full justify-start overflow-x-auto">
+        <Tabs value={settingsTab} onValueChange={setSettingsTab} className="mt-6">
+          {/* Computador (768px+): abas no topo. Escondidas no celular. */}
+          <TabsList className="hidden w-full justify-start overflow-x-auto md:flex">
             <TabsTrigger value="geral">Geral</TabsTrigger>
             {isOrgAdmin && <TabsTrigger value="empresa">Empresa</TabsTrigger>}
             {isOrgAdmin && <TabsTrigger value="equipe">Equipe</TabsTrigger>}
@@ -931,107 +964,359 @@ export function SettingsScreen() {
             <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="geral" className="mt-4 space-y-6">
-            {/* Meu Perfil */}
-            <section className="rounded-lg border border-border bg-card p-5">
-              <h2 className="text-sm font-medium text-foreground">Meu Perfil</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="nome">Nome</Label>
-                  <Input
-                    id="nome"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Seu nome"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input id="email" value={email} readOnly disabled className="bg-muted/50" />
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button onClick={handleSaveProfile} disabled={savingProfile} size="sm">
-                  {savingProfile ? "Salvando..." : "Salvar"}
-                </Button>
-              </div>
-            </section>
+          {/* Celular (<768px): lista de seções estilo "Ajustes". Some quando
+              uma seção é aberta; cada item entra na seção (com Voltar). */}
+          {!settingsMobileOpen && (
+            <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white md:hidden">
+              {settingsSections
+                .filter((s) => s.show)
+                .map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => {
+                      setSettingsTab(s.value);
+                      setSettingsMobileOpen(true);
+                    }}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-gray-800 hover:bg-gray-50"
+                  >
+                    <span>{s.label}</span>
+                    <ChevronRight size={16} className="text-gray-400" />
+                  </button>
+                ))}
+            </div>
+          )}
 
-            {/* Alterar Senha */}
-            <section className="rounded-lg border border-border bg-card p-5">
-              <h2 className="text-sm font-medium text-foreground">Alterar Senha</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="senha-atual">Senha atual</Label>
-                  <Input
-                    id="senha-atual"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="••••••"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nova-senha">Nova senha</Label>
-                  <Input
-                    id="nova-senha"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmar-senha">Confirmar nova senha</Label>
-                  <Input
-                    id="confirmar-senha"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repita a nova senha"
-                  />
-                </div>
-              </div>
+          {/* Conteúdo das seções: no celular só aparece quando uma seção foi
+              aberta (com "Voltar" no topo); no computador aparece sempre
+              (controlado pelas abas acima). */}
+          <div className={settingsMobileOpen ? "" : "hidden md:block"}>
+            {settingsMobileOpen && (
+              <button
+                onClick={() => setSettingsMobileOpen(false)}
+                className="mb-3 flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 md:hidden"
+              >
+                <ChevronLeft size={16} /> Voltar
+              </button>
+            )}
 
-              {(passwordError || passwordSuccess) && (
-                <p className={`mt-3 text-sm ${passwordError ? "text-destructive" : "text-green-600"}`}>
-                  {passwordError ?? passwordSuccess}
-                </p>
-              )}
-
-              <div className="mt-4 flex justify-end">
-                <Button onClick={handleChangePassword} disabled={changingPassword} size="sm">
-                  {changingPassword ? "Alterando..." : "Alterar senha"}
-                </Button>
-              </div>
-            </section>
-          </TabsContent>
-
-          {/* Bloco E.0 — Empresa (só dono/admin) */}
-          {isOrgAdmin && (
-            <TabsContent value="empresa" className="mt-4 space-y-6">
+            <TabsContent value="geral" className="mt-4 space-y-6">
+              {/* Meu Perfil */}
               <section className="rounded-lg border border-border bg-card p-5">
-                <h2 className="text-sm font-medium text-foreground">Dados da Empresa</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Visível apenas para o dono e administradores da empresa.
-                </p>
+                <h2 className="text-sm font-medium text-foreground">Meu Perfil</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="org-nome">Nome da empresa</Label>
+                    <Label htmlFor="nome">Nome</Label>
                     <Input
-                      id="org-nome"
-                      value={orgName}
-                      onChange={(e) => setOrgName(e.target.value)}
-                      placeholder="Nome da empresa"
+                      id="nome"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Seu nome"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="org-fuso">Fuso horário da empresa</Label>
-                    <Select value={orgTimezone} onValueChange={setOrgTimezone}>
-                      <SelectTrigger id="org-fuso">
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input id="email" value={email} readOnly disabled className="bg-muted/50" />
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleSaveProfile} disabled={savingProfile} size="sm">
+                    {savingProfile ? "Salvando..." : "Salvar"}
+                  </Button>
+                </div>
+              </section>
+
+              {/* Alterar Senha */}
+              <section className="rounded-lg border border-border bg-card p-5">
+                <h2 className="text-sm font-medium text-foreground">Alterar Senha</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="senha-atual">Senha atual</Label>
+                    <Input
+                      id="senha-atual"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="••••••"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nova-senha">Nova senha</Label>
+                    <Input
+                      id="nova-senha"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmar-senha">Confirmar nova senha</Label>
+                    <Input
+                      id="confirmar-senha"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repita a nova senha"
+                    />
+                  </div>
+                </div>
+
+                {(passwordError || passwordSuccess) && (
+                  <p className={`mt-3 text-sm ${passwordError ? "text-destructive" : "text-green-600"}`}>
+                    {passwordError ?? passwordSuccess}
+                  </p>
+                )}
+
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleChangePassword} disabled={changingPassword} size="sm">
+                    {changingPassword ? "Alterando..." : "Alterar senha"}
+                  </Button>
+                </div>
+              </section>
+            </TabsContent>
+
+            {/* Bloco E.0 — Empresa (só dono/admin) */}
+            {isOrgAdmin && (
+              <TabsContent value="empresa" className="mt-4 space-y-6">
+                <section className="rounded-lg border border-border bg-card p-5">
+                  <h2 className="text-sm font-medium text-foreground">Dados da Empresa</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Visível apenas para o dono e administradores da empresa.
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="org-nome">Nome da empresa</Label>
+                      <Input
+                        id="org-nome"
+                        value={orgName}
+                        onChange={(e) => setOrgName(e.target.value)}
+                        placeholder="Nome da empresa"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="org-fuso">Fuso horário da empresa</Label>
+                      <Select value={orgTimezone} onValueChange={setOrgTimezone}>
+                        <SelectTrigger id="org-fuso">
+                          <SelectValue placeholder="Selecione o fuso" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {tzOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Usado como padrão para novos usuários e relatórios.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button onClick={handleSaveOrg} disabled={savingOrg} size="sm">
+                      {savingOrg ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </section>
+              </TabsContent>
+            )}
+
+            {/* Fase 2 / Bloco J — Equipe (criar/gerenciar usuários da empresa) */}
+            {isOrgAdmin && (
+              <TabsContent value="equipe" className="mt-4 space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Crie e gerencie os usuários da sua empresa.{" "}
+                    {isOwner ? "Você pode criar admins e atendentes." : "Você pode criar atendentes."}
+                  </p>
+                  <Button onClick={openNewUser} size="sm" className="shrink-0">
+                    <UserPlus className="mr-1 h-4 w-4" /> Novo usuário
+                  </Button>
+                </div>
+
+                {orgUsersQuery.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Carregando…</p>
+                ) : (
+                  <div className="space-y-2">
+                    {orgUsersList.map((u) => {
+                      const isSelf = u.user_id === user?.id;
+                      const isOwnerRow = u.role === "owner";
+                      // Quem chama pode mexer nesta linha? (espelha as regras do servidor)
+                      const canManage = !isSelf && !isOwnerRow && (isOwner || u.role === "agent");
+                      return (
+                        <div
+                          key={u.user_id}
+                          className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate text-sm font-medium text-foreground">{u.name}</p>
+                              {isSelf && (
+                                <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                                  Você
+                                </span>
+                              )}
+                            </div>
+                            {u.email && <p className="truncate text-xs text-muted-foreground">{u.email}</p>}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            {isOwner && canManage ? (
+                              <Select
+                                value={u.role}
+                                onValueChange={(v) => handleChangeRole(u, v as "agent" | "admin")}
+                                disabled={teamBusyId === u.user_id}
+                              >
+                                <SelectTrigger className="h-8 w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="agent">Atendente</SelectItem>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                                {ORG_ROLE_LABEL[u.role] ?? u.role}
+                              </span>
+                            )}
+                            {canManage && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleRemoveUser(u)}
+                                disabled={teamBusyId === u.user_id}
+                                title="Remover da empresa"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Modal: novo usuário */}
+                <Dialog open={newUserOpen} onOpenChange={setNewUserOpen}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Novo usuário</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="nu-name">Nome</Label>
+                        <Input
+                          id="nu-name"
+                          value={nuName}
+                          onChange={(e) => setNuName(e.target.value)}
+                          placeholder="Ex.: Maria Silva"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="nu-email">E-mail</Label>
+                        <Input
+                          id="nu-email"
+                          type="email"
+                          value={nuEmail}
+                          onChange={(e) => setNuEmail(e.target.value)}
+                          placeholder="maria@empresa.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Papel</Label>
+                        <Select value={nuRole} onValueChange={(v) => setNuRole(v as "agent" | "admin")}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="agent">Atendente</SelectItem>
+                            {isOwner && <SelectItem value="admin">Admin</SelectItem>}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {nuRole === "admin"
+                            ? "Admin gerencia a operação e a equipe (atendentes)."
+                            : "Atendente atende as conversas."}
+                        </p>
+                      </div>
+                      {nuError && <p className="text-sm text-destructive">{nuError}</p>}
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setNewUserOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleCreateUser}
+                          disabled={nuBusy || !nuName.trim() || !nuEmail.trim()}
+                        >
+                          {nuBusy ? "Criando…" : "Criar usuário"}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Modal: credenciais geradas (mostradas UMA única vez) */}
+                <Dialog
+                  open={!!createdCreds}
+                  onOpenChange={(o) => {
+                    if (!o) setCreatedCreds(null);
+                  }}
+                >
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Usuário criado ✅</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Anote e envie estes dados ao novo usuário.{" "}
+                        <strong className="text-foreground">A senha provisória só aparece agora.</strong> Ele deve
+                        trocá-la após entrar (Configurações &gt; Usuário).
+                      </p>
+                      <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">E-mail: </span>
+                          <span className="break-all font-medium text-foreground">{createdCreds?.email}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Senha provisória: </span>
+                          <span className="break-all font-mono font-medium text-foreground">
+                            {createdCreds?.password}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={copyCreds}>
+                          <Copy className="mr-1 h-4 w-4" /> Copiar acesso
+                        </Button>
+                        <Button size="sm" onClick={() => setCreatedCreds(null)}>
+                          Fechar
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </TabsContent>
+            )}
+
+            {/* Bloco E.0 — Usuário (fuso + idioma) */}
+            <TabsContent value="usuario" className="mt-4 space-y-6">
+              <section className="rounded-lg border border-border bg-card p-5">
+                <h2 className="text-sm font-medium text-foreground">Preferências do Usuário</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="user-fuso">Meu fuso horário</Label>
+                    <Select
+                      value={userTimezone ? userTimezone : TZ_INHERIT}
+                      onValueChange={(v) => setUserTimezone(v === TZ_INHERIT ? "" : v)}
+                    >
+                      <SelectTrigger id="user-fuso">
                         <SelectValue placeholder="Selecione o fuso" />
                       </SelectTrigger>
                       <SelectContent className="max-h-72">
+                        <SelectItem value={TZ_INHERIT}>Usar o fuso da empresa ({orgTimezone})</SelectItem>
                         {tzOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
                             {o.label}
@@ -1039,731 +1324,521 @@ export function SettingsScreen() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Usado como padrão para novos usuários e relatórios.</p>
+                    <p className="text-xs text-muted-foreground">É este fuso que vale na hora de agendar mensagens.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="user-idioma">Idioma</Label>
+                    <Select value={userLanguage} onValueChange={setUserLanguage}>
+                      <SelectTrigger id="user-idioma">
+                        <SelectValue placeholder="Selecione o idioma" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LANGUAGES.map((l) => (
+                          <SelectItem key={l.value} value={l.value}>
+                            {l.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      O app ainda está em português; a tradução será ativada em breve.
+                    </p>
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end">
-                  <Button onClick={handleSaveOrg} disabled={savingOrg} size="sm">
-                    {savingOrg ? "Salvando..." : "Salvar"}
+                  <Button onClick={handleSaveUserPrefs} disabled={savingPrefs} size="sm">
+                    {savingPrefs ? "Salvando..." : "Salvar"}
                   </Button>
                 </div>
               </section>
             </TabsContent>
-          )}
 
-          {/* Fase 2 / Bloco J — Equipe (criar/gerenciar usuários da empresa) */}
-          {isOrgAdmin && (
-            <TabsContent value="equipe" className="mt-4 space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Crie e gerencie os usuários da sua empresa.{" "}
-                  {isOwner ? "Você pode criar admins e atendentes." : "Você pode criar atendentes."}
-                </p>
-                <Button onClick={openNewUser} size="sm" className="shrink-0">
-                  <UserPlus className="mr-1 h-4 w-4" /> Novo usuário
+            <TabsContent value="tags" className="mt-4 space-y-4">
+              {/* Cards */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <p className="text-2xl font-semibold text-foreground">{tagsList.length}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Tags criadas</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <p className="text-2xl font-semibold text-foreground">{contactsWithTagQuery.data ?? 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Contatos com tag</p>
+                </div>
+              </div>
+
+              {/* Search + New */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={tagSearch}
+                    onChange={(e) => setTagSearch(e.target.value)}
+                    placeholder="Buscar tag…"
+                    className="pl-9"
+                  />
+                </div>
+                <Button onClick={openNewTag} size="sm">
+                  <Plus className="mr-1 h-4 w-4" /> Nova Tag
                 </Button>
               </div>
 
-              {orgUsersQuery.isLoading ? (
-                <p className="text-sm text-muted-foreground">Carregando…</p>
-              ) : (
-                <div className="space-y-2">
-                  {orgUsersList.map((u) => {
-                    const isSelf = u.user_id === user?.id;
-                    const isOwnerRow = u.role === "owner";
-                    // Quem chama pode mexer nesta linha? (espelha as regras do servidor)
-                    const canManage = !isSelf && !isOwnerRow && (isOwner || u.role === "agent");
-                    return (
-                      <div
-                        key={u.user_id}
-                        className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-medium text-foreground">{u.name}</p>
-                            {isSelf && (
-                              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
-                                Você
-                              </span>
-                            )}
-                          </div>
-                          {u.email && <p className="truncate text-xs text-muted-foreground">{u.email}</p>}
+              {/* List */}
+              <div className="rounded-lg border border-border bg-card">
+                {filteredTags.length === 0 ? (
+                  <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                    {tagSearch.trim() ? "Nenhuma tag encontrada." : "Nenhuma tag criada ainda."}
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {filteredTags.map((t) => (
+                      <li key={t.id} className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: t.color }} />
+                          <span className="text-sm font-medium text-foreground">{t.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {t.contact_count} {t.contact_count === 1 ? "contato" : "contatos"}
+                          </span>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {isOwner && canManage ? (
-                            <Select
-                              value={u.role}
-                              onValueChange={(v) => handleChangeRole(u, v as "agent" | "admin")}
-                              disabled={teamBusyId === u.user_id}
-                            >
-                              <SelectTrigger className="h-8 w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="agent">Atendente</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <span className="rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-                              {ORG_ROLE_LABEL[u.role] ?? u.role}
-                            </span>
-                          )}
-                          {canManage && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => handleRemoveUser(u)}
-                              disabled={teamBusyId === u.user_id}
-                              title="Remover da empresa"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Modal: novo usuário */}
-              <Dialog open={newUserOpen} onOpenChange={setNewUserOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Novo usuário</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="nu-name">Nome</Label>
-                      <Input
-                        id="nu-name"
-                        value={nuName}
-                        onChange={(e) => setNuName(e.target.value)}
-                        placeholder="Ex.: Maria Silva"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="nu-email">E-mail</Label>
-                      <Input
-                        id="nu-email"
-                        type="email"
-                        value={nuEmail}
-                        onChange={(e) => setNuEmail(e.target.value)}
-                        placeholder="maria@empresa.com"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Papel</Label>
-                      <Select value={nuRole} onValueChange={(v) => setNuRole(v as "agent" | "admin")}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="agent">Atendente</SelectItem>
-                          {isOwner && <SelectItem value="admin">Admin</SelectItem>}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        {nuRole === "admin"
-                          ? "Admin gerencia a operação e a equipe (atendentes)."
-                          : "Atendente atende as conversas."}
-                      </p>
-                    </div>
-                    {nuError && <p className="text-sm text-destructive">{nuError}</p>}
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setNewUserOpen(false)}>
-                        Cancelar
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleCreateUser}
-                        disabled={nuBusy || !nuName.trim() || !nuEmail.trim()}
-                      >
-                        {nuBusy ? "Criando…" : "Criar usuário"}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              {/* Modal: credenciais geradas (mostradas UMA única vez) */}
-              <Dialog
-                open={!!createdCreds}
-                onOpenChange={(o) => {
-                  if (!o) setCreatedCreds(null);
-                }}
-              >
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Usuário criado ✅</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Anote e envie estes dados ao novo usuário.{" "}
-                      <strong className="text-foreground">A senha provisória só aparece agora.</strong> Ele deve
-                      trocá-la após entrar (Configurações &gt; Usuário).
-                    </p>
-                    <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">E-mail: </span>
-                        <span className="break-all font-medium text-foreground">{createdCreds?.email}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Senha provisória: </span>
-                        <span className="break-all font-mono font-medium text-foreground">
-                          {createdCreds?.password}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={copyCreds}>
-                        <Copy className="mr-1 h-4 w-4" /> Copiar acesso
-                      </Button>
-                      <Button size="sm" onClick={() => setCreatedCreds(null)}>
-                        Fechar
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </TabsContent>
-          )}
-
-          {/* Bloco E.0 — Usuário (fuso + idioma) */}
-          <TabsContent value="usuario" className="mt-4 space-y-6">
-            <section className="rounded-lg border border-border bg-card p-5">
-              <h2 className="text-sm font-medium text-foreground">Preferências do Usuário</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="user-fuso">Meu fuso horário</Label>
-                  <Select
-                    value={userTimezone ? userTimezone : TZ_INHERIT}
-                    onValueChange={(v) => setUserTimezone(v === TZ_INHERIT ? "" : v)}
-                  >
-                    <SelectTrigger id="user-fuso">
-                      <SelectValue placeholder="Selecione o fuso" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      <SelectItem value={TZ_INHERIT}>Usar o fuso da empresa ({orgTimezone})</SelectItem>
-                      {tzOptions.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">É este fuso que vale na hora de agendar mensagens.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="user-idioma">Idioma</Label>
-                  <Select value={userLanguage} onValueChange={setUserLanguage}>
-                    <SelectTrigger id="user-idioma">
-                      <SelectValue placeholder="Selecione o idioma" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LANGUAGES.map((l) => (
-                        <SelectItem key={l.value} value={l.value}>
-                          {l.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    O app ainda está em português; a tradução será ativada em breve.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button onClick={handleSaveUserPrefs} disabled={savingPrefs} size="sm">
-                  {savingPrefs ? "Salvando..." : "Salvar"}
-                </Button>
-              </div>
-            </section>
-          </TabsContent>
-
-          <TabsContent value="tags" className="mt-4 space-y-4">
-            {/* Cards */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-2xl font-semibold text-foreground">{tagsList.length}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Tags criadas</p>
-              </div>
-              <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-2xl font-semibold text-foreground">{contactsWithTagQuery.data ?? 0}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Contatos com tag</p>
-              </div>
-            </div>
-
-            {/* Search + New */}
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={tagSearch}
-                  onChange={(e) => setTagSearch(e.target.value)}
-                  placeholder="Buscar tag…"
-                  className="pl-9"
-                />
-              </div>
-              <Button onClick={openNewTag} size="sm">
-                <Plus className="mr-1 h-4 w-4" /> Nova Tag
-              </Button>
-            </div>
-
-            {/* List */}
-            <div className="rounded-lg border border-border bg-card">
-              {filteredTags.length === 0 ? (
-                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-                  {tagSearch.trim() ? "Nenhuma tag encontrada." : "Nenhuma tag criada ainda."}
-                </div>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {filteredTags.map((t) => (
-                    <li key={t.id} className="flex items-center justify-between px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: t.color }} />
-                        <span className="text-sm font-medium text-foreground">{t.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {t.contact_count} {t.contact_count === 1 ? "contato" : "contatos"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditTag(t)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => deleteTag(t)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Tag Modal (create / edit) */}
-            <Dialog open={tagModalOpen} onOpenChange={setTagModalOpen}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{editingTag ? "Editar tag" : "Nova tag"}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tag-name">Nome</Label>
-                    <Input
-                      id="tag-name"
-                      value={tagName}
-                      onChange={(e) => setTagName(e.target.value)}
-                      placeholder="Nome da tag"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Cor</Label>
-                    <ColorPicker value={tagColor} onChange={setTagColor} />
-                  </div>
-                  {tagError && <p className="text-sm text-destructive">{tagError}</p>}
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setTagModalOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button size="sm" onClick={saveTag} disabled={tagBusy || !tagName.trim()}>
-                      {tagBusy ? "Salvando…" : editingTag ? "Salvar" : "Criar"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
-
-          <TabsContent value="campos" className="mt-4 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm text-muted-foreground">
-                Campos extras que aparecerão no painel de detalhes do contato
-              </p>
-              <Button onClick={openNewField} size="sm">
-                <Plus className="mr-1 h-4 w-4" /> Novo Campo
-              </Button>
-            </div>
-
-            <div className="rounded-lg border border-border bg-card">
-              {fieldsList.length === 0 ? (
-                <div className="flex h-40 flex-col items-center justify-center text-center text-sm">
-                  <p className="font-medium text-foreground">Nenhum campo criado</p>
-                  <p className="mt-1 text-muted-foreground">Crie campos como CPF, Empresa, Cargo, etc.</p>
-                </div>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {fieldsList.map((f) => (
-                    <li key={f.id} className="flex items-center justify-between px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-foreground">{f.name}</span>
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                          {FIELD_TYPE_LABEL[f.field_type]}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditField(f)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => deleteField(f)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <Dialog open={fieldModalOpen} onOpenChange={setFieldModalOpen}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{editingField ? "Editar campo" : "Novo campo"}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="field-name">Nome</Label>
-                    <Input
-                      id="field-name"
-                      value={fieldName}
-                      onChange={(e) => setFieldName(e.target.value)}
-                      placeholder="Ex.: CPF"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Tipo</Label>
-                    <Select value={fieldType} onValueChange={(v) => setFieldType(v as FieldType)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="text">Texto</SelectItem>
-                        <SelectItem value="number">Número</SelectItem>
-                        <SelectItem value="date">Data</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {fieldError && <p className="text-sm text-destructive">{fieldError}</p>}
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setFieldModalOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button size="sm" onClick={saveField} disabled={fieldBusy || !fieldName.trim()}>
-                      {fieldBusy ? "Salvando…" : editingField ? "Salvar" : "Criar"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
-
-          {/* Fase 2 / Passo 1 — Departamentos + alocação de usuários */}
-          <TabsContent value="departamentos" className="mt-4 space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                Organize sua equipe em departamentos (ex.: Suporte, Vendas). Um atendente pode estar em vários.
-              </p>
-              {isOrgAdmin ? (
-                <Button onClick={openNewDept} size="sm" className="shrink-0">
-                  <Plus className="mr-1 h-4 w-4" /> Novo Departamento
-                </Button>
-              ) : (
-                <span className="text-xs text-muted-foreground">Somente o dono e administradores podem gerenciar.</span>
-              )}
-            </div>
-
-            {departmentsQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Carregando…</p>
-            ) : departmentsList.length === 0 ? (
-              <div className="flex h-40 flex-col items-center justify-center rounded-lg border border-border bg-card text-center text-sm">
-                <Users className="mb-2 h-6 w-6 text-muted-foreground opacity-50" />
-                <p className="font-medium text-foreground">Nenhum departamento criado</p>
-                <p className="mt-1 text-muted-foreground">
-                  {isOrgAdmin ? "Clique em “Novo Departamento” para começar." : "Peça ao administrador para criar."}
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {departmentsList.map((d) => (
-                  <div key={d.id} className="rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {d.member_count} {d.member_count === 1 ? "atendente" : "atendentes"}
-                        </p>
-                      </div>
-                      {isOrgAdmin && (
-                        <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openEditDept(d)}
-                            title="Renomear"
-                          >
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditTag(t)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => deleteDept(d)}
-                            title="Excluir"
+                            onClick={() => deleteTag(t)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      )}
-                    </div>
-                    {isOrgAdmin && (
-                      <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setAllocDept(d)}>
-                        <Users className="mr-1 h-4 w-4" /> Atendentes
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            )}
 
-            {/* Modal: criar / renomear departamento */}
-            <Dialog open={deptModalOpen} onOpenChange={setDeptModalOpen}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{editingDept ? "Renomear departamento" : "Novo departamento"}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dept-name">Nome</Label>
-                    <Input
-                      id="dept-name"
-                      value={deptName}
-                      onChange={(e) => setDeptName(e.target.value)}
-                      placeholder="Ex.: Suporte"
-                    />
-                  </div>
-                  {deptError && <p className="text-sm text-destructive">{deptError}</p>}
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setDeptModalOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button size="sm" onClick={saveDept} disabled={deptBusy || !deptName.trim()}>
-                      {deptBusy ? "Salvando…" : editingDept ? "Salvar" : "Criar"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Modal: alocar atendentes a um departamento */}
-            <Dialog
-              open={!!allocDept}
-              onOpenChange={(o) => {
-                if (!o) setAllocDept(null);
-              }}
-            >
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Atendentes — {allocDept?.name}</DialogTitle>
-                </DialogHeader>
-                <p className="text-xs text-muted-foreground">
-                  Marque quem atende este departamento. As mudanças são salvas na hora.
-                </p>
-                <div className="mt-2 max-h-80 space-y-1 overflow-y-auto">
-                  {orgUsersQuery.isLoading ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">Carregando…</p>
-                  ) : orgUsersList.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">Nenhum usuário na empresa ainda.</p>
-                  ) : (
-                    orgUsersList.map((u) => {
-                      const isMember = deptMemberSet.has(u.user_id);
-                      return (
-                        <button
-                          key={u.user_id}
-                          type="button"
-                          onClick={() => toggleMember(u.user_id, isMember)}
-                          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted"
-                        >
-                          <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                              isMember ? "border-primary bg-primary text-primary-foreground" : "border-input"
-                            }`}
-                          >
-                            {isMember && <Check className="h-3.5 w-3.5" />}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-foreground">{u.name}</span>
-                            {u.email && <span className="block truncate text-xs text-muted-foreground">{u.email}</span>}
-                          </span>
-                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
-                            {ORG_ROLE_LABEL[u.role] ?? u.role}
-                          </span>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-                <div className="mt-2 flex justify-end">
-                  <Button variant="outline" size="sm" onClick={() => setAllocDept(null)}>
-                    Fechar
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
-
-          <TabsContent value="respostas" className="mt-4 space-y-4">
-            {/* Cards */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-2xl font-semibold text-foreground">{quickRepliesList.length}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Respostas rápidas</p>
-              </div>
-              <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-2xl font-semibold text-foreground">{activeQuickReplies}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Ativas</p>
-              </div>
-            </div>
-
-            {/* Search + New */}
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={qrSearch}
-                  onChange={(e) => setQrSearch(e.target.value)}
-                  placeholder="Buscar respostas rápidas…"
-                  className="pl-9"
-                />
-              </div>
-              <Button onClick={openNewQuickReply} size="sm">
-                <Plus className="mr-1 h-4 w-4" /> Nova Resposta
-              </Button>
-            </div>
-
-            {/* List */}
-            <div className="rounded-lg border border-border bg-card">
-              {filteredQuickReplies.length === 0 ? (
-                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-                  {qrSearch.trim() ? "Nenhuma resposta encontrada." : "Nenhuma resposta rápida criada ainda."}
-                </div>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {filteredQuickReplies.map((q) => (
-                    <li key={q.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">{q.title?.trim() || q.shortcut}</span>
-                          <span className="text-xs text-muted-foreground">/{q.shortcut}</span>
-                        </div>
-                        <p className="mt-0.5 truncate text-sm text-muted-foreground">{q.content}</p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleQuickReply(q)}
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            q.active ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {q.active ? "Ativa" : "Inativa"}
-                        </button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditQuickReply(q)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => deleteQuickReply(q)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Quick reply Modal (create / edit) */}
-            <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{editingQr ? "Editar resposta rápida" : "Nova resposta rápida"}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="qr-shortcut">Atalho</Label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">/</span>
+              {/* Tag Modal (create / edit) */}
+              <Dialog open={tagModalOpen} onOpenChange={setTagModalOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{editingTag ? "Editar tag" : "Nova tag"}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="tag-name">Nome</Label>
                       <Input
-                        id="qr-shortcut"
-                        value={qrShortcut}
-                        onChange={(e) => setQrShortcut(e.target.value)}
-                        placeholder="saudacao"
+                        id="tag-name"
+                        value={tagName}
+                        onChange={(e) => setTagName(e.target.value)}
+                        placeholder="Nome da tag"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Sem espaços. No campo de mensagem você usa digitando /
-                      {qrShortcut
-                        .trim()
-                        .toLowerCase()
-                        .replace(/[^a-z0-9_-]/g, "") || "atalho"}
-                    </p>
+                    <div className="space-y-2">
+                      <Label>Cor</Label>
+                      <ColorPicker value={tagColor} onChange={setTagColor} />
+                    </div>
+                    {tagError && <p className="text-sm text-destructive">{tagError}</p>}
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setTagModalOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" onClick={saveTag} disabled={tagBusy || !tagName.trim()}>
+                        {tagBusy ? "Salvando…" : editingTag ? "Salvar" : "Criar"}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="qr-title">Título (opcional)</Label>
-                    <Input
-                      id="qr-title"
-                      value={qrTitle}
-                      onChange={(e) => setQrTitle(e.target.value)}
-                      placeholder="Ex.: Saudação inicial"
-                    />
+                </DialogContent>
+              </Dialog>
+            </TabsContent>
+
+            <TabsContent value="campos" className="mt-4 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Campos extras que aparecerão no painel de detalhes do contato
+                </p>
+                <Button onClick={openNewField} size="sm">
+                  <Plus className="mr-1 h-4 w-4" /> Novo Campo
+                </Button>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card">
+                {fieldsList.length === 0 ? (
+                  <div className="flex h-40 flex-col items-center justify-center text-center text-sm">
+                    <p className="font-medium text-foreground">Nenhum campo criado</p>
+                    <p className="mt-1 text-muted-foreground">Crie campos como CPF, Empresa, Cargo, etc.</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="qr-content">Mensagem</Label>
-                    <textarea
-                      id="qr-content"
-                      value={qrContent}
-                      onChange={(e) => setQrContent(e.target.value)}
-                      placeholder="Texto que será inserido na conversa…"
-                      className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    />
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {fieldsList.map((f) => (
+                      <li key={f.id} className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium text-foreground">{f.name}</span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                            {FIELD_TYPE_LABEL[f.field_type]}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditField(f)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => deleteField(f)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <Dialog open={fieldModalOpen} onOpenChange={setFieldModalOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{editingField ? "Editar campo" : "Novo campo"}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="field-name">Nome</Label>
+                      <Input
+                        id="field-name"
+                        value={fieldName}
+                        onChange={(e) => setFieldName(e.target.value)}
+                        placeholder="Ex.: CPF"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tipo</Label>
+                      <Select value={fieldType} onValueChange={(v) => setFieldType(v as FieldType)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="text">Texto</SelectItem>
+                          <SelectItem value="number">Número</SelectItem>
+                          <SelectItem value="date">Data</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {fieldError && <p className="text-sm text-destructive">{fieldError}</p>}
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setFieldModalOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" onClick={saveField} disabled={fieldBusy || !fieldName.trim()}>
+                        {fieldBusy ? "Salvando…" : editingField ? "Salvar" : "Criar"}
+                      </Button>
+                    </div>
                   </div>
-                  {qrError && <p className="text-sm text-destructive">{qrError}</p>}
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setQrModalOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button size="sm" onClick={saveQuickReply} disabled={qrBusy}>
-                      {qrBusy ? "Salvando…" : editingQr ? "Salvar" : "Criar"}
-                    </Button>
-                  </div>
+                </DialogContent>
+              </Dialog>
+            </TabsContent>
+
+            {/* Fase 2 / Passo 1 — Departamentos + alocação de usuários */}
+            <TabsContent value="departamentos" className="mt-4 space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Organize sua equipe em departamentos (ex.: Suporte, Vendas). Um atendente pode estar em vários.
+                </p>
+                {isOrgAdmin ? (
+                  <Button onClick={openNewDept} size="sm" className="shrink-0">
+                    <Plus className="mr-1 h-4 w-4" /> Novo Departamento
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    Somente o dono e administradores podem gerenciar.
+                  </span>
+                )}
+              </div>
+
+              {departmentsQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">Carregando…</p>
+              ) : departmentsList.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center rounded-lg border border-border bg-card text-center text-sm">
+                  <Users className="mb-2 h-6 w-6 text-muted-foreground opacity-50" />
+                  <p className="font-medium text-foreground">Nenhum departamento criado</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {isOrgAdmin ? "Clique em “Novo Departamento” para começar." : "Peça ao administrador para criar."}
+                  </p>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {departmentsList.map((d) => (
+                    <div key={d.id} className="rounded-lg border border-border bg-card p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {d.member_count} {d.member_count === 1 ? "atendente" : "atendentes"}
+                          </p>
+                        </div>
+                        {isOrgAdmin && (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEditDept(d)}
+                              title="Renomear"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => deleteDept(d)}
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      {isOrgAdmin && (
+                        <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setAllocDept(d)}>
+                          <Users className="mr-1 h-4 w-4" /> Atendentes
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
-          <TabsContent value="horarios" className="mt-4">
-            <Placeholder message="Disponível junto com a automação." />
-          </TabsContent>
+              {/* Modal: criar / renomear departamento */}
+              <Dialog open={deptModalOpen} onOpenChange={setDeptModalOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{editingDept ? "Renomear departamento" : "Novo departamento"}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dept-name">Nome</Label>
+                      <Input
+                        id="dept-name"
+                        value={deptName}
+                        onChange={(e) => setDeptName(e.target.value)}
+                        placeholder="Ex.: Suporte"
+                      />
+                    </div>
+                    {deptError && <p className="text-sm text-destructive">{deptError}</p>}
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setDeptModalOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" onClick={saveDept} disabled={deptBusy || !deptName.trim()}>
+                        {deptBusy ? "Salvando…" : editingDept ? "Salvar" : "Criar"}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
-          <TabsContent value="distribuicao" className="mt-4">
-            <Placeholder message="Disponível na fase de múltiplos usuários." />
-          </TabsContent>
+              {/* Modal: alocar atendentes a um departamento */}
+              <Dialog
+                open={!!allocDept}
+                onOpenChange={(o) => {
+                  if (!o) setAllocDept(null);
+                }}
+              >
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Atendentes — {allocDept?.name}</DialogTitle>
+                  </DialogHeader>
+                  <p className="text-xs text-muted-foreground">
+                    Marque quem atende este departamento. As mudanças são salvas na hora.
+                  </p>
+                  <div className="mt-2 max-h-80 space-y-1 overflow-y-auto">
+                    {orgUsersQuery.isLoading ? (
+                      <p className="py-6 text-center text-sm text-muted-foreground">Carregando…</p>
+                    ) : orgUsersList.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-muted-foreground">Nenhum usuário na empresa ainda.</p>
+                    ) : (
+                      orgUsersList.map((u) => {
+                        const isMember = deptMemberSet.has(u.user_id);
+                        return (
+                          <button
+                            key={u.user_id}
+                            type="button"
+                            onClick={() => toggleMember(u.user_id, isMember)}
+                            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted"
+                          >
+                            <span
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                                isMember ? "border-primary bg-primary text-primary-foreground" : "border-input"
+                              }`}
+                            >
+                              {isMember && <Check className="h-3.5 w-3.5" />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-foreground">{u.name}</span>
+                              {u.email && (
+                                <span className="block truncate text-xs text-muted-foreground">{u.email}</span>
+                              )}
+                            </span>
+                            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                              {ORG_ROLE_LABEL[u.role] ?? u.role}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                  <div className="mt-2 flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setAllocDept(null)}>
+                      Fechar
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </TabsContent>
+
+            <TabsContent value="respostas" className="mt-4 space-y-4">
+              {/* Cards */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <p className="text-2xl font-semibold text-foreground">{quickRepliesList.length}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Respostas rápidas</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <p className="text-2xl font-semibold text-foreground">{activeQuickReplies}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Ativas</p>
+                </div>
+              </div>
+
+              {/* Search + New */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={qrSearch}
+                    onChange={(e) => setQrSearch(e.target.value)}
+                    placeholder="Buscar respostas rápidas…"
+                    className="pl-9"
+                  />
+                </div>
+                <Button onClick={openNewQuickReply} size="sm">
+                  <Plus className="mr-1 h-4 w-4" /> Nova Resposta
+                </Button>
+              </div>
+
+              {/* List */}
+              <div className="rounded-lg border border-border bg-card">
+                {filteredQuickReplies.length === 0 ? (
+                  <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                    {qrSearch.trim() ? "Nenhuma resposta encontrada." : "Nenhuma resposta rápida criada ainda."}
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {filteredQuickReplies.map((q) => (
+                      <li key={q.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-foreground">{q.title?.trim() || q.shortcut}</span>
+                            <span className="text-xs text-muted-foreground">/{q.shortcut}</span>
+                          </div>
+                          <p className="mt-0.5 truncate text-sm text-muted-foreground">{q.content}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleQuickReply(q)}
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              q.active ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {q.active ? "Ativa" : "Inativa"}
+                          </button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditQuickReply(q)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => deleteQuickReply(q)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Quick reply Modal (create / edit) */}
+              <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{editingQr ? "Editar resposta rápida" : "Nova resposta rápida"}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="qr-shortcut">Atalho</Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">/</span>
+                        <Input
+                          id="qr-shortcut"
+                          value={qrShortcut}
+                          onChange={(e) => setQrShortcut(e.target.value)}
+                          placeholder="saudacao"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Sem espaços. No campo de mensagem você usa digitando /
+                        {qrShortcut
+                          .trim()
+                          .toLowerCase()
+                          .replace(/[^a-z0-9_-]/g, "") || "atalho"}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="qr-title">Título (opcional)</Label>
+                      <Input
+                        id="qr-title"
+                        value={qrTitle}
+                        onChange={(e) => setQrTitle(e.target.value)}
+                        placeholder="Ex.: Saudação inicial"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="qr-content">Mensagem</Label>
+                      <textarea
+                        id="qr-content"
+                        value={qrContent}
+                        onChange={(e) => setQrContent(e.target.value)}
+                        placeholder="Texto que será inserido na conversa…"
+                        className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                    </div>
+                    {qrError && <p className="text-sm text-destructive">{qrError}</p>}
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setQrModalOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" onClick={saveQuickReply} disabled={qrBusy}>
+                        {qrBusy ? "Salvando…" : editingQr ? "Salvar" : "Criar"}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </TabsContent>
+
+            <TabsContent value="horarios" className="mt-4">
+              <Placeholder message="Disponível junto com a automação." />
+            </TabsContent>
+
+            <TabsContent value="distribuicao" className="mt-4">
+              <Placeholder message="Disponível na fase de múltiplos usuários." />
+            </TabsContent>
+          </div>
         </Tabs>
       </div>
     </div>

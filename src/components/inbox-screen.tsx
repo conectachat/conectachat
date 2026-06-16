@@ -1,6 +1,6 @@
 import { Fragment, useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +36,9 @@ import {
   Star,
   StarOff,
   Download,
+  ArrowRightLeft,
+  Users,
+  Building2,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -514,6 +517,102 @@ export function InboxScreen() {
     }
     toast.success("Você assumiu o atendimento.");
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+  // ===================================================================
+  // Bloco N — TRANSFERÊNCIA
+  // ===================================================================
+  // Estado do modal: aberto/fechado, alvo escolhido, motivo e "enviando".
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferMode, setTransferMode] = useState<"department" | "user">("department");
+  const [transferDeptId, setTransferDeptId] = useState<string>("");
+  const [transferUserId, setTransferUserId] = useState<string>("");
+  const [transferNote, setTransferNote] = useState("");
+  const [transferring, setTransferring] = useState(false);
+
+  // Lista de departamentos da empresa (para o seletor "Para um departamento").
+  const deptsQuery = useQuery({
+    queryKey: ["transfer-departments", orgId],
+    enabled: !!orgId && transferOpen,
+    queryFn: async (): Promise<{ id: string; name: string }[]> => {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("id, name")
+        .eq("org_id", orgId!)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string }[];
+    },
+  });
+  const deptList = deptsQuery.data ?? [];
+
+  // Lista de atendentes da empresa (para o seletor "Para um atendente").
+  // Tira o próprio usuário (não faz sentido "transferir para mim").
+  const teamQuery = useQuery({
+    queryKey: ["transfer-team", orgId],
+    enabled: !!orgId && transferOpen,
+    queryFn: async (): Promise<{ user_id: string; name: string }[]> => {
+      const { data, error } = await supabase
+        .from("org_members")
+        .select("user_id, role, profiles(full_name, email)")
+        .eq("org_id", orgId!);
+      if (error) throw error;
+      return (data ?? []).map((m: any) => ({
+        user_id: m.user_id,
+        name: m.profiles?.full_name || m.profiles?.email || "Usuário",
+      }));
+    },
+  });
+  const teamList = (teamQuery.data ?? []).filter((u) => u.user_id !== myId);
+
+  // Abre o modal já zerado e na aba "departamento".
+  function openTransfer() {
+    setTransferMode("department");
+    setTransferDeptId("");
+    setTransferUserId("");
+    setTransferNote("");
+    setTransferOpen(true);
+  }
+
+  // Chama a Edge Function segura que troca dono/setor + grava histórico + aviso.
+  async function doTransfer() {
+    if (!selectedId) return;
+    const toDept = transferMode === "department" ? transferDeptId : transferDeptId || null;
+    const toUser = transferMode === "user" ? transferUserId : null;
+
+    if (transferMode === "department" && !transferDeptId) {
+      toast.error("Escolha o departamento.");
+      return;
+    }
+    if (transferMode === "user" && !transferUserId) {
+      toast.error("Escolha o atendente.");
+      return;
+    }
+
+    setTransferring(true);
+    const { data, error } = await supabase.functions.invoke("transfer-conversation", {
+      body: {
+        conversationId: selectedId,
+        toDepartmentId: toDept || null,
+        toUserId: toUser,
+        note: transferNote.trim() || null,
+      },
+    });
+    setTransferring(false);
+
+    // A função responde { ok:false, error } com HTTP 200 em caso de regra de
+    // negócio (sem permissão, alvo inválido…); 'error' aqui é só falha de rede.
+    if (error || !data?.ok) {
+      toast.error(data?.error || "Não foi possível transferir a conversa.");
+      return;
+    }
+
+    toast.success("Conversa transferida.");
+    setTransferOpen(false);
+    // Se mandei para outro dono/fila, ela some da minha tela — fecho a conversa.
+    setSelectedId(null);
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
   }
 
   // Bloco M — contadores por aba (sobre a lista já filtrada pela busca).
@@ -1367,6 +1466,13 @@ export function InboxScreen() {
                 >
                   Marcar como não lida
                 </button>
+                <button
+                  onClick={openTransfer}
+                  title="Transferir esta conversa para outro atendente ou departamento"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  <ArrowRightLeft size={15} /> Transferir
+                </button>
                 {selected.assigned_user_id && selected.assigned_user_id === user?.id ? (
                   <button
                     onClick={() => assignConversation(null)}
@@ -1426,6 +1532,18 @@ export function InboxScreen() {
               {!loadingMsgs &&
                 renderMessages.map((m, idx, arr) => {
                   const out = m.direction === "outbound";
+                  // Bloco N — "aviso de sistema" (ex.: transferência): gravado como
+                  // mensagem de texto com external_message_id = "system:transfer".
+                  // Mostramos centralizado/cinza, não como bolha de conversa.
+                  if (m.external_message_id === "system:transfer") {
+                    return (
+                      <div key={m.id} className="my-2 flex justify-center">
+                        <span className="rounded-full bg-gray-100 px-3 py-1 text-center text-[11px] font-medium text-gray-500">
+                          {m.content}
+                        </span>
+                      </div>
+                    );
+                  }
                   // H.3a — separador de data quando muda o dia em relação à mensagem anterior.
                   const showDateSep = idx === 0 || ymd(arr[idx - 1].created_at) !== ymd(m.created_at);
                   const reactionCounts = m.reactions
@@ -1975,6 +2093,163 @@ export function InboxScreen() {
             {forwarding && (
               <div className="border-t border-gray-100 px-4 py-2 text-center text-xs text-gray-500">Encaminhando…</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Bloco N — Modal de transferência */}
+      {transferOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !transferring && setTransferOpen(false)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">Transferir conversa</h3>
+              <button
+                onClick={() => !transferring && setTransferOpen(false)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              {/* Escolha do tipo de transferência */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTransferMode("department")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${
+                    transferMode === "department"
+                      ? "border-brand-blue bg-brand-blue/10 text-brand-blue"
+                      : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Building2 size={15} /> Departamento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTransferMode("user")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${
+                    transferMode === "user"
+                      ? "border-brand-blue bg-brand-blue/10 text-brand-blue"
+                      : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Users size={15} /> Atendente
+                </button>
+              </div>
+
+              {/* Modo DEPARTAMENTO */}
+              {transferMode === "department" && (
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Departamento de destino</label>
+                  {deptsQuery.isLoading ? (
+                    <p className="mt-1 text-sm text-gray-400">Carregando…</p>
+                  ) : deptList.length === 0 ? (
+                    <p className="mt-1 text-sm text-gray-400">
+                      Nenhum departamento cadastrado. Crie um em Configurações &gt; Departamentos.
+                    </p>
+                  ) : (
+                    <select
+                      value={transferDeptId}
+                      onChange={(e) => setTransferDeptId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                    >
+                      <option value="">Selecione…</option>
+                      {deptList.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    A conversa volta para a fila <span className="font-medium">Aguardando</span> deste setor (sem
+                    atendente), e qualquer pessoa do departamento pode aceitá-la.
+                  </p>
+                </div>
+              )}
+
+              {/* Modo ATENDENTE */}
+              {transferMode === "user" && (
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Atendente de destino</label>
+                    {teamQuery.isLoading ? (
+                      <p className="mt-1 text-sm text-gray-400">Carregando…</p>
+                    ) : teamList.length === 0 ? (
+                      <p className="mt-1 text-sm text-gray-400">Nenhum outro atendente disponível.</p>
+                    ) : (
+                      <select
+                        value={transferUserId}
+                        onChange={(e) => setTransferUserId(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                      >
+                        <option value="">Selecione…</option>
+                        {teamList.map((u) => (
+                          <option key={u.user_id} value={u.user_id}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Departamento (opcional)</label>
+                    <select
+                      value={transferDeptId}
+                      onChange={(e) => setTransferDeptId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                    >
+                      <option value="">Manter o atual</option>
+                      {deptList.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1.5 text-xs text-gray-500">
+                      A conversa cai direto em <span className="font-medium">Minhas</span> do atendente escolhido.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Motivo opcional */}
+              <div>
+                <label className="text-xs font-medium text-gray-600">Motivo (opcional)</label>
+                <textarea
+                  value={transferNote}
+                  onChange={(e) => setTransferNote(e.target.value)}
+                  rows={2}
+                  placeholder="Ex.: cliente quer falar com o financeiro."
+                  className="mt-1 w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-gray-100 px-4 py-3">
+              <button
+                onClick={() => !transferring && setTransferOpen(false)}
+                disabled={transferring}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={doTransfer}
+                disabled={transferring}
+                className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {transferring ? "Transferindo…" : "Transferir"}
+              </button>
+            </div>
           </div>
         </div>
       )}

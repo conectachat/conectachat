@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Settings, Plus, Pencil, Trash2, Search, Users, Check } from "lucide-react";
+import { Settings, Plus, Pencil, Trash2, Search, Users, Check, UserPlus, Copy } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -125,6 +125,7 @@ export function SettingsScreen() {
   const { user, activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id ?? null;
   const isOrgAdmin = activeMembership?.role === "owner" || activeMembership?.role === "admin";
+  const isOwner = activeMembership?.role === "owner";
   const qc = useQueryClient();
   const confirm = useConfirm();
 
@@ -186,6 +187,18 @@ export function SettingsScreen() {
   const [deptBusy, setDeptBusy] = useState(false);
   const [deptError, setDeptError] = useState<string | null>(null);
   const [allocDept, setAllocDept] = useState<Department | null>(null); // departamento aberto na alocação
+
+  // Equipe / Usuários state (Fase 2 / Bloco J)
+  const [newUserOpen, setNewUserOpen] = useState(false);
+  const [nuName, setNuName] = useState("");
+  const [nuEmail, setNuEmail] = useState("");
+  const [nuRole, setNuRole] = useState<"agent" | "admin">("agent");
+  const [nuBusy, setNuBusy] = useState(false);
+  const [nuError, setNuError] = useState<string | null>(null);
+  // Credenciais geradas (mostradas UMA única vez, para o dono repassar).
+  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
+  // Usuário em ação (troca de papel / remoção) — trava os botões da linha.
+  const [teamBusyId, setTeamBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -793,6 +806,112 @@ export function SettingsScreen() {
     invalidateDepartments();
   }
 
+  // --- Equipe / Usuários (Fase 2 / Bloco J) -------------------------------
+  // Toda escrita passa pela Edge Function "manage-team" (service role no
+  // servidor); o navegador NÃO escreve direto em org_members.
+  function invalidateOrgUsers() {
+    qc.invalidateQueries({ queryKey: ["settings-org-users"] });
+    qc.invalidateQueries({ queryKey: ["settings-departments"] }); // contagem de atendentes pode mudar
+    qc.invalidateQueries({ queryKey: ["org_members"] }); // hook use-current-user (caso o próprio papel mude)
+  }
+
+  // Chama a função e padroniza a leitura do resultado.
+  // Sucesso = data.ok === true. Erro de negócio = data.ok === false (+ data.error).
+  async function callTeam(body: Record<string, unknown>) {
+    const { data, error } = await supabase.functions.invoke("manage-team", { body });
+    const errorMsg: string | undefined =
+      (data && data.ok === false ? (data.error as string) : undefined) ?? (error ? error.message : undefined);
+    return { data: data as any, okFlag: !!data?.ok, errorMsg };
+  }
+
+  function openNewUser() {
+    setNuName("");
+    setNuEmail("");
+    setNuRole("agent");
+    setNuError(null);
+    setNewUserOpen(true);
+  }
+
+  async function handleCreateUser() {
+    setNuError(null);
+    if (!orgId) {
+      setNuError("Sem empresa vinculada.");
+      return;
+    }
+    if (!nuName.trim()) {
+      setNuError("Informe o nome.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuEmail.trim())) {
+      setNuError("E-mail inválido.");
+      return;
+    }
+    setNuBusy(true);
+    const { data, okFlag, errorMsg } = await callTeam({
+      action: "create",
+      orgId,
+      fullName: nuName.trim(),
+      email: nuEmail.trim(),
+      role: nuRole,
+    });
+    setNuBusy(false);
+    if (!okFlag) {
+      setNuError(errorMsg ?? "Não foi possível criar o usuário.");
+      return;
+    }
+    setNewUserOpen(false);
+    setCreatedCreds({ email: data.email, password: data.tempPassword });
+    invalidateOrgUsers();
+  }
+
+  async function handleChangeRole(u: OrgUser, role: "agent" | "admin") {
+    if (role === u.role || !orgId) return;
+    setTeamBusyId(u.user_id);
+    const { okFlag, errorMsg } = await callTeam({ action: "set-role", orgId, userId: u.user_id, role });
+    setTeamBusyId(null);
+    if (!okFlag) {
+      toast.error("Não foi possível trocar o papel", { description: errorMsg });
+      return;
+    }
+    toast.success("Papel atualizado.");
+    invalidateOrgUsers();
+  }
+
+  async function handleRemoveUser(u: OrgUser) {
+    if (!orgId) return;
+    const okC = await confirm({
+      title: "Remover usuário?",
+      description: `"${u.name}" perderá o acesso a esta empresa. O histórico de mensagens é mantido; a conta e o e-mail não são apagados.`,
+      confirmText: "Remover",
+      danger: true,
+    });
+    if (!okC) return;
+    setTeamBusyId(u.user_id);
+    const { okFlag, errorMsg } = await callTeam({ action: "remove", orgId, userId: u.user_id });
+    setTeamBusyId(null);
+    if (!okFlag) {
+      toast.error("Não foi possível remover", { description: errorMsg });
+      return;
+    }
+    toast.success("Usuário removido da empresa.");
+    invalidateOrgUsers();
+  }
+
+  async function copyCreds() {
+    if (!createdCreds) return;
+    const txt =
+      `ConectaChat — seu acesso\n` +
+      `E-mail: ${createdCreds.email}\n` +
+      `Senha provisória: ${createdCreds.password}\n\n` +
+      `Entre e troque a senha em Configurações > Usuário.`;
+    try {
+      await navigator.clipboard.writeText(txt);
+      toast.success("Acesso copiado!");
+    } catch {
+      toast.error("Não foi possível copiar. Copie manualmente.");
+    }
+  }
+
   return (
     <div className="h-full overflow-auto bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto max-w-4xl">
@@ -802,6 +921,7 @@ export function SettingsScreen() {
           <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="geral">Geral</TabsTrigger>
             {isOrgAdmin && <TabsTrigger value="empresa">Empresa</TabsTrigger>}
+            {isOrgAdmin && <TabsTrigger value="equipe">Equipe</TabsTrigger>}
             <TabsTrigger value="usuario">Usuário</TabsTrigger>
             <TabsTrigger value="tags">Tags</TabsTrigger>
             <TabsTrigger value="campos">Campos</TabsTrigger>
@@ -928,6 +1048,186 @@ export function SettingsScreen() {
                   </Button>
                 </div>
               </section>
+            </TabsContent>
+          )}
+
+          {/* Fase 2 / Bloco J — Equipe (criar/gerenciar usuários da empresa) */}
+          {isOrgAdmin && (
+            <TabsContent value="equipe" className="mt-4 space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Crie e gerencie os usuários da sua empresa.{" "}
+                  {isOwner ? "Você pode criar admins e atendentes." : "Você pode criar atendentes."}
+                </p>
+                <Button onClick={openNewUser} size="sm" className="shrink-0">
+                  <UserPlus className="mr-1 h-4 w-4" /> Novo usuário
+                </Button>
+              </div>
+
+              {orgUsersQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">Carregando…</p>
+              ) : (
+                <div className="space-y-2">
+                  {orgUsersList.map((u) => {
+                    const isSelf = u.user_id === user?.id;
+                    const isOwnerRow = u.role === "owner";
+                    // Quem chama pode mexer nesta linha? (espelha as regras do servidor)
+                    const canManage = !isSelf && !isOwnerRow && (isOwner || u.role === "agent");
+                    return (
+                      <div
+                        key={u.user_id}
+                        className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-medium text-foreground">{u.name}</p>
+                            {isSelf && (
+                              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                                Você
+                              </span>
+                            )}
+                          </div>
+                          {u.email && <p className="truncate text-xs text-muted-foreground">{u.email}</p>}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {isOwner && canManage ? (
+                            <Select
+                              value={u.role}
+                              onValueChange={(v) => handleChangeRole(u, v as "agent" | "admin")}
+                              disabled={teamBusyId === u.user_id}
+                            >
+                              <SelectTrigger className="h-8 w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="agent">Atendente</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                              {ORG_ROLE_LABEL[u.role] ?? u.role}
+                            </span>
+                          )}
+                          {canManage && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => handleRemoveUser(u)}
+                              disabled={teamBusyId === u.user_id}
+                              title="Remover da empresa"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Modal: novo usuário */}
+              <Dialog open={newUserOpen} onOpenChange={setNewUserOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Novo usuário</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="nu-name">Nome</Label>
+                      <Input
+                        id="nu-name"
+                        value={nuName}
+                        onChange={(e) => setNuName(e.target.value)}
+                        placeholder="Ex.: Maria Silva"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nu-email">E-mail</Label>
+                      <Input
+                        id="nu-email"
+                        type="email"
+                        value={nuEmail}
+                        onChange={(e) => setNuEmail(e.target.value)}
+                        placeholder="maria@empresa.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Papel</Label>
+                      <Select value={nuRole} onValueChange={(v) => setNuRole(v as "agent" | "admin")}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="agent">Atendente</SelectItem>
+                          {isOwner && <SelectItem value="admin">Admin</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {nuRole === "admin"
+                          ? "Admin gerencia a operação e a equipe (atendentes)."
+                          : "Atendente atende as conversas."}
+                      </p>
+                    </div>
+                    {nuError && <p className="text-sm text-destructive">{nuError}</p>}
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setNewUserOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleCreateUser}
+                        disabled={nuBusy || !nuName.trim() || !nuEmail.trim()}
+                      >
+                        {nuBusy ? "Criando…" : "Criar usuário"}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Modal: credenciais geradas (mostradas UMA única vez) */}
+              <Dialog
+                open={!!createdCreds}
+                onOpenChange={(o) => {
+                  if (!o) setCreatedCreds(null);
+                }}
+              >
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Usuário criado ✅</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Anote e envie estes dados ao novo usuário.{" "}
+                      <strong className="text-foreground">A senha provisória só aparece agora.</strong> Ele deve
+                      trocá-la após entrar (Configurações &gt; Usuário).
+                    </p>
+                    <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">E-mail: </span>
+                        <span className="break-all font-medium text-foreground">{createdCreds?.email}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Senha provisória: </span>
+                        <span className="break-all font-mono font-medium text-foreground">
+                          {createdCreds?.password}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={copyCreds}>
+                        <Copy className="mr-1 h-4 w-4" /> Copiar acesso
+                      </Button>
+                      <Button size="sm" onClick={() => setCreatedCreds(null)}>
+                        Fechar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
           )}
 

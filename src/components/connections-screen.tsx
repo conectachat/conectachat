@@ -39,8 +39,11 @@ type ChannelRow = {
   external_instance_id: string | null;
   receive_groups: boolean;
   credentials: Credentials;
+  default_department_id: string | null;
   created_at: string;
 };
+
+type DeptRow = { id: string; name: string };
 
 type QrTarget = { channelId: string; qr: string | null; pairingCode: string | null };
 
@@ -124,11 +127,25 @@ export function ConnectionsScreen() {
     queryFn: async (): Promise<ChannelRow[]> => {
       const { data, error } = await supabase
         .from("channels")
-        .select("id, name, type, status, external_instance_id, receive_groups, credentials, created_at")
+        .select(
+          "id, name, type, status, external_instance_id, receive_groups, credentials, default_department_id, created_at",
+        )
         .eq("org_id", orgId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as ChannelRow[];
+    },
+  });
+
+  // Departamentos da empresa (para o seletor "Departamento padrão" no card).
+  // Leitura liberada a todo membro (Bloco I); só dono/admin pode alterar.
+  const departmentsQuery = useQuery({
+    queryKey: ["connections-departments", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<DeptRow[]> => {
+      const { data, error } = await supabase.from("departments").select("id, name").eq("org_id", orgId!).order("name");
+      if (error) throw error;
+      return (data ?? []) as DeptRow[];
     },
   });
 
@@ -147,11 +164,28 @@ export function ConnectionsScreen() {
   }, [orgId, queryClient]);
 
   const channels = channelsQuery.data ?? [];
+  const departments = departmentsQuery.data ?? [];
+  const isAdmin = activeMembership?.role === "owner" || activeMembership?.role === "admin";
   const isLoading = channelsQuery.isLoading;
   const refetch = () => channelsQuery.refetch();
 
   async function callFn(body: Record<string, unknown>) {
     return supabase.functions.invoke("manage-channels", { body });
+  }
+
+  // Define (ou limpa) o departamento padrão de uma conexão. Só dono/admin.
+  // É uma escrita simples na tabela channels (a RLS já permite a membros);
+  // a hierarquia de "quem pode" é garantida escondendo o seletor para agentes.
+  async function handleSetDepartment(ch: ChannelRow, deptId: string | null) {
+    setBusyId(ch.id);
+    const { error } = await supabase.from("channels").update({ default_department_id: deptId }).eq("id", ch.id);
+    setBusyId(null);
+    if (error) {
+      toast.error("Não foi possível salvar o departamento", { description: error.message });
+      return;
+    }
+    toast.success("Departamento padrão atualizado");
+    refetch();
   }
 
   async function handleRefresh(ch: ChannelRow) {
@@ -243,12 +277,15 @@ export function ConnectionsScreen() {
           ) : (
             <ChannelList
               channels={channels}
+              departments={departments}
+              isAdmin={isAdmin}
               busyId={busyId}
               onRefresh={handleRefresh}
               onReconnect={handleReconnect}
               onDisconnect={handleDisconnect}
               onEdit={setEditing}
               onDelete={setConfirmDelete}
+              onSetDepartment={handleSetDepartment}
             />
           )}
         </div>
@@ -318,20 +355,26 @@ export function ConnectionsScreen() {
 // ===================================================================
 function ChannelList({
   channels,
+  departments,
+  isAdmin,
   busyId,
   onRefresh,
   onReconnect,
   onDisconnect,
   onEdit,
   onDelete,
+  onSetDepartment,
 }: {
   channels: ChannelRow[];
+  departments: DeptRow[];
+  isAdmin: boolean;
   busyId: string | null;
   onRefresh: (ch: ChannelRow) => void;
   onReconnect: (ch: ChannelRow) => void;
   onDisconnect: (ch: ChannelRow) => void;
   onEdit: (ch: ChannelRow) => void;
   onDelete: (ch: ChannelRow) => void;
+  onSetDepartment: (ch: ChannelRow, deptId: string | null) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -343,6 +386,7 @@ function ChannelList({
         const number = (ch.credentials as Credentials)?.number;
         const connected = ch.status === "connected";
         const busy = busyId === ch.id;
+        const deptName = departments.find((d) => d.id === ch.default_department_id)?.name ?? null;
 
         return (
           <div key={ch.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
@@ -369,6 +413,35 @@ function ChannelList({
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 {number ? `+${number}` : "O número aparece após conectar"}
               </p>
+
+              {/* Bloco K — Departamento padrão da conexão.
+                  Toda conversa NOVA deste número entra neste departamento.
+                  Só dono/admin edita; atendente vê em texto. */}
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+                <span className="shrink-0 text-muted-foreground">Departamento padrão:</span>
+                {isAdmin ? (
+                  departments.length > 0 ? (
+                    <select
+                      className="h-7 max-w-[180px] rounded-md border border-border bg-background px-2 text-xs text-foreground disabled:opacity-60"
+                      value={ch.default_department_id ?? ""}
+                      onChange={(e) => onSetDepartment(ch, e.target.value || null)}
+                      disabled={busy}
+                      title="Departamento onde as conversas novas deste número entram"
+                    >
+                      <option value="">Sem departamento</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-muted-foreground">Crie departamentos em Configurações para rotear.</span>
+                  )
+                ) : (
+                  <span className="font-medium text-foreground">{deptName ?? "Sem departamento"}</span>
+                )}
+              </div>
             </div>
 
             <div className="ml-auto flex items-center gap-1">

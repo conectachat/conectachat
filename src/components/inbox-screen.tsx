@@ -452,7 +452,8 @@ export function InboxScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState("");
   // Bloco M — aba ativa da lista. "aguardando" = sem atendente; "minhas" = atribuída a mim.
-  const [tab, setTab] = useState<"todas" | "aguardando" | "minhas">("todas");
+  // Abre em "Minhas" por padrão; ordem das abas: Minhas → Aguardando → Todas.
+  const [tab, setTab] = useState<"todas" | "aguardando" | "minhas">("minhas");
 
   // H.3a — lista de conversas filtrada pela busca (nome, telefone ou e-mail).
   const filteredConvs = useMemo(() => {
@@ -1159,9 +1160,9 @@ export function InboxScreen() {
           <div className="flex gap-1 px-3 pb-3">
             {(
               [
-                ["todas", "Todas", counts.todas],
-                ["aguardando", "Aguardando", counts.aguardando],
                 ["minhas", "Minhas", counts.minhas],
+                ["aguardando", "Aguardando", counts.aguardando],
+                ["todas", "Todas", counts.todas],
               ] as const
             ).map(([key, label, n]) => {
               const isActive = tab === key;

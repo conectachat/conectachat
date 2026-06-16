@@ -10,7 +10,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 //  - role:           o papel na plataforma (super_admin/finance/…), ou null
 //  - isPlatformStaff: faz parte da equipe da plataforma (qualquer papel)
 //  - isSuperAdmin:    é o super_admin (a "chave-mestra") — gerencia Planos/Clientes
-//  - isLoading:       ainda buscando
+//  - isLoading:       ainda buscando (ver observação abaixo)
 export function usePlatformStaff() {
   const { user } = useCurrentUser();
   const userId = user?.id;
@@ -19,11 +19,7 @@ export function usePlatformStaff() {
     queryKey: ["platform_staff", userId],
     enabled: !!userId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("platform_staff")
-        .select("role")
-        .eq("user_id", userId!)
-        .maybeSingle();
+      const { data, error } = await supabase.from("platform_staff").select("role").eq("user_id", userId!).maybeSingle();
       if (error) throw error;
       return data; // { role } ou null
     },
@@ -31,10 +27,16 @@ export function usePlatformStaff() {
 
   const role = query.data?.role ?? null;
 
+  // IMPORTANTE: "ainda carregando" enquanto NÃO sabemos quem está logado
+  // (user === undefined, antes de o login ser confirmado) OU enquanto a consulta
+  // ao platform_staff não terminou. Sem isso, a tela conclui "não é super_admin"
+  // no primeiro instante e redireciona sem querer (o "abre e volta").
+  const isLoading = user === undefined || (!!userId && query.isLoading);
+
   return {
     role,
     isPlatformStaff: !!role,
     isSuperAdmin: role === "super_admin",
-    isLoading: !!userId && query.isLoading,
+    isLoading,
   };
 }

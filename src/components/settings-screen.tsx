@@ -184,6 +184,11 @@ export function SettingsScreen() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  // Alterar e-mail de acesso (Bloco P / setup)
+  const [newEmail, setNewEmail] = useState("");
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
 
   // Tags state
   const [tagSearch, setTagSearch] = useState("");
@@ -341,6 +346,33 @@ export function SettingsScreen() {
       setConfirmPassword("");
     }
     setChangingPassword(false);
+  };
+
+  // Alterar e-mail de acesso. A troca é feita no servidor pela Edge Function
+  // "update-email" (service role) — assim não depende de SMTP/confirmação por
+  // e-mail. O usuário só altera o PRÓPRIO e-mail (a função usa o id de quem chama).
+  const handleChangeEmail = async () => {
+    setEmailError(null);
+    setEmailSuccess(null);
+    const e = newEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      setEmailError("E-mail inválido.");
+      return;
+    }
+    if (e === (email || "").toLowerCase()) {
+      setEmailError("Esse já é o seu e-mail atual.");
+      return;
+    }
+    setChangingEmail(true);
+    const { data, error } = await supabase.functions.invoke("update-email", { body: { newEmail: e } });
+    setChangingEmail(false);
+    if (error || !data?.ok) {
+      setEmailError(data?.error || "Não foi possível alterar o e-mail.");
+      return;
+    }
+    setEmail(e);
+    setNewEmail("");
+    setEmailSuccess("E-mail alterado! Use o novo e-mail no próximo login.");
   };
 
   // Tags queries
@@ -1070,6 +1102,43 @@ export function SettingsScreen() {
                 <div className="mt-4 flex justify-end">
                   <Button onClick={handleChangePassword} disabled={changingPassword} size="sm">
                     {changingPassword ? "Alterando..." : "Alterar senha"}
+                  </Button>
+                </div>
+              </section>
+
+              {/* Alterar E-mail de acesso */}
+              <section className="rounded-lg border border-border bg-card p-5">
+                <h2 className="text-sm font-medium text-foreground">Alterar e-mail de acesso</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Troca o e-mail usado para entrar no app. A alteração é imediata; use o novo e-mail no próximo login.
+                  Sua sessão atual continua aberta normalmente.
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="email-atual-ro">E-mail atual</Label>
+                    <Input id="email-atual-ro" value={email} readOnly disabled className="bg-muted/50" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="novo-email">Novo e-mail</Label>
+                    <Input
+                      id="novo-email"
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="voce@empresa.com"
+                    />
+                  </div>
+                </div>
+
+                {(emailError || emailSuccess) && (
+                  <p className={`mt-3 text-sm ${emailError ? "text-destructive" : "text-green-600"}`}>
+                    {emailError ?? emailSuccess}
+                  </p>
+                )}
+
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleChangeEmail} disabled={changingEmail} size="sm">
+                    {changingEmail ? "Alterando..." : "Alterar e-mail"}
                   </Button>
                 </div>
               </section>

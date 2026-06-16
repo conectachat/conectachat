@@ -118,17 +118,6 @@ function contentLabel(type: string, content: string | null) {
   };
   return map[type] ?? "Mensagem";
 }
-const statusLabel: Record<string, string> = {
-  open: "Aberto",
-  pending: "Aguardando",
-  closed: "Fechado",
-};
-const statusClass: Record<string, string> = {
-  open: "bg-brand-green/15 text-brand-green-foreground",
-  pending: "bg-amber-100 text-amber-800",
-  closed: "bg-gray-100 text-gray-600",
-};
-
 function ContactAvatar({
   path,
   initials,
@@ -462,6 +451,8 @@ export function InboxScreen() {
   const { data: conversations, isLoading } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState("");
+  // Bloco M — aba ativa da lista. "aguardando" = sem atendente; "minhas" = atribuída a mim.
+  const [tab, setTab] = useState<"todas" | "aguardando" | "minhas">("todas");
 
   // H.3a — lista de conversas filtrada pela busca (nome, telefone ou e-mail).
   const filteredConvs = useMemo(() => {
@@ -510,6 +501,37 @@ export function InboxScreen() {
     toast.success(uid ? "Você assumiu o atendimento." : "Atendimento liberado.");
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
+
+  // Bloco M — "Aceitar": um clique no card de uma conversa Aguardando atribui a mim.
+  const myId = user?.id ?? null;
+  async function acceptConversation(convId: string) {
+    if (!myId) return;
+    const { error } = await supabase.from("conversations").update({ assigned_user_id: myId }).eq("id", convId);
+    if (error) {
+      toast.error("Não foi possível aceitar a conversa.");
+      return;
+    }
+    toast.success("Você assumiu o atendimento.");
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+  // Bloco M — contadores por aba (sobre a lista já filtrada pela busca).
+  const counts = useMemo(() => {
+    let aguardando = 0;
+    let minhas = 0;
+    for (const c of filteredConvs) {
+      if (!c.assigned_user_id) aguardando++;
+      else if (c.assigned_user_id === myId) minhas++;
+    }
+    return { todas: filteredConvs.length, aguardando, minhas };
+  }, [filteredConvs, myId]);
+
+  // Bloco M — lista exibida = busca + aba ativa.
+  const visibleConvs = useMemo(() => {
+    if (tab === "aguardando") return filteredConvs.filter((c) => !c.assigned_user_id);
+    if (tab === "minhas") return filteredConvs.filter((c) => c.assigned_user_id === myId);
+    return filteredConvs;
+  }, [filteredConvs, tab, myId]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
@@ -1133,6 +1155,36 @@ export function InboxScreen() {
               )}
             </div>
           </div>
+          {/* Bloco M — abas com contadores */}
+          <div className="flex gap-1 px-3 pb-3">
+            {(
+              [
+                ["todas", "Todas", counts.todas],
+                ["aguardando", "Aguardando", counts.aguardando],
+                ["minhas", "Minhas", counts.minhas],
+              ] as const
+            ).map(([key, label, n]) => {
+              const isActive = tab === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setTab(key)}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                    isActive ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <span>{label}</span>
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] font-semibold ${
+                      isActive ? "bg-white/25 text-white" : "bg-gray-200 text-gray-600"
+                    }`}
+                  >
+                    {n}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading && (
@@ -1148,13 +1200,19 @@ export function InboxScreen() {
               ))}
             </ul>
           )}
-          {!isLoading && filteredConvs.length === 0 && (
+          {!isLoading && visibleConvs.length === 0 && (
             <p className="px-4 py-10 text-center text-sm text-gray-500">
-              {convSearch.trim() ? "Nenhuma conversa encontrada" : "Nenhuma conversa ainda"}
+              {convSearch.trim()
+                ? "Nenhuma conversa encontrada"
+                : tab === "aguardando"
+                  ? "Nenhuma conversa aguardando"
+                  : tab === "minhas"
+                    ? "Você não está atendendo nenhuma conversa"
+                    : "Nenhuma conversa ainda"}
             </p>
           )}
           {!isLoading &&
-            filteredConvs.map((c) => {
+            visibleConvs.map((c) => {
               const name = displayName(c.contact);
               const active = c.id === selectedId;
               const unread = (c.unread_count ?? 0) > 0;
@@ -1205,24 +1263,47 @@ export function InboxScreen() {
                       </div>
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-1.5">
                         <span
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusClass[c.status] ?? "bg-gray-100 text-gray-600"}`}
+                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            c.assigned_user_id ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"
+                          }`}
                         >
-                          {statusLabel[c.status] ?? c.status}
+                          {c.assigned_user_id ? "Em atendimento" : "Aguardando"}
                         </span>
+                        {c.department?.name && (
+                          <span className="shrink-0 truncate rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
+                            {c.department.name}
+                          </span>
+                        )}
                         {c.contact?.is_group && (
-                          <span className="rounded bg-brand-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-blue">
+                          <span className="shrink-0 rounded bg-brand-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-blue">
                             Grupo
                           </span>
                         )}
                         <span className="truncate text-[11px] text-gray-500">{c.channel?.name ?? ""}</span>
                       </div>
-                      {unread && (
-                        <span className="rounded-full bg-brand-green px-2 text-xs font-semibold text-white">
-                          {c.unread_count}
-                        </span>
-                      )}
+                      <div className="flex shrink-0 items-center gap-1">
+                        {!c.assigned_user_id && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            title="Aceitar (assumir o atendimento)"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              acceptConversation(c.id);
+                            }}
+                            className="rounded-full bg-brand-green px-2 py-0.5 text-[11px] font-semibold text-white hover:opacity-90"
+                          >
+                            Aceitar
+                          </span>
+                        )}
+                        {unread && (
+                          <span className="rounded-full bg-brand-green px-2 text-xs font-semibold text-white">
+                            {c.unread_count}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>

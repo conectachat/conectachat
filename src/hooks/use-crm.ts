@@ -113,15 +113,11 @@ export function useFunnelBoard(funnelId: string | null) {
     if (!orgId) return;
     const ch = supabase
       .channel(`crm-rt-${orgId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "crm_cards", filter: `org_id=eq.${orgId}` },
-        () => qc.invalidateQueries({ queryKey: ["crm-cards"] }),
+      .on("postgres_changes", { event: "*", schema: "public", table: "crm_cards", filter: `org_id=eq.${orgId}` }, () =>
+        qc.invalidateQueries({ queryKey: ["crm-cards"] }),
       )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "crm_stages", filter: `org_id=eq.${orgId}` },
-        () => qc.invalidateQueries({ queryKey: ["crm-stages"] }),
+      .on("postgres_changes", { event: "*", schema: "public", table: "crm_stages", filter: `org_id=eq.${orgId}` }, () =>
+        qc.invalidateQueries({ queryKey: ["crm-stages"] }),
       )
       .subscribe();
     return () => {
@@ -167,6 +163,59 @@ export function useCreateCard() {
       if (error) throw error;
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-cards"] });
+    },
+  });
+}
+
+// ===================================================================
+//  MOVER CARTÃO — salva nova etapa/ordem após arrastar-e-soltar.
+//  Renumera a(s) coluna(s) afetada(s) e, se a etapa de destino for
+//  Ganho/Perdido, marca o status e a data correspondente.
+// ===================================================================
+export function useMoveCard() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      movedId: string;
+      prevStatus: CrmStageKind;
+      dest: { stageId: string; kind: CrmStageKind; cardIds: string[] };
+      source: { stageId: string; cardIds: string[] } | null;
+    }) => {
+      const now = new Date().toISOString();
+      const ops: PromiseLike<{ error: unknown }>[] = [];
+
+      // Coluna de destino: cada cartão recebe a etapa e a posição (índice).
+      input.dest.cardIds.forEach((id, index) => {
+        const patch: Record<string, unknown> = {
+          stage_id: input.dest.stageId,
+          position: index,
+        };
+        // Só o cartão movido muda de status (e só se o tipo da etapa mudou).
+        if (id === input.movedId && input.dest.kind !== input.prevStatus) {
+          patch.status = input.dest.kind;
+          patch.won_at = input.dest.kind === "won" ? now : null;
+          patch.lost_at = input.dest.kind === "lost" ? now : null;
+        }
+        ops.push(supabase.from("crm_cards").update(patch).eq("id", id));
+      });
+
+      // Coluna de origem (quando o cartão mudou de coluna): renumera o resto.
+      if (input.source && input.source.stageId !== input.dest.stageId) {
+        input.source.cardIds.forEach((id, index) => {
+          ops.push(
+            supabase.from("crm_cards").update({ stage_id: input.source!.stageId, position: index }).eq("id", id),
+          );
+        });
+      }
+
+      const results = await Promise.all(ops);
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    // Recarrega do banco para garantir que o quadro reflete o estado real.
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["crm-cards"] });
     },
   });

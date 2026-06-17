@@ -208,12 +208,10 @@ export function useMoveCard() {
 
       const tasks: Promise<void>[] = [];
 
-      // Coluna de destino: renumera todos os cartões na nova ordem.
       input.dest.cardIds.forEach((id, index) => {
         tasks.push(moveOne(id, input.dest.stageId, index));
       });
 
-      // Coluna de origem (quando o cartão mudou de coluna): renumera o resto.
       if (input.source && input.source.stageId !== input.dest.stageId) {
         const src = input.source;
         src.cardIds.forEach((id, index) => {
@@ -223,9 +221,94 @@ export function useMoveCard() {
 
       await Promise.all(tasks);
     },
-    // Recarrega do banco para garantir que o quadro reflete o estado real.
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["crm-cards"] });
+    },
+  });
+}
+
+// ===================================================================
+//  FUNIS — criar / renomear / excluir (gerenciamento; só dono/admin)
+// ===================================================================
+export function useCreateFunnel() {
+  const { activeMembership } = useCurrentUser();
+  const orgId = activeMembership?.org_id ?? null;
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { name: string }) => {
+      if (!orgId) throw new Error("Empresa não encontrada.");
+
+      // posição = logo após o último funil
+      const { data: last } = await supabase
+        .from("crm_funnels")
+        .select("position")
+        .eq("org_id", orgId)
+        .order("position", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const position = (last?.position ?? -1) + 1;
+
+      const { data, error } = await supabase
+        .from("crm_funnels")
+        .insert({ org_id: orgId, name: input.name, position })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id as string;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-funnels"] });
+    },
+  });
+}
+
+export function useRenameFunnel() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; name: string }) => {
+      const { error } = await supabase.from("crm_funnels").update({ name: input.name }).eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-funnels"] });
+    },
+  });
+}
+
+export function useDeleteFunnel() {
+  const { activeMembership } = useCurrentUser();
+  const orgId = activeMembership?.org_id ?? null;
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string }) => {
+      if (!orgId) throw new Error("Empresa não encontrada.");
+
+      // 1) a empresa precisa de pelo menos 1 funil
+      const { count: funnelCount } = await supabase
+        .from("crm_funnels")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId);
+      if ((funnelCount ?? 0) <= 1) throw new Error("LAST_FUNNEL");
+
+      // 2) não excluir funil que ainda tem cartões
+      const { count: cardCount } = await supabase
+        .from("crm_cards")
+        .select("id", { count: "exact", head: true })
+        .eq("funnel_id", input.id);
+      if ((cardCount ?? 0) > 0) throw new Error("HAS_CARDS");
+
+      // 3) apaga as etapas e depois o funil
+      const { error: stErr } = await supabase.from("crm_stages").delete().eq("funnel_id", input.id);
+      if (stErr) throw stErr;
+      const { error: fnErr } = await supabase.from("crm_funnels").delete().eq("id", input.id);
+      if (fnErr) throw fnErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-funnels"] });
+      qc.invalidateQueries({ queryKey: ["crm-stages"] });
     },
   });
 }

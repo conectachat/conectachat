@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSchedulesRouteImport } from './routes/_authenticated/schedules'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
 import { Route as AuthenticatedPlatformPlansRouteImport } from './routes/_authenticated/platform/plans'
@@ -55,6 +56,11 @@ const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCrmRoute = AuthenticatedCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedContactsRoute = AuthenticatedContactsRouteImport.update({
   id: '/contacts',
   path: '/contacts',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/set-password': typeof SetPasswordRoute
   '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
+  '/crm': typeof AuthenticatedCrmRoute
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/set-password': typeof SetPasswordRoute
   '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
+  '/crm': typeof AuthenticatedCrmRoute
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/set-password': typeof SetPasswordRoute
   '/_authenticated/connections': typeof AuthenticatedConnectionsRoute
   '/_authenticated/contacts': typeof AuthenticatedContactsRoute
+  '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/schedules': typeof AuthenticatedSchedulesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/connections'
     | '/contacts'
+    | '/crm'
     | '/inbox'
     | '/schedules'
     | '/settings'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/connections'
     | '/contacts'
+    | '/crm'
     | '/inbox'
     | '/schedules'
     | '/settings'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/_authenticated/connections'
     | '/_authenticated/contacts'
+    | '/_authenticated/crm'
     | '/_authenticated/inbox'
     | '/_authenticated/schedules'
     | '/_authenticated/settings'
@@ -215,6 +227,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/crm': {
+      id: '/_authenticated/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof AuthenticatedCrmRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/contacts': {
       id: '/_authenticated/contacts'
       path: '/contacts'
@@ -249,6 +268,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedConnectionsRoute: typeof AuthenticatedConnectionsRoute
   AuthenticatedContactsRoute: typeof AuthenticatedContactsRoute
+  AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedSchedulesRoute: typeof AuthenticatedSchedulesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -259,6 +279,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConnectionsRoute: AuthenticatedConnectionsRoute,
   AuthenticatedContactsRoute: AuthenticatedContactsRoute,
+  AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedSchedulesRoute: AuthenticatedSchedulesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
@@ -278,3 +299,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

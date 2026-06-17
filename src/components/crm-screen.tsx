@@ -1,5 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { Plus } from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -7,38 +21,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "sonner";
 
-import {
-  useFunnels,
-  useFunnelBoard,
-  useCreateCard,
-  type CrmStage,
-  type CrmCard,
-} from "@/hooks/use-crm";
+import { useFunnels, useFunnelBoard, useCreateCard, useMoveCard, type CrmStage, type CrmCard } from "@/hooks/use-crm";
 
 // -------------------------------------------------------------------
 //  Ajudantes
@@ -70,13 +59,104 @@ function formatMoney(cents: number | null, currency: string | null): string | nu
 function parseToCents(text: string): number | null {
   const clean = text.trim();
   if (!clean) return null;
-  const normalized = clean.replace(/[^\d.,-]/g, "").replace(/\./g, "").replace(",", ".");
+  const normalized = clean
+    .replace(/[^\d.,-]/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
   const value = Number(normalized);
   if (Number.isNaN(value)) return null;
   return Math.round(value * 100);
 }
 
 type ContactLite = { id: string; name: string | null; external_id: string };
+
+// -------------------------------------------------------------------
+//  Visual do cartão (usado na coluna e na "sombra" enquanto arrasta)
+// -------------------------------------------------------------------
+function CardView({ card, dragging }: { card: CrmCard; dragging?: boolean }) {
+  const label = contactLabel(card);
+  const money = formatMoney(card.value_cents, card.currency);
+  return (
+    <div
+      className={`rounded-lg border border-border bg-background p-3 shadow-sm ${
+        dragging ? "shadow-md ring-2 ring-primary/40" : ""
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={card.contact?.avatar_url ?? undefined} alt={label} />
+          <AvatarFallback className="text-xs">
+            {initials(card.contact?.name, card.contact?.external_id ?? "?")}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{label}</p>
+          {money && <p className="text-xs text-emerald-600">{money}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------
+//  Cartão arrastável
+// -------------------------------------------------------------------
+function SortableCard({ card }: { card: CrmCard }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: card.id,
+  });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+      <CardView card={card} />
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------
+//  Coluna (etapa) — área onde se solta o cartão
+// -------------------------------------------------------------------
+function Column({ stage, cards, onAdd }: { stage: CrmStage; cards: CrmCard[]; onAdd: (stage: CrmStage) => void }) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+  return (
+    <div className="flex h-full w-72 shrink-0 flex-col rounded-lg border border-border bg-card">
+      {/* Cabeçalho da coluna */}
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: stage.color ?? "#94A3B8" }} />
+        <span className="truncate text-sm font-medium text-foreground">{stage.name}</span>
+        <span className="ml-auto rounded-full bg-muted px-2 text-xs text-muted-foreground">{cards.length}</span>
+      </div>
+
+      {/* Cartões (área de soltar) */}
+      <div ref={setNodeRef} className={`min-h-0 flex-1 space-y-2 overflow-y-auto p-2 ${isOver ? "bg-muted/50" : ""}`}>
+        <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+          {cards.length === 0 ? (
+            <p className="px-1 py-6 text-center text-xs text-muted-foreground">Nenhum cartão</p>
+          ) : (
+            cards.map((card) => <SortableCard key={card.id} card={card} />)
+          )}
+        </SortableContext>
+      </div>
+
+      {/* Adicionar cartão */}
+      <div className="border-t border-border p-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-muted-foreground"
+          onClick={() => onAdd(stage)}
+        >
+          <Plus className="mr-1 h-4 w-4" />
+          Adicionar cartão
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 // ===================================================================
 //  TELA
@@ -86,25 +166,133 @@ export function CrmScreen() {
   const funnels = funnelsQuery.data ?? [];
 
   const [funnelId, setFunnelId] = useState<string | null>(null);
-
-  // Assim que os funis carregam, seleciona o primeiro automaticamente.
   useEffect(() => {
     if (!funnelId && funnels.length > 0) setFunnelId(funnels[0].id);
   }, [funnels, funnelId]);
 
   const { stages, cards, isLoading } = useFunnelBoard(funnelId);
   const createCard = useCreateCard();
+  const moveCard = useMoveCard();
 
-  // Cartões agrupados por etapa.
-  const cardsByStage = useMemo(() => {
-    const map: Record<string, CrmCard[]> = {};
-    for (const c of cards) {
-      (map[c.stage_id] ??= []).push(c);
-    }
-    return map;
+  // Estado local do quadro (espelha o banco; muda na hora ao arrastar).
+  const [columns, setColumns] = useState<Record<string, CrmCard[]>>({});
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const sourceRef = useRef<string | null>(null);
+  const draggingRef = useRef(false);
+
+  const cardById = useMemo(() => {
+    const m: Record<string, CrmCard> = {};
+    for (const c of cards) m[c.id] = c;
+    return m;
   }, [cards]);
 
-  // -------- Janela "adicionar cartão" --------
+  const stagesById = useMemo(() => {
+    const m: Record<string, CrmStage> = {};
+    for (const s of stages) m[s.id] = s;
+    return m;
+  }, [stages]);
+
+  // Reconstrói as colunas a partir do banco (exceto durante um arraste).
+  useEffect(() => {
+    if (draggingRef.current) return;
+    const next: Record<string, CrmCard[]> = {};
+    for (const s of stages) next[s.id] = [];
+    for (const c of cards) {
+      (next[c.stage_id] ??= []).push(c);
+    }
+    setColumns(next);
+  }, [stages, cards]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+  );
+
+  function findContainer(id: string): string | null {
+    if (columns[id]) return id; // é a chave de uma coluna (etapa)
+    for (const stageId of Object.keys(columns)) {
+      if (columns[stageId].some((c) => c.id === id)) return stageId;
+    }
+    return null;
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    const id = String(event.active.id);
+    draggingRef.current = true;
+    setActiveId(id);
+    sourceRef.current = findContainer(id);
+  }
+
+  // Move o cartão entre colunas enquanto arrasta (feedback imediato).
+  function handleDragOver(event: DragOverEvent) {
+    const { active, over } = event;
+    if (!over) return;
+    const activeContainer = findContainer(String(active.id));
+    const overContainer = findContainer(String(over.id));
+    if (!activeContainer || !overContainer || activeContainer === overContainer) return;
+
+    setColumns((prev) => {
+      const activeItems = prev[activeContainer] ?? [];
+      const overItems = prev[overContainer] ?? [];
+      const activeIndex = activeItems.findIndex((c) => c.id === active.id);
+      if (activeIndex < 0) return prev;
+      const moved = activeItems[activeIndex];
+
+      let overIndex = overItems.findIndex((c) => c.id === over.id);
+      if (overIndex < 0) overIndex = overItems.length; // soltou na coluna vazia/fim
+
+      const newActive = [...activeItems];
+      newActive.splice(activeIndex, 1);
+      const newOver = [...overItems];
+      newOver.splice(overIndex, 0, moved);
+      return { ...prev, [activeContainer]: newActive, [overContainer]: newOver };
+    });
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    draggingRef.current = false;
+    const movedId = String(active.id);
+    const src = sourceRef.current;
+    sourceRef.current = null;
+    setActiveId(null);
+    if (!over) return;
+
+    const destContainer = findContainer(movedId);
+    if (!destContainer) return;
+
+    // Ordena dentro da coluna de destino.
+    const list = columns[destContainer] ?? [];
+    const oldIndex = list.findIndex((c) => c.id === movedId);
+    let newIndex = destContainer === String(over.id) ? list.length - 1 : list.findIndex((c) => c.id === over.id);
+    if (newIndex < 0) newIndex = list.length - 1;
+
+    let dest = list;
+    if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+      dest = arrayMove(list, oldIndex, newIndex);
+    }
+    const newColumns = { ...columns, [destContainer]: dest };
+    setColumns(newColumns);
+
+    // Se nada mudou de fato, não grava nada.
+    const sameSpot = src === destContainer && oldIndex === newIndex;
+    if (sameSpot) return;
+
+    const destStage = stagesById[destContainer];
+    const sourceChanged = !!src && src !== destContainer;
+    moveCard.mutate({
+      movedId,
+      prevStatus: cardById[movedId]?.status ?? "open",
+      dest: {
+        stageId: destContainer,
+        kind: destStage?.kind ?? "open",
+        cardIds: newColumns[destContainer].map((c) => c.id),
+      },
+      source: sourceChanged ? { stageId: src!, cardIds: (newColumns[src!] ?? []).map((c) => c.id) } : null,
+    });
+  }
+
+  // ---- Janela "adicionar cartão" ----
   const [addStage, setAddStage] = useState<CrmStage | null>(null);
   const [selContact, setSelContact] = useState<ContactLite | null>(null);
   const [valueText, setValueText] = useState("");
@@ -112,7 +300,6 @@ export function CrmScreen() {
   const [contactResults, setContactResults] = useState<ContactLite[]>([]);
   const [contactPopOpen, setContactPopOpen] = useState(false);
 
-  // Busca de contatos (com pequeno atraso para não consultar a cada tecla).
   useEffect(() => {
     if (!addStage) return;
     let active = true;
@@ -141,14 +328,13 @@ export function CrmScreen() {
     setContactSearch("");
     setContactResults([]);
   }
-
   function closeAdd() {
     setAddStage(null);
   }
 
   async function handleCreate() {
     if (!funnelId || !addStage || !selContact) return;
-    const position = (cardsByStage[addStage.id]?.length ?? 0);
+    const position = columns[addStage.id]?.length ?? 0;
     try {
       await createCard.mutateAsync({
         funnelId,
@@ -171,13 +357,14 @@ export function CrmScreen() {
   }
 
   const selectedFunnel = funnels.find((f) => f.id === funnelId) ?? null;
+  const activeCard = activeId ? cardById[activeId] : null;
 
   // -------------------------------------------------------------------
   return (
     <div className="flex h-full min-h-0 flex-col bg-gray-50 p-4 md:p-6">
       <PageHeader
         title="CRM"
-        subtitle="Acompanhe seus contatos em etapas, como um funil."
+        subtitle="Arraste os cartões entre as etapas do funil."
         actions={
           funnels.length > 0 ? (
             <Select value={funnelId ?? undefined} onValueChange={setFunnelId}>
@@ -196,7 +383,6 @@ export function CrmScreen() {
         }
       />
 
-      {/* Estados de carregamento / vazio */}
       {funnelsQuery.isLoading || isLoading ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
           Carregando o quadro…
@@ -206,82 +392,28 @@ export function CrmScreen() {
           Nenhum funil encontrado.
         </div>
       ) : (
-        // Quadro: colunas roláveis na horizontal
         <div className="min-h-0 flex-1 overflow-x-auto">
-          <div className="flex h-full gap-4 pb-2">
-            {stages.map((stage) => {
-              const list = cardsByStage[stage.id] ?? [];
-              return (
-                <div
-                  key={stage.id}
-                  className="flex h-full w-72 shrink-0 flex-col rounded-lg border border-border bg-card"
-                >
-                  {/* Cabeçalho da coluna */}
-                  <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: stage.color ?? "#94A3B8" }}
-                    />
-                    <span className="truncate text-sm font-medium text-foreground">{stage.name}</span>
-                    <span className="ml-auto rounded-full bg-muted px-2 text-xs text-muted-foreground">
-                      {list.length}
-                    </span>
-                  </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="flex h-full gap-4 pb-2">
+              {stages.map((stage) => (
+                <Column key={stage.id} stage={stage} cards={columns[stage.id] ?? []} onAdd={openAdd} />
+              ))}
+            </div>
 
-                  {/* Cartões */}
-                  <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-                    {list.length === 0 ? (
-                      <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-                        Nenhum cartão
-                      </p>
-                    ) : (
-                      list.map((card) => {
-                        const label = contactLabel(card);
-                        const money = formatMoney(card.value_cents, card.currency);
-                        return (
-                          <div
-                            key={card.id}
-                            className="rounded-lg border border-border bg-background p-3 shadow-sm"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage
-                                  src={card.contact?.avatar_url ?? undefined}
-                                  alt={label}
-                                />
-                                <AvatarFallback className="text-xs">
-                                  {initials(card.contact?.name, card.contact?.external_id ?? "?")}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium text-foreground">{label}</p>
-                                {money && (
-                                  <p className="text-xs text-emerald-600">{money}</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Adicionar cartão */}
-                  <div className="border-t border-border p-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start text-muted-foreground"
-                      onClick={() => openAdd(stage)}
-                    >
-                      <Plus className="mr-1 h-4 w-4" />
-                      Adicionar cartão
-                    </Button>
-                  </div>
+            <DragOverlay>
+              {activeCard ? (
+                <div className="w-64">
+                  <CardView card={activeCard} dragging />
                 </div>
-              );
-            })}
-          </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </div>
       )}
 
@@ -293,15 +425,12 @@ export function CrmScreen() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Escolher contato */}
             <div className="space-y-1.5">
               <Label>Contato</Label>
               <Popover open={contactPopOpen} onOpenChange={setContactPopOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start font-normal">
-                    {selContact
-                      ? selContact.name?.trim() || selContact.external_id
-                      : "Buscar contato…"}
+                    {selContact ? selContact.name?.trim() || selContact.external_id : "Buscar contato…"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
@@ -323,9 +452,7 @@ export function CrmScreen() {
                               setContactPopOpen(false);
                             }}
                           >
-                            <span className="truncate">
-                              {c.name?.trim() || c.external_id}
-                            </span>
+                            <span className="truncate">{c.name?.trim() || c.external_id}</span>
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -335,7 +462,6 @@ export function CrmScreen() {
               </Popover>
             </div>
 
-            {/* Valor (opcional) */}
             <div className="space-y-1.5">
               <Label htmlFor="crm-value">Valor (opcional)</Label>
               <Input

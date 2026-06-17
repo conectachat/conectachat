@@ -14,6 +14,7 @@ export type Database = {
           credentials: Json;
           crm_enabled: boolean;
           crm_funnel_id: string | null;
+          default_department_id: string | null;
           external_instance_id: string | null;
           id: string;
           name: string;
@@ -27,6 +28,7 @@ export type Database = {
           credentials?: Json;
           crm_enabled?: boolean;
           crm_funnel_id?: string | null;
+          default_department_id?: string | null;
           external_instance_id?: string | null;
           id?: string;
           name: string;
@@ -40,6 +42,7 @@ export type Database = {
           credentials?: Json;
           crm_enabled?: boolean;
           crm_funnel_id?: string | null;
+          default_department_id?: string | null;
           external_instance_id?: string | null;
           id?: string;
           name?: string;
@@ -54,6 +57,13 @@ export type Database = {
             columns: ["crm_funnel_id"];
             isOneToOne: false;
             referencedRelation: "crm_funnels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "channels_default_department_id_fkey";
+            columns: ["default_department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -741,6 +751,7 @@ export type Database = {
         Row: {
           created_at: string;
           id: string;
+          is_internal: boolean;
           name: string;
           plan_id: string | null;
           slug: string;
@@ -750,6 +761,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           id?: string;
+          is_internal?: boolean;
           name: string;
           plan_id?: string | null;
           slug: string;
@@ -759,6 +771,7 @@ export type Database = {
         Update: {
           created_at?: string;
           id?: string;
+          is_internal?: boolean;
           name?: string;
           plan_id?: string | null;
           slug?: string;
@@ -1089,10 +1102,15 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      can_see_conversation: {
+        Args: { p_conversation_id: string };
+        Returns: boolean;
+      };
       is_member_of: { Args: { p_org_id: string }; Returns: boolean };
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
       is_platform_staff: { Args: never; Returns: boolean };
       is_super_admin: { Args: never; Returns: boolean };
+      shares_org_with: { Args: { p_user: string }; Returns: boolean };
     };
     Enums: {
       channel_status: "disconnected" | "connecting" | "connected" | "error";

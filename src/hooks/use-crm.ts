@@ -184,35 +184,44 @@ export function useMoveCard() {
       source: { stageId: string; cardIds: string[] } | null;
     }) => {
       const now = new Date().toISOString();
-      const ops: PromiseLike<{ error: unknown }>[] = [];
 
-      // Coluna de destino: cada cartão recebe a etapa e a posição (índice).
+      // Atualiza um cartão: nova etapa + posição. Só o cartão movido troca de
+      // status (e apenas quando o TIPO da etapa muda), marcando a data.
+      const moveOne = async (id: string, stageId: string, index: number) => {
+        const trocaStatus = id === input.movedId && input.dest.kind !== input.prevStatus;
+
+        const { error } = trocaStatus
+          ? await supabase
+              .from("crm_cards")
+              .update({
+                stage_id: stageId,
+                position: index,
+                status: input.dest.kind,
+                won_at: input.dest.kind === "won" ? now : null,
+                lost_at: input.dest.kind === "lost" ? now : null,
+              })
+              .eq("id", id)
+          : await supabase.from("crm_cards").update({ stage_id: stageId, position: index }).eq("id", id);
+
+        if (error) throw error;
+      };
+
+      const tasks: Promise<void>[] = [];
+
+      // Coluna de destino: renumera todos os cartões na nova ordem.
       input.dest.cardIds.forEach((id, index) => {
-        const patch: Record<string, unknown> = {
-          stage_id: input.dest.stageId,
-          position: index,
-        };
-        // Só o cartão movido muda de status (e só se o tipo da etapa mudou).
-        if (id === input.movedId && input.dest.kind !== input.prevStatus) {
-          patch.status = input.dest.kind;
-          patch.won_at = input.dest.kind === "won" ? now : null;
-          patch.lost_at = input.dest.kind === "lost" ? now : null;
-        }
-        ops.push(supabase.from("crm_cards").update(patch).eq("id", id));
+        tasks.push(moveOne(id, input.dest.stageId, index));
       });
 
       // Coluna de origem (quando o cartão mudou de coluna): renumera o resto.
       if (input.source && input.source.stageId !== input.dest.stageId) {
-        input.source.cardIds.forEach((id, index) => {
-          ops.push(
-            supabase.from("crm_cards").update({ stage_id: input.source!.stageId, position: index }).eq("id", id),
-          );
+        const src = input.source;
+        src.cardIds.forEach((id, index) => {
+          tasks.push(moveOne(id, src.stageId, index));
         });
       }
 
-      const results = await Promise.all(ops);
-      const failed = results.find((r) => r.error);
-      if (failed?.error) throw failed.error;
+      await Promise.all(tasks);
     },
     // Recarrega do banco para garantir que o quadro reflete o estado real.
     onSettled: () => {

@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug, ChevronLeft, ChevronRight, Layers, Building2 } from "lucide-react";
+import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug, ChevronLeft, ChevronRight, Layers, Building2, SquareKanban } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 import {
@@ -24,6 +24,7 @@ import { usePlatformStaff } from "@/hooks/use-platform-staff";
 
 const items = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
+  { title: "CRM", url: "/crm", icon: SquareKanban },
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },
   { title: "Conexões", url: "/connections", icon: Plug },

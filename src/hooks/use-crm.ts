@@ -70,6 +70,25 @@ export function useFunnels() {
 }
 
 // ===================================================================
+//  ETAPAS de um funil (usado no quadro e no gerenciador)
+// ===================================================================
+export function useFunnelStages(funnelId: string | null) {
+  return useQuery({
+    queryKey: ["crm-stages", funnelId],
+    enabled: !!funnelId,
+    queryFn: async (): Promise<CrmStage[]> => {
+      const { data, error } = await supabase
+        .from("crm_stages")
+        .select("id, funnel_id, name, kind, color, position")
+        .eq("funnel_id", funnelId!)
+        .order("position", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as CrmStage[];
+    },
+  });
+}
+
+// ===================================================================
 //  QUADRO — etapas + cartões do funil escolhido, atualizando AO VIVO
 // ===================================================================
 export function useFunnelBoard(funnelId: string | null) {
@@ -170,8 +189,6 @@ export function useCreateCard() {
 
 // ===================================================================
 //  MOVER CARTÃO — salva nova etapa/ordem após arrastar-e-soltar.
-//  Renumera a(s) coluna(s) afetada(s) e, se a etapa de destino for
-//  Ganho/Perdido, marca o status e a data correspondente.
 // ===================================================================
 export function useMoveCard() {
   const qc = useQueryClient();
@@ -185,8 +202,6 @@ export function useMoveCard() {
     }) => {
       const now = new Date().toISOString();
 
-      // Atualiza um cartão: nova etapa + posição. Só o cartão movido troca de
-      // status (e apenas quando o TIPO da etapa muda), marcando a data.
       const moveOne = async (id: string, stageId: string, index: number) => {
         const trocaStatus = id === input.movedId && input.dest.kind !== input.prevStatus;
 
@@ -239,7 +254,6 @@ export function useCreateFunnel() {
     mutationFn: async (input: { name: string }) => {
       if (!orgId) throw new Error("Empresa não encontrada.");
 
-      // posição = logo após o último funil
       const { data: last } = await supabase
         .from("crm_funnels")
         .select("position")
@@ -286,21 +300,18 @@ export function useDeleteFunnel() {
     mutationFn: async (input: { id: string }) => {
       if (!orgId) throw new Error("Empresa não encontrada.");
 
-      // 1) a empresa precisa de pelo menos 1 funil
       const { count: funnelCount } = await supabase
         .from("crm_funnels")
         .select("id", { count: "exact", head: true })
         .eq("org_id", orgId);
       if ((funnelCount ?? 0) <= 1) throw new Error("LAST_FUNNEL");
 
-      // 2) não excluir funil que ainda tem cartões
       const { count: cardCount } = await supabase
         .from("crm_cards")
         .select("id", { count: "exact", head: true })
         .eq("funnel_id", input.id);
       if ((cardCount ?? 0) > 0) throw new Error("HAS_CARDS");
 
-      // 3) apaga as etapas e depois o funil
       const { error: stErr } = await supabase.from("crm_stages").delete().eq("funnel_id", input.id);
       if (stErr) throw stErr;
       const { error: fnErr } = await supabase.from("crm_funnels").delete().eq("id", input.id);
@@ -308,6 +319,143 @@ export function useDeleteFunnel() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["crm-funnels"] });
+      qc.invalidateQueries({ queryKey: ["crm-stages"] });
+    },
+  });
+}
+
+// ===================================================================
+//  ETAPAS — criar / renomear / cor / ordem / excluir
+//  Regras: Ganho (won) e Perdido (lost) ficam SEMPRE no fim; só as
+//  etapas "open" são reordenáveis e excluíveis.
+// ===================================================================
+
+// Renumera as posições garantindo a ordem: open... < won < lost
+async function normalizeStagePositions(funnelId: string) {
+  const { data, error } = await supabase
+    .from("crm_stages")
+    .select("id, kind, position")
+    .eq("funnel_id", funnelId)
+    .order("position", { ascending: true });
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const rank = (k: string) => (k === "open" ? 0 : k === "won" ? 1 : 2);
+  const sorted = [...rows].sort((a, b) => {
+    const d = rank(a.kind) - rank(b.kind);
+    return d !== 0 ? d : a.position - b.position;
+  });
+
+  const tasks: Promise<void>[] = [];
+  sorted.forEach((row, index) => {
+    if (row.position !== index) {
+      tasks.push(
+        (async () => {
+          const { error: e } = await supabase.from("crm_stages").update({ position: index }).eq("id", row.id);
+          if (e) throw e;
+        })(),
+      );
+    }
+  });
+  await Promise.all(tasks);
+}
+
+export function useCreateStage() {
+  const { activeMembership } = useCurrentUser();
+  const orgId = activeMembership?.org_id ?? null;
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { funnelId: string; name: string; color: string | null }) => {
+      if (!orgId) throw new Error("Empresa não encontrada.");
+      // position alta temporária → vira a última etapa "open"; depois normaliza
+      const { error } = await supabase.from("crm_stages").insert({
+        org_id: orgId,
+        funnel_id: input.funnelId,
+        name: input.name,
+        kind: "open",
+        color: input.color,
+        position: 1000,
+      });
+      if (error) throw error;
+      await normalizeStagePositions(input.funnelId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-stages"] });
+    },
+  });
+}
+
+export function useRenameStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; name: string }) => {
+      const { error } = await supabase.from("crm_stages").update({ name: input.name }).eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-stages"] });
+    },
+  });
+}
+
+export function useRecolorStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; color: string }) => {
+      const { error } = await supabase.from("crm_stages").update({ color: input.color }).eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-stages"] });
+    },
+  });
+}
+
+export function useDeleteStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; funnelId: string }) => {
+      const { count } = await supabase
+        .from("crm_cards")
+        .select("id", { count: "exact", head: true })
+        .eq("stage_id", input.id);
+      if ((count ?? 0) > 0) throw new Error("HAS_CARDS");
+
+      const { error } = await supabase.from("crm_stages").delete().eq("id", input.id);
+      if (error) throw error;
+      await normalizeStagePositions(input.funnelId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-stages"] });
+      qc.invalidateQueries({ queryKey: ["crm-cards"] });
+    },
+  });
+}
+
+export function useReorderStages() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      funnelId: string;
+      openIdsInOrder: string[];
+      wonId: string | null;
+      lostId: string | null;
+    }) => {
+      const upd = (id: string, position: number) =>
+        (async () => {
+          const { error } = await supabase.from("crm_stages").update({ position }).eq("id", id);
+          if (error) throw error;
+        })();
+
+      const tasks: Promise<void>[] = [];
+      input.openIdsInOrder.forEach((id, index) => tasks.push(upd(id, index)));
+      const base = input.openIdsInOrder.length;
+      if (input.wonId) tasks.push(upd(input.wonId, base));
+      if (input.lostId) tasks.push(upd(input.lostId, base + 1));
+      await Promise.all(tasks);
+    },
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["crm-stages"] });
     },
   });

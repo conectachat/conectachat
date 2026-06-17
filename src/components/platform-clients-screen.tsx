@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Plus, Pencil, Eye, Users, Plug, Copy, MessageSquareOff } from "lucide-react";
+import { Building2, Plus, Pencil, Eye, Users, Plug, MessageSquareOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -101,7 +101,6 @@ export function PlatformClientsScreen() {
   const [formClient, setFormClient] = useState<ClientRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [detailOrgId, setDetailOrgId] = useState<string | null>(null);
-  const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
 
   // Trava: só super_admin (a de verdade é no banco/Edge Function).
   useEffect(() => {
@@ -174,12 +173,7 @@ export function PlatformClientsScreen() {
           ) : (
             <div className="space-y-3">
               {clients.map((c) => (
-                <ClientCard
-                  key={c.id}
-                  client={c}
-                  onDetail={() => setDetailOrgId(c.id)}
-                  onEdit={() => openEdit(c)}
-                />
+                <ClientCard key={c.id} client={c} onDetail={() => setDetailOrgId(c.id)} onEdit={() => openEdit(c)} />
               ))}
             </div>
           )}
@@ -191,16 +185,13 @@ export function PlatformClientsScreen() {
         client={formClient}
         plans={plans}
         onClose={() => setFormOpen(false)}
-        onSaved={(created) => {
+        onSaved={() => {
           setFormOpen(false);
           queryClient.invalidateQueries({ queryKey: ["platform-clients"] });
-          if (created) setCreatedInfo(created);
         }}
       />
 
       <ClientDetailDialog orgId={detailOrgId} onClose={() => setDetailOrgId(null)} />
-
-      <PasswordRevealDialog info={createdInfo} onClose={() => setCreatedInfo(null)} />
     </div>
   );
 }
@@ -208,15 +199,7 @@ export function PlatformClientsScreen() {
 // ===================================================================
 //  CARTÃO DE UM CLIENTE
 // ===================================================================
-function ClientCard({
-  client,
-  onDetail,
-  onEdit,
-}: {
-  client: ClientRow;
-  onDetail: () => void;
-  onEdit: () => void;
-}) {
+function ClientCard({ client, onDetail, onEdit }: { client: ClientRow; onDetail: () => void; onEdit: () => void }) {
   const sub = subBadge(client.subscription_status);
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
@@ -306,7 +289,7 @@ function ClientFormDialog({
   client: ClientRow | null;
   plans: PlanOption[];
   onClose: () => void;
-  onSaved: (created?: { email: string; password: string }) => void;
+  onSaved: () => void;
 }) {
   const isEdit = !!client;
 
@@ -380,14 +363,15 @@ function ClientFormDialog({
         ownerEmail: oEmail,
         planId: planArg,
         status,
+        appUrl: window.location.origin,
       });
       setSaving(false);
       if (error || !data?.ok) {
         toast.error("Não foi possível criar o cliente", { description: data?.error ?? error?.message });
         return;
       }
-      toast.success("Cliente criado");
-      onSaved({ email: data.ownerEmail, password: data.tempPassword });
+      toast.success("Cliente criado", { description: `Convite enviado para ${oEmail}.` });
+      onSaved();
     }
   }
 
@@ -430,7 +414,7 @@ function ClientFormDialog({
                   placeholder="dono@empresa.com"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Vamos criar o acesso desse dono com uma senha provisória (mostrada uma vez no fim).
+                  O dono vai receber um e-mail com um link para definir a própria senha e acessar.
                 </p>
               </div>
             </>
@@ -631,61 +615,5 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
       {children}
     </div>
-  );
-}
-
-// ===================================================================
-//  DIÁLOGO: senha provisória (mostrada uma vez após criar)
-// ===================================================================
-function PasswordRevealDialog({
-  info,
-  onClose,
-}: {
-  info: { email: string; password: string } | null;
-  onClose: () => void;
-}) {
-  async function copyAccess() {
-    if (!info) return;
-    const text = `Acesso ao ConectaChat\nE-mail: ${info.email}\nSenha provisória: ${info.password}\n(Peça para trocar a senha em Configurações > Usuário.)`;
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Acesso copiado");
-    } catch {
-      toast.error("Não foi possível copiar — anote manualmente.");
-    }
-  }
-
-  return (
-    <Dialog open={!!info} onOpenChange={(o) => (!o ? onClose() : undefined)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Cliente criado — guarde o acesso</DialogTitle>
-        </DialogHeader>
-        {info && (
-          <div className="space-y-3 py-1 text-sm">
-            <p className="text-muted-foreground">
-              Esta senha aparece <strong>uma única vez</strong>. Copie e repasse ao dono da empresa.
-            </p>
-            <div className="space-y-1 rounded-md border border-border bg-muted/50 p-3 font-mono text-xs">
-              <div>
-                <span className="text-muted-foreground">E-mail: </span>
-                {info.email}
-              </div>
-              <div>
-                <span className="text-muted-foreground">Senha: </span>
-                {info.password}
-              </div>
-            </div>
-          </div>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={copyAccess}>
-            <Copy className="h-4 w-4" />
-            <span className="ml-1">Copiar acesso</span>
-          </Button>
-          <Button onClick={onClose}>Fechar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

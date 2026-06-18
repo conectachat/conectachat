@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { Plus } from "lucide-react";
+import { Plus, MessageCircle } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   DndContext,
   DragOverlay,
@@ -73,8 +74,18 @@ type ContactLite = { id: string; name: string | null; external_id: string };
 
 // -------------------------------------------------------------------
 //  Visual do cartão (usado na coluna e na "sombra" enquanto arrasta)
+//  S5 — quando há conversa ligada e um onOpenConversation, mostra o ícone
+//  de "abrir conversa" no canto do cartão.
 // -------------------------------------------------------------------
-function CardView({ card, dragging }: { card: CrmCard; dragging?: boolean }) {
+function CardView({
+  card,
+  dragging,
+  onOpenConversation,
+}: {
+  card: CrmCard;
+  dragging?: boolean;
+  onOpenConversation?: (card: CrmCard) => void;
+}) {
   const label = contactLabel(card);
   const money = formatMoney(card.value_cents, card.currency);
   return (
@@ -94,6 +105,24 @@ function CardView({ card, dragging }: { card: CrmCard; dragging?: boolean }) {
           <p className="truncate text-sm font-medium text-foreground">{label}</p>
           {money && <p className="text-xs text-emerald-600">{money}</p>}
         </div>
+        {/* S5 — Abrir a conversa ligada na Caixa de entrada.
+            onPointerDown para parar aqui o início do arraste (não conflita
+            com o arrastar-e-soltar do cartão). */}
+        {onOpenConversation && card.conversation_id && (
+          <button
+            type="button"
+            title="Abrir conversa na Caixa de entrada"
+            aria-label="Abrir conversa"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenConversation(card);
+            }}
+            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <MessageCircle className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -102,7 +131,7 @@ function CardView({ card, dragging }: { card: CrmCard; dragging?: boolean }) {
 // -------------------------------------------------------------------
 //  Cartão arrastável
 // -------------------------------------------------------------------
-function SortableCard({ card }: { card: CrmCard }) {
+function SortableCard({ card, onOpenConversation }: { card: CrmCard; onOpenConversation: (card: CrmCard) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
   });
@@ -113,7 +142,7 @@ function SortableCard({ card }: { card: CrmCard }) {
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-      <CardView card={card} />
+      <CardView card={card} onOpenConversation={onOpenConversation} />
     </div>
   );
 }
@@ -121,7 +150,17 @@ function SortableCard({ card }: { card: CrmCard }) {
 // -------------------------------------------------------------------
 //  Coluna (etapa) — área onde se solta o cartão
 // -------------------------------------------------------------------
-function Column({ stage, cards, onAdd }: { stage: CrmStage; cards: CrmCard[]; onAdd: (stage: CrmStage) => void }) {
+function Column({
+  stage,
+  cards,
+  onAdd,
+  onOpenConversation,
+}: {
+  stage: CrmStage;
+  cards: CrmCard[];
+  onAdd: (stage: CrmStage) => void;
+  onOpenConversation: (card: CrmCard) => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   return (
     <div className="flex h-full w-72 shrink-0 flex-col rounded-lg border border-border bg-card">
@@ -138,7 +177,7 @@ function Column({ stage, cards, onAdd }: { stage: CrmStage; cards: CrmCard[]; on
           {cards.length === 0 ? (
             <p className="px-1 py-6 text-center text-xs text-muted-foreground">Nenhum cartão</p>
           ) : (
-            cards.map((card) => <SortableCard key={card.id} card={card} />)
+            cards.map((card) => <SortableCard key={card.id} card={card} onOpenConversation={onOpenConversation} />)
           )}
         </SortableContext>
       </div>
@@ -163,6 +202,7 @@ function Column({ stage, cards, onAdd }: { stage: CrmStage; cards: CrmCard[]; on
 //  TELA
 // ===================================================================
 export function CrmScreen() {
+  const navigate = useNavigate();
   const funnelsQuery = useFunnels();
   const funnels = funnelsQuery.data ?? [];
 
@@ -176,6 +216,18 @@ export function CrmScreen() {
   const { stages, cards, isLoading } = useFunnelBoard(funnelId);
   const createCard = useCreateCard();
   const moveCard = useMoveCard();
+
+  // S5 — Abre a conversa ligada ao cartão na Caixa de entrada.
+  // Usa o mesmo gancho que a inbox já lê ao montar (sessionStorage.openConvId).
+  function openConversation(card: CrmCard) {
+    if (!card.conversation_id) return;
+    try {
+      sessionStorage.setItem("openConvId", card.conversation_id);
+    } catch {
+      /* ignore */
+    }
+    navigate({ to: "/inbox" });
+  }
 
   // Estado local do quadro (espelha o banco; muda na hora ao arrastar).
   const [columns, setColumns] = useState<Record<string, CrmCard[]>>({});
@@ -408,7 +460,13 @@ export function CrmScreen() {
           >
             <div className="flex h-full gap-4 pb-2">
               {stages.map((stage) => (
-                <Column key={stage.id} stage={stage} cards={columns[stage.id] ?? []} onAdd={openAdd} />
+                <Column
+                  key={stage.id}
+                  stage={stage}
+                  cards={columns[stage.id] ?? []}
+                  onAdd={openAdd}
+                  onOpenConversation={openConversation}
+                />
               ))}
             </div>
 

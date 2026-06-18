@@ -19,6 +19,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useFunnels } from "@/hooks/use-crm";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,10 +41,14 @@ type ChannelRow = {
   receive_groups: boolean;
   credentials: Credentials;
   default_department_id: string | null;
+  // Bloco S5 — CRM: entrada automática de leads neste canal.
+  crm_enabled: boolean;
+  crm_funnel_id: string | null;
   created_at: string;
 };
 
 type DeptRow = { id: string; name: string };
+type FunnelRow = { id: string; name: string };
 
 type QrTarget = { channelId: string; qr: string | null; pairingCode: string | null };
 
@@ -128,7 +133,7 @@ export function ConnectionsScreen() {
       const { data, error } = await supabase
         .from("channels")
         .select(
-          "id, name, type, status, external_instance_id, receive_groups, credentials, default_department_id, created_at",
+          "id, name, type, status, external_instance_id, receive_groups, credentials, default_department_id, crm_enabled, crm_funnel_id, created_at",
         )
         .eq("org_id", orgId!)
         .order("created_at", { ascending: true });
@@ -148,6 +153,11 @@ export function ConnectionsScreen() {
       return (data ?? []) as DeptRow[];
     },
   });
+
+  // Bloco S5 — Funis da empresa (para o seletor de CRM no card).
+  // Leitura liberada a todo membro (RLS do CRM); só dono/admin altera.
+  const funnelsQuery = useFunnels();
+  const funnels: FunnelRow[] = funnelsQuery.data ?? [];
 
   // Tempo real: a lista reage sozinha quando o status/QR muda no banco.
   useEffect(() => {
@@ -185,6 +195,31 @@ export function ConnectionsScreen() {
       return;
     }
     toast.success("Departamento padrão atualizado");
+    refetch();
+  }
+
+  // Bloco S5 — Liga/desliga o CRM do canal e escolhe o funil de entrada.
+  // Escrita simples em channels (RLS permite a membros); só dono/admin vê o
+  // controle. Ao ATIVAR sem funil, já assume o 1º funil (nunca fica ligado
+  // sem funil — senão o webhook não cria cartão).
+  async function handleSetCrm(ch: ChannelRow, patch: { crm_enabled?: boolean; crm_funnel_id?: string | null }) {
+    const update: { crm_enabled?: boolean; crm_funnel_id?: string | null } = { ...patch };
+    if (update.crm_enabled === true && !ch.crm_funnel_id && update.crm_funnel_id == null) {
+      const first = funnels[0]?.id ?? null;
+      if (!first) {
+        toast.error("Crie um funil no CRM antes de ativar o CRM neste canal.");
+        return;
+      }
+      update.crm_funnel_id = first;
+    }
+    setBusyId(ch.id);
+    const { error } = await supabase.from("channels").update(update).eq("id", ch.id);
+    setBusyId(null);
+    if (error) {
+      toast.error("Não foi possível salvar o CRM do canal", { description: error.message });
+      return;
+    }
+    toast.success("CRM do canal atualizado");
     refetch();
   }
 
@@ -278,6 +313,7 @@ export function ConnectionsScreen() {
             <ChannelList
               channels={channels}
               departments={departments}
+              funnels={funnels}
               isAdmin={isAdmin}
               busyId={busyId}
               onRefresh={handleRefresh}
@@ -286,6 +322,7 @@ export function ConnectionsScreen() {
               onEdit={setEditing}
               onDelete={setConfirmDelete}
               onSetDepartment={handleSetDepartment}
+              onSetCrm={handleSetCrm}
             />
           )}
         </div>
@@ -356,6 +393,7 @@ export function ConnectionsScreen() {
 function ChannelList({
   channels,
   departments,
+  funnels,
   isAdmin,
   busyId,
   onRefresh,
@@ -364,9 +402,11 @@ function ChannelList({
   onEdit,
   onDelete,
   onSetDepartment,
+  onSetCrm,
 }: {
   channels: ChannelRow[];
   departments: DeptRow[];
+  funnels: FunnelRow[];
   isAdmin: boolean;
   busyId: string | null;
   onRefresh: (ch: ChannelRow) => void;
@@ -375,6 +415,7 @@ function ChannelList({
   onEdit: (ch: ChannelRow) => void;
   onDelete: (ch: ChannelRow) => void;
   onSetDepartment: (ch: ChannelRow, deptId: string | null) => void;
+  onSetCrm: (ch: ChannelRow, patch: { crm_enabled?: boolean; crm_funnel_id?: string | null }) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -387,6 +428,7 @@ function ChannelList({
         const connected = ch.status === "connected";
         const busy = busyId === ch.id;
         const deptName = departments.find((d) => d.id === ch.default_department_id)?.name ?? null;
+        const funnelName = funnels.find((f) => f.id === ch.crm_funnel_id)?.name ?? null;
 
         return (
           <div key={ch.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
@@ -440,6 +482,51 @@ function ChannelList({
                   )
                 ) : (
                   <span className="font-medium text-foreground">{deptName ?? "Sem departamento"}</span>
+                )}
+              </div>
+
+              {/* Bloco S5 — CRM: entrada automática de leads.
+                  Quando ligado, toda conversa NOVA recebida neste número vira
+                  um cartão no funil escolhido (etapa inicial, no topo).
+                  Só dono/admin edita; atendente vê em texto. */}
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="shrink-0 text-muted-foreground">CRM (entrada automática):</span>
+                {isAdmin ? (
+                  funnels.length > 0 ? (
+                    <>
+                      <label className="inline-flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5"
+                          checked={ch.crm_enabled}
+                          onChange={(e) => onSetCrm(ch, { crm_enabled: e.target.checked })}
+                          disabled={busy}
+                        />
+                        <span className="text-foreground">Ativar</span>
+                      </label>
+                      {ch.crm_enabled && (
+                        <select
+                          className="h-7 max-w-[180px] rounded-md border border-border bg-background px-2 text-xs text-foreground disabled:opacity-60"
+                          value={ch.crm_funnel_id ?? ""}
+                          onChange={(e) => onSetCrm(ch, { crm_funnel_id: e.target.value || null })}
+                          disabled={busy}
+                          title="Funil onde os leads novos deste número entram"
+                        >
+                          {funnels.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Crie um funil no CRM para ativar.</span>
+                  )
+                ) : (
+                  <span className="font-medium text-foreground">
+                    {ch.crm_enabled ? `Ativo — ${funnelName ?? "funil"}` : "Desativado"}
+                  </span>
                 )}
               </div>
             </div>

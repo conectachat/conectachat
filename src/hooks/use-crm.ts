@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -144,9 +144,14 @@ export function useFunnelBoard(funnelId: string | null) {
     };
   }, [orgId, qc]);
 
+  // IMPORTANTE: memoizar evita recriar as listas a cada render (senão a tela
+  // entra em loop de atualização — o erro React #185).
+  const stages = useMemo(() => stagesQuery.data ?? [], [stagesQuery.data]);
+  const cards = useMemo(() => cardsQuery.data ?? [], [cardsQuery.data]);
+
   return {
-    stages: stagesQuery.data ?? [],
-    cards: cardsQuery.data ?? [],
+    stages,
+    cards,
     isLoading: stagesQuery.isLoading || cardsQuery.isLoading,
   };
 }

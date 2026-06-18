@@ -28,8 +28,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "sonner";
 
-import { useFunnels, useFunnelBoard, useCreateCard, useMoveCard, type CrmStage, type CrmCard } from "@/hooks/use-crm";
+import {
+  useFunnels,
+  useFunnelBoard,
+  useCreateCard,
+  useMoveCard,
+  useOrgUsers,
+  type CrmStage,
+  type CrmCard,
+  type OrgUser,
+} from "@/hooks/use-crm";
 import { CrmFunnelsManager } from "@/components/crm-funnels-manager";
+import { CrmCardDetail } from "@/components/crm-card-detail";
 
 // -------------------------------------------------------------------
 //  Ajudantes
@@ -74,25 +84,30 @@ type ContactLite = { id: string; name: string | null; external_id: string };
 
 // -------------------------------------------------------------------
 //  Visual do cartão (usado na coluna e na "sombra" enquanto arrasta)
-//  S5 — quando há conversa ligada e um onOpenConversation, mostra o ícone
-//  de "abrir conversa" no canto do cartão.
+//  S5 — ícone "abrir conversa" quando há conversa ligada.
+//  S6 — clicar no cartão abre o detalhe; mostra o responsável (iniciais).
 // -------------------------------------------------------------------
 function CardView({
   card,
   dragging,
   onOpenConversation,
+  onOpenDetail,
+  assignee,
 }: {
   card: CrmCard;
   dragging?: boolean;
   onOpenConversation?: (card: CrmCard) => void;
+  onOpenDetail?: (card: CrmCard) => void;
+  assignee?: OrgUser | null;
 }) {
   const label = contactLabel(card);
   const money = formatMoney(card.value_cents, card.currency);
   return (
     <div
+      onClick={onOpenDetail ? () => onOpenDetail(card) : undefined}
       className={`rounded-lg border border-border bg-background p-3 shadow-sm ${
         dragging ? "shadow-md ring-2 ring-primary/40" : ""
-      }`}
+      } ${onOpenDetail ? "cursor-pointer hover:border-foreground/30" : ""}`}
     >
       <div className="flex items-center gap-2">
         <Avatar className="h-8 w-8">
@@ -105,9 +120,20 @@ function CardView({
           <p className="truncate text-sm font-medium text-foreground">{label}</p>
           {money && <p className="text-xs text-emerald-600">{money}</p>}
         </div>
+
+        {/* S6 — Responsável (iniciais), se houver. */}
+        {assignee && (
+          <span
+            title={`Responsável: ${assignee.name}`}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-medium text-primary"
+          >
+            {initials(assignee.name, "?")}
+          </span>
+        )}
+
         {/* S5 — Abrir a conversa ligada na Caixa de entrada.
-            onPointerDown para parar aqui o início do arraste (não conflita
-            com o arrastar-e-soltar do cartão). */}
+            onPointerDown para parar aqui o início do arraste; stopPropagation
+            no clique para não abrir o detalhe junto. */}
         {onOpenConversation && card.conversation_id && (
           <button
             type="button"
@@ -131,7 +157,17 @@ function CardView({
 // -------------------------------------------------------------------
 //  Cartão arrastável
 // -------------------------------------------------------------------
-function SortableCard({ card, onOpenConversation }: { card: CrmCard; onOpenConversation: (card: CrmCard) => void }) {
+function SortableCard({
+  card,
+  onOpenConversation,
+  onOpenDetail,
+  usersById,
+}: {
+  card: CrmCard;
+  onOpenConversation: (card: CrmCard) => void;
+  onOpenDetail: (card: CrmCard) => void;
+  usersById: Map<string, OrgUser>;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
   });
@@ -140,9 +176,10 @@ function SortableCard({ card, onOpenConversation }: { card: CrmCard; onOpenConve
     transition,
     opacity: isDragging ? 0.4 : 1,
   };
+  const assignee = card.assigned_user_id ? (usersById.get(card.assigned_user_id) ?? null) : null;
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-      <CardView card={card} onOpenConversation={onOpenConversation} />
+      <CardView card={card} onOpenConversation={onOpenConversation} onOpenDetail={onOpenDetail} assignee={assignee} />
     </div>
   );
 }
@@ -155,11 +192,15 @@ function Column({
   cards,
   onAdd,
   onOpenConversation,
+  onOpenDetail,
+  usersById,
 }: {
   stage: CrmStage;
   cards: CrmCard[];
   onAdd: (stage: CrmStage) => void;
   onOpenConversation: (card: CrmCard) => void;
+  onOpenDetail: (card: CrmCard) => void;
+  usersById: Map<string, OrgUser>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   return (
@@ -177,7 +218,15 @@ function Column({
           {cards.length === 0 ? (
             <p className="px-1 py-6 text-center text-xs text-muted-foreground">Nenhum cartão</p>
           ) : (
-            cards.map((card) => <SortableCard key={card.id} card={card} onOpenConversation={onOpenConversation} />)
+            cards.map((card) => (
+              <SortableCard
+                key={card.id}
+                card={card}
+                onOpenConversation={onOpenConversation}
+                onOpenDetail={onOpenDetail}
+                usersById={usersById}
+              />
+            ))
           )}
         </SortableContext>
       </div>
@@ -206,6 +255,10 @@ export function CrmScreen() {
   const funnelsQuery = useFunnels();
   const funnels = funnelsQuery.data ?? [];
 
+  // Equipe (para mostrar o responsável no cartão).
+  const orgUsersQuery = useOrgUsers();
+  const usersById = useMemo(() => new Map((orgUsersQuery.data ?? []).map((u) => [u.id, u])), [orgUsersQuery.data]);
+
   const [funnelId, setFunnelId] = useState<string | null>(null);
   useEffect(() => {
     if (funnels.length === 0) return;
@@ -217,6 +270,10 @@ export function CrmScreen() {
   const createCard = useCreateCard();
   const moveCard = useMoveCard();
 
+  // S6 — detalhe do cartão (guardamos o id; o cartão "vivo" vem da lista).
+  const [detailCardId, setDetailCardId] = useState<string | null>(null);
+  const lastDragEndRef = useRef(0);
+
   // S5 — Abre a conversa ligada ao cartão na Caixa de entrada.
   // Usa o mesmo gancho que a inbox já lê ao montar (sessionStorage.openConvId).
   function openConversation(card: CrmCard) {
@@ -227,6 +284,12 @@ export function CrmScreen() {
       /* ignore */
     }
     navigate({ to: "/inbox" });
+  }
+
+  // Abre o detalhe ao clicar — mas ignora o "clique fantasma" logo após arrastar.
+  function openDetail(card: CrmCard) {
+    if (Date.now() - lastDragEndRef.current < 250) return;
+    setDetailCardId(card.id);
   }
 
   // Estado local do quadro (espelha o banco; muda na hora ao arrastar).
@@ -246,6 +309,13 @@ export function CrmScreen() {
     for (const s of stages) m[s.id] = s;
     return m;
   }, [stages]);
+
+  // Cartão "vivo" do detalhe (sempre o mais atual da lista). Se sumir
+  // (ex.: excluído), a janela fecha sozinha.
+  const detailCard = useMemo(
+    () => (detailCardId ? (cards.find((c) => c.id === detailCardId) ?? null) : null),
+    [cards, detailCardId],
+  );
 
   // Reconstrói as colunas a partir do banco (exceto durante um arraste).
   useEffect(() => {
@@ -307,6 +377,7 @@ export function CrmScreen() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     draggingRef.current = false;
+    lastDragEndRef.current = Date.now();
     const movedId = String(active.id);
     const src = sourceRef.current;
     sourceRef.current = null;
@@ -413,6 +484,7 @@ export function CrmScreen() {
 
   const selectedFunnel = funnels.find((f) => f.id === funnelId) ?? null;
   const activeCard = activeId ? cardById[activeId] : null;
+  const activeAssignee = activeCard?.assigned_user_id ? (usersById.get(activeCard.assigned_user_id) ?? null) : null;
 
   // -------------------------------------------------------------------
   return (
@@ -424,7 +496,7 @@ export function CrmScreen() {
           <div className="flex items-center gap-2">
             {funnels.length > 0 && (
               <Select value={funnelId ?? undefined} onValueChange={setFunnelId}>
-                <SelectTrigger className="w-56">
+                <SelectTrigger className="w-44 sm:w-56">
                   <SelectValue placeholder="Escolher funil" />
                 </SelectTrigger>
                 <SelectContent>
@@ -466,6 +538,8 @@ export function CrmScreen() {
                   cards={columns[stage.id] ?? []}
                   onAdd={openAdd}
                   onOpenConversation={openConversation}
+                  onOpenDetail={openDetail}
+                  usersById={usersById}
                 />
               ))}
             </div>
@@ -473,13 +547,22 @@ export function CrmScreen() {
             <DragOverlay>
               {activeCard ? (
                 <div className="w-64">
-                  <CardView card={activeCard} dragging />
+                  <CardView card={activeCard} dragging assignee={activeAssignee} />
                 </div>
               ) : null}
             </DragOverlay>
           </DndContext>
         </div>
       )}
+
+      {/* Detalhe do cartão (S6) */}
+      <CrmCardDetail
+        card={detailCard}
+        stages={stages}
+        funnelId={funnelId ?? ""}
+        onClose={() => setDetailCardId(null)}
+        onOpenConversation={openConversation}
+      />
 
       {/* Janela: adicionar cartão */}
       <Dialog open={!!addStage} onOpenChange={(o) => !o && closeAdd()}>

@@ -10,6 +10,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
+import { ConversationCrmCard } from "@/components/conversation-crm";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Paperclip,

@@ -38,12 +38,30 @@ export type CrmCard = {
   stage_id: string;
   contact_id: string;
   conversation_id: string | null;
+  assigned_user_id: string | null;
   title: string | null;
   value_cents: number | null;
   currency: string | null;
   status: CrmStageKind;
   position: number;
+  lost_reason: string | null;
   contact: CrmCardContact | null;
+};
+
+// Anotação do cartão (histórico), com o autor.
+export type CrmCardNote = {
+  id: string;
+  body: string;
+  created_at: string;
+  author_user_id: string | null;
+  author: { id: string; full_name: string | null; email: string | null } | null;
+};
+
+// Usuário da empresa (para o seletor de responsável).
+export type OrgUser = {
+  id: string;
+  name: string;
+  role: string;
 };
 
 // ===================================================================
@@ -117,7 +135,7 @@ export function useFunnelBoard(funnelId: string | null) {
       const { data, error } = await supabase
         .from("crm_cards")
         .select(
-          "id, funnel_id, stage_id, contact_id, conversation_id, title, value_cents, currency, status, position, contact:contacts ( id, name, avatar_url, external_id )",
+          "id, funnel_id, stage_id, contact_id, conversation_id, assigned_user_id, title, value_cents, currency, status, position, lost_reason, contact:contacts ( id, name, avatar_url, external_id )",
         )
         .eq("funnel_id", funnelId!)
         .order("position", { ascending: true })
@@ -243,6 +261,218 @@ export function useMoveCard() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["crm-cards"] });
+    },
+  });
+}
+
+// ===================================================================
+//  ATUALIZAR CARTÃO — campos do detalhe (valor, moeda, título, responsável)
+// ===================================================================
+export function useUpdateCard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      cardId: string;
+      patch: {
+        title?: string | null;
+        value_cents?: number | null;
+        currency?: string | null;
+        assigned_user_id?: string | null;
+      };
+    }) => {
+      const { error } = await supabase.from("crm_cards").update(input.patch).eq("id", input.cardId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-cards"] });
+      qc.invalidateQueries({ queryKey: ["crm-conv-cards"] });
+    },
+  });
+}
+
+// ===================================================================
+//  GANHO / PERDIDO / REABRIR — move o cartão para a etapa certa do funil
+//  e grava status + data + motivo. (won/lost = 1ª etapa daquele tipo;
+//  reabrir = 1ª etapa "open" do funil.)
+// ===================================================================
+export function useSetCardStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      cardId: string;
+      funnelId: string;
+      target: CrmStageKind; // "won" | "lost" | "open"
+      lostReason?: string | null;
+    }) => {
+      // 1ª etapa do tipo alvo (Ganho/Perdido têm 1 só; "open" = Novo Lead).
+      const { data: stage, error: stErr } = await supabase
+        .from("crm_stages")
+        .select("id")
+        .eq("funnel_id", input.funnelId)
+        .eq("kind", input.target)
+        .order("position", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (stErr) throw stErr;
+      if (!stage) throw new Error("Etapa de destino não encontrada.");
+
+      // "No topo" da etapa de destino.
+      const { data: top } = await supabase
+        .from("crm_cards")
+        .select("position")
+        .eq("stage_id", stage.id)
+        .order("position", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      const position = (top?.position ?? 0) - 1;
+
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("crm_cards")
+        .update({
+          stage_id: stage.id,
+          position,
+          status: input.target,
+          won_at: input.target === "won" ? now : null,
+          lost_at: input.target === "lost" ? now : null,
+          lost_reason: input.target === "lost" ? (input.lostReason ?? null) : null,
+        })
+        .eq("id", input.cardId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-cards"] });
+      qc.invalidateQueries({ queryKey: ["crm-conv-cards"] });
+    },
+  });
+}
+
+// ===================================================================
+//  EXCLUIR CARTÃO
+// ===================================================================
+export function useDeleteCard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { cardId: string }) => {
+      const { error } = await supabase.from("crm_cards").delete().eq("id", input.cardId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-cards"] });
+      qc.invalidateQueries({ queryKey: ["crm-conv-cards"] });
+    },
+  });
+}
+
+// ===================================================================
+//  EQUIPE — usuários da empresa (para o seletor de responsável)
+// ===================================================================
+export function useOrgUsers() {
+  const { activeMembership } = useCurrentUser();
+  const orgId = activeMembership?.org_id ?? null;
+
+  return useQuery({
+    queryKey: ["crm-org-users", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<OrgUser[]> => {
+      const { data: members, error } = await supabase.from("org_members").select("user_id, role").eq("org_id", orgId!);
+      if (error) throw error;
+      const ids = (members ?? []).map((m) => m.user_id);
+      if (ids.length === 0) return [];
+
+      const { data: profs, error: pErr } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+      if (pErr) throw pErr;
+
+      const byId = new Map((profs ?? []).map((p) => [p.id, p]));
+      return (members ?? []).map((m) => {
+        const p = byId.get(m.user_id);
+        return {
+          id: m.user_id,
+          name: p?.full_name?.trim() || p?.email || "Usuário",
+          role: m.role as string,
+        };
+      });
+    },
+  });
+}
+
+// ===================================================================
+//  ANOTAÇÕES do cartão (histórico) — listar (ao vivo) / criar / apagar
+// ===================================================================
+export function useCardNotes(cardId: string | null) {
+  const qc = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ["crm-card-notes", cardId],
+    enabled: !!cardId,
+    queryFn: async (): Promise<CrmCardNote[]> => {
+      const { data, error } = await supabase
+        .from("crm_card_notes")
+        .select(
+          "id, body, created_at, author_user_id, author:profiles!crm_card_notes_author_user_id_fkey ( id, full_name, email )",
+        )
+        .eq("card_id", cardId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as CrmCardNote[];
+    },
+  });
+
+  // Tempo real: novas notas (de qualquer atendente) aparecem na hora.
+  useEffect(() => {
+    if (!cardId) return;
+    const ch = supabase
+      .channel(`crm-notes-${cardId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "crm_card_notes", filter: `card_id=eq.${cardId}` },
+        () => qc.invalidateQueries({ queryKey: ["crm-card-notes", cardId] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [cardId, qc]);
+
+  return query;
+}
+
+export function useAddCardNote() {
+  const { activeMembership } = useCurrentUser();
+  const orgId = activeMembership?.org_id ?? null;
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { cardId: string; body: string }) => {
+      if (!orgId) throw new Error("Empresa não encontrada.");
+      const body = input.body.trim();
+      if (!body) throw new Error("Anotação vazia.");
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) throw new Error("Sessão não encontrada.");
+      const { error } = await supabase.from("crm_card_notes").insert({
+        org_id: orgId,
+        card_id: input.cardId,
+        author_user_id: uid,
+        body,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["crm-card-notes", vars.cardId] });
+    },
+  });
+}
+
+export function useDeleteCardNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { noteId: string; cardId: string }) => {
+      const { error } = await supabase.from("crm_card_notes").delete().eq("id", input.noteId);
+      if (error) throw error;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["crm-card-notes", vars.cardId] });
     },
   });
 }

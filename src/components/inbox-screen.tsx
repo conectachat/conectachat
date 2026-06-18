@@ -10,6 +10,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Logo } from "@/components/logo";
 import { ContactTagsSection } from "@/components/contact-tags";
+import { ConversationCrmCard } from "@/components/conversation-crm";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Paperclip,
@@ -2040,6 +2041,10 @@ export function InboxScreen() {
 
             <div className="mt-6 border-t border-gray-200 pt-4">
               <ContactTagsSection contactId={contact.id} orgId={orgId} />
+            </div>
+
+            <div className="mt-6 border-t border-gray-200 pt-4">
+              <ConversationCrmCard conversationId={selected.id} contactId={contact.id} orgId={orgId} />
             </div>
 
             <div className="mt-6 border-t border-gray-200 pt-4">

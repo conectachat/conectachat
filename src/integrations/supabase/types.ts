@@ -337,6 +337,55 @@ export type Database = {
           },
         ]
       }
+      crm_card_notes: {
+        Row: {
+          author_user_id: string | null
+          body: string
+          card_id: string
+          created_at: string
+          id: string
+          org_id: string
+        }
+        Insert: {
+          author_user_id?: string | null
+          body: string
+          card_id: string
+          created_at?: string
+          id?: string
+          org_id: string
+        }
+        Update: {
+          author_user_id?: string | null
+          body?: string
+          card_id?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_card_notes_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_card_notes_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "crm_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_card_notes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_cards: {
         Row: {
           assigned_user_id: string | null

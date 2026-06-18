@@ -2044,6 +2044,10 @@ export function InboxScreen() {
             </div>
 
             <div className="mt-6 border-t border-gray-200 pt-4">
+              <ConversationCrmCard conversationId={selected.id} contactId={contact.id} orgId={orgId} />
+            </div>
+
+            <div className="mt-6 border-t border-gray-200 pt-4">
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Observações</h4>
               <textarea
                 value={notesDraft}

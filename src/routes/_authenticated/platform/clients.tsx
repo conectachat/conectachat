@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PlatformClientsScreen } from "@/components/platform-clients-screen";
+import { PlatformClientsScreen } from "@/components/platform/platform-clients-screen";
 
 export const Route = createFileRoute("/_authenticated/platform/clients")({
   head: () => ({

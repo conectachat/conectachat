@@ -2,8 +2,8 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Building2 } from "lucide-react";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { ConnectionBanner } from "@/components/connection-banner";
+import { AppSidebar } from "@/components/shared/app-sidebar";
+import { ConnectionBanner } from "@/components/connections/connection-banner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useNotifications } from "@/hooks/use-notifications";

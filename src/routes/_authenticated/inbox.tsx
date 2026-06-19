@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { InboxScreen } from "@/components/inbox-screen";
+import { InboxScreen } from "@/components/inbox/inbox-screen";
 
 export const Route = createFileRoute("/_authenticated/inbox")({
   head: () => ({

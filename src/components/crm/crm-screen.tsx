@@ -17,7 +17,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,8 +38,8 @@ import {
   type CrmCard,
   type OrgUser,
 } from "@/hooks/use-crm";
-import { CrmFunnelsManager } from "@/components/crm-funnels-manager";
-import { CrmCardDetail } from "@/components/crm-card-detail";
+import { CrmFunnelsManager } from "@/components/crm/crm-funnels-manager";
+import { CrmCardDetail } from "@/components/crm/crm-card-detail";
 
 // -------------------------------------------------------------------
 //  Ajudantes

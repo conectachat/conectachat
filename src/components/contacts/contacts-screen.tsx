@@ -20,7 +20,7 @@ import {
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { TagsManagerDialog, TagFilterSelect, ContactTagsSection, TagChip, type Tag } from "@/components/contact-tags";
+import { TagsManagerDialog, TagFilterSelect, ContactTagsSection, TagChip, type Tag } from "@/components/contacts/contact-tags";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";

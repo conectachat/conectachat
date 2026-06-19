@@ -14,6 +14,7 @@ import {
   SquareKanban,
   Sun,
   Moon,
+  type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 
@@ -37,7 +38,9 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { usePlatformStaff } from "@/hooks/use-platform-staff";
 import { useTheme } from "@/hooks/use-theme";
 
-const items = [
+type NavItemData = { title: string; url: string; icon: LucideIcon };
+
+const items: NavItemData[] = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
   { title: "CRM", url: "/crm", icon: SquareKanban },
   { title: "Contatos", url: "/contacts", icon: Contact },
@@ -47,7 +50,7 @@ const items = [
 ];
 
 // Itens da ÁREA DA PLATAFORMA (só aparecem para o super_admin da ConectaChat).
-const platformItems = [
+const platformItems: NavItemData[] = [
   { title: "Planos", url: "/platform/plans", icon: Layers },
   { title: "Clientes", url: "/platform/clients", icon: Building2 },
 ];
@@ -63,6 +66,40 @@ function initials(name: string | null | undefined, email: string | null | undefi
   const parts = source.split(/\s+/);
   const letters = parts.length >= 2 ? parts[0][0] + parts[1][0] : source.slice(0, 2);
   return letters.toUpperCase();
+}
+
+// Item do menu com o acabamento AZ1.3: quando ativo, ganha fundo verde suave
+// (--brand-soft), texto/ícone na cor da marca (--brand-text), um brilho leve
+// (--shadow-glow) e a barrinha verde à esquerda. Usa style inline para vencer
+// o realce padrão do componente sem precisar mexer no ui/sidebar.tsx.
+function NavItem({ item, active, collapsed }: { item: NavItemData; active: boolean; collapsed: boolean }) {
+  const Icon = item.icon;
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={active}
+        className="relative"
+        style={
+          active
+            ? {
+                background: "var(--brand-soft)",
+                color: "var(--brand-text)",
+                boxShadow: "var(--shadow-glow)",
+              }
+            : undefined
+        }
+      >
+        <Link to={item.url} className="flex items-center gap-2">
+          {active && (
+            <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-brand-green" />
+          )}
+          <Icon className="h-4 w-4 shrink-0" />
+          {!collapsed && <span>{item.title}</span>}
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
 }
 
 export function AppSidebar() {
@@ -124,14 +161,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={pathname === item.url}>
-                    <Link to={item.url} className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <NavItem key={item.url} item={item} active={pathname === item.url} collapsed={collapsed} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -144,14 +174,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {platformItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton asChild isActive={pathname === item.url}>
-                      <Link to={item.url} className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <NavItem key={item.url} item={item} active={pathname === item.url} collapsed={collapsed} />
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>

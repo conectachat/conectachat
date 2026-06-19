@@ -11,6 +11,8 @@ import {
   Copy,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
+  CheckCircle2,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -121,6 +123,34 @@ const LANGUAGES: Array<{ value: string; label: string }> = [
 
 // Radix Select não aceita value="" — usamos este código para "herdar da empresa".
 const TZ_INHERIT = "__inherit__";
+
+// --- Plano e cobrança -----------------------------------------------------
+// O plano da empresa vem da tabela "plans". Os recursos são flags (jsonb).
+type PlanRow = {
+  name: string;
+  description: string | null;
+  price_cents: number;
+  currency: string;
+  max_users: number;
+  max_channels: number;
+  features: Record<string, boolean> | null;
+};
+
+// Tradução das flags de recurso (plans.features) para rótulos amigáveis.
+const PLAN_FEATURE_LABEL: Record<string, string> = {
+  crm_kanban: "CRM Kanban",
+  chatbot: "Chatbot / automação",
+  broadcast: "Disparo em massa",
+};
+
+// Formata centavos -> moeda (ex.: 29900, "BRL" -> "R$ 299,00").
+function fmtMoney(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(cents / 100);
+  } catch {
+    return `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
+  }
+}
 
 function Placeholder({ message }: { message: string }) {
   return (
@@ -274,6 +304,24 @@ export function SettingsScreen() {
         setOrgTimezone(data?.timezone ?? "America/Sao_Paulo");
       });
   }, [orgId]);
+
+  // Plano e cobrança — lê o plano atual da empresa (só dono/admin vê a aba).
+  const planQuery = useQuery({
+    queryKey: ["org-plan", orgId],
+    enabled: !!orgId && isOrgAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("plan_id, plans:plan_id(name, description, price_cents, currency, max_users, max_channels, features)")
+        .eq("id", orgId!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+  // O embed pode vir como objeto ou (em alguns casos) lista — tratamos os dois.
+  const planRaw = (planQuery.data as any)?.plans;
+  const plan = ((Array.isArray(planRaw) ? planRaw[0] : planRaw) ?? null) as PlanRow | null;
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -1251,10 +1299,78 @@ export function SettingsScreen() {
                     </Button>
                   </div>
                 </section>
+
+                {/* Plano e cobrança ------------------------------------------------ */}
+                <section className="rounded-lg border border-border bg-card p-5">
+                  <h2 className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    Plano e cobrança
+                  </h2>
+
+                  {planQuery.isLoading ? (
+                    <p className="mt-4 text-sm text-muted-foreground">Carregando…</p>
+                  ) : !plan ? (
+                    <p className="mt-4 text-sm text-muted-foreground">Nenhum plano vinculado ainda.</p>
+                  ) : (
+                    <div className="mt-4 space-y-4">
+                      {/* Caixa de destaque do plano atual */}
+                      <div className="rounded-xl border border-brand-soft-strong bg-brand-soft p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-bold uppercase tracking-wider text-brand-text">
+                              Plano atual
+                            </div>
+                            <div className="mt-0.5 text-xl font-extrabold text-foreground">
+                              {plan.name} ·{" "}
+                              {plan.price_cents === 0 ? "Grátis" : `${fmtMoney(plan.price_cents, plan.currency)}/mês`}
+                            </div>
+                            {plan.description && (
+                              <div className="mt-0.5 text-xs text-muted-foreground">{plan.description}</div>
+                            )}
+                          </div>
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Ativo
+                          </span>
+                        </div>
+
+                        <ul className="mt-3 space-y-1 text-[12.5px] text-muted-foreground">
+                          <li>
+                            •{" "}
+                            {plan.max_users >= 9999
+                              ? "Atendentes ilimitados"
+                              : `Até ${plan.max_users} ${plan.max_users === 1 ? "atendente" : "atendentes"}`}
+                          </li>
+                          <li>
+                            •{" "}
+                            {plan.max_channels >= 9999
+                              ? "Canais de WhatsApp ilimitados"
+                              : `${plan.max_channels} ${plan.max_channels === 1 ? "canal" : "canais"} de WhatsApp`}
+                          </li>
+                          {Object.entries(plan.features ?? {})
+                            .filter(([, on]) => on)
+                            .map(([key]) => (
+                              <li key={key}>• {PLAN_FEATURE_LABEL[key] ?? key}</li>
+                            ))}
+                        </ul>
+                      </div>
+
+                      {/* Cobrança online (Stripe) — ainda não ativada */}
+                      <div className="rounded-lg border border-dashed border-border p-3">
+                        <p className="text-xs text-muted-foreground">
+                          Cobrança online em breve. Quando o pagamento por cartão estiver ativo, aqui você verá a
+                          próxima cobrança e o cartão cadastrado, e poderá trocar de plano.
+                        </p>
+                      </div>
+
+                      <Button variant="outline" disabled className="w-full">
+                        Gerenciar assinatura
+                      </Button>
+                    </div>
+                  )}
+                </section>
               </TabsContent>
             )}
-
-            {/* Fase 2 / Bloco J — Equipe (criar/gerenciar usuários da empresa) */}
             {isOrgAdmin && (
               <TabsContent value="equipe" className="mt-4 space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

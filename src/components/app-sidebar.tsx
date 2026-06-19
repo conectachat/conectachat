@@ -1,6 +1,20 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, LogOut, Contact, Settings, CalendarClock, Plug, ChevronLeft, ChevronRight, Layers, Building2, SquareKanban } from "lucide-react";
+import {
+  Inbox,
+  LogOut,
+  Contact,
+  Settings,
+  CalendarClock,
+  Plug,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Building2,
+  SquareKanban,
+  Sun,
+  Moon,
+} from "lucide-react";
 import { Logo } from "@/components/logo";
 
 import {
@@ -21,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { usePlatformStaff } from "@/hooks/use-platform-staff";
+import { useTheme } from "@/hooks/use-theme";
 
 const items = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
@@ -58,6 +73,7 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, profile, activeMembership } = useCurrentUser();
   const { isSuperAdmin } = usePlatformStaff();
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     await queryClient.cancelQueries();
@@ -68,6 +84,7 @@ export function AppSidebar() {
 
   const displayName = profile?.full_name || user?.email || "";
   const role = activeMembership?.role;
+  const isDark = theme === "dark";
 
   return (
     <Sidebar collapsible="icon">
@@ -160,6 +177,16 @@ export function AppSidebar() {
           </div>
         )}
         <SidebarMenu>
+          {/* Botão de tema (sol/lua) — alterna claro/escuro e lembra a escolha. */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={toggleTheme}
+              title={isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {!collapsed && <span>{isDark ? "Tema claro" : "Tema escuro"}</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout}>
               <LogOut className="h-4 w-4" />

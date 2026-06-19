@@ -488,7 +488,7 @@ export function CrmScreen() {
 
   // -------------------------------------------------------------------
   return (
-    <div className="flex h-full min-h-0 flex-col bg-gray-50 p-4 md:p-6">
+    <div className="flex h-full min-h-0 flex-col bg-gray-50 dark:bg-background p-4 md:p-6">
       <PageHeader
         title="CRM"
         subtitle="Arraste os cartões entre as etapas do funil."

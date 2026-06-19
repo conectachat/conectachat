@@ -992,7 +992,7 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="h-full overflow-auto bg-gray-50 p-4 sm:p-6">
+    <div className="h-full overflow-auto bg-gray-50 dark:bg-background p-4 sm:p-6">
       <div className="mx-auto max-w-4xl">
         <PageHeader title="Configurações" subtitle="Gerencie as configurações do sistema." />
 

@@ -285,7 +285,7 @@ export function ConnectionsScreen() {
   const qrLiveChannel = qrTarget ? (channels.find((c) => c.id === qrTarget.channelId) ?? null) : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-background">
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-6xl">
           <PageHeader

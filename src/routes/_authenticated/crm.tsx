@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CrmScreen } from "@/components/crm-screen";
+import { CrmScreen } from "@/components/crm/crm-screen";
 
 export const Route = createFileRoute("/_authenticated/crm")({
   head: () => ({

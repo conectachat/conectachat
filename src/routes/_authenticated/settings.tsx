@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsScreen } from "@/components/settings-screen";
+import { SettingsScreen } from "@/components/settings/settings-screen";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({

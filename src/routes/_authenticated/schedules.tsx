@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SchedulesScreen } from "@/components/schedules-screen";
+import { SchedulesScreen } from "@/components/schedules/schedules-screen";
 
 export const Route = createFileRoute("/_authenticated/schedules")({
   head: () => ({

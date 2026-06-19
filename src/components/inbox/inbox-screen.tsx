@@ -7,10 +7,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages, type Message } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useConfirm } from "@/components/confirm-dialog";
-import { Logo } from "@/components/logo";
-import { ContactTagsSection } from "@/components/contact-tags";
-import { ConversationCrmCard } from "@/components/conversation-crm";
+import { useConfirm } from "@/components/shared/confirm-dialog";
+import { Logo } from "@/components/shared/logo";
+import { ContactTagsSection } from "@/components/contacts/contact-tags";
+import { ConversationCrmCard } from "@/components/crm/conversation-crm";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Paperclip,

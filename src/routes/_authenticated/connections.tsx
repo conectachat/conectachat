@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ConnectionsScreen } from "@/components/connections-screen";
+import { ConnectionsScreen } from "@/components/connections/connections-screen";
 
 export const Route = createFileRoute("/_authenticated/connections")({
   head: () => ({

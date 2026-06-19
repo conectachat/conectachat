@@ -6,7 +6,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
-import { ConfirmProvider } from "@/components/confirm-dialog";
+import { ConfirmProvider } from "@/components/shared/confirm-dialog";
 
 // Anti-flash de tema: roda no <head>, ANTES da tela aparecer. Lê a preferência
 // salva e aplica a classe "dark" no <html> na hora — sem o "pisca" de cor.

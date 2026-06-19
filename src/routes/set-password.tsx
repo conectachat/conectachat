@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Logo } from "@/components/logo";
+import { Logo } from "@/components/shared/logo";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";

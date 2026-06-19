@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TAG_PALETTE, ColorPicker, type Tag as TagType } from "@/components/contacts/contact-tags";
+import { CompanyDetailsCard } from "@/components/settings/company-details-card";
 
 type FieldType = "text" | "number" | "date";
 type CustomField = {
@@ -182,7 +183,7 @@ export function SettingsScreen() {
     { value: "geral", label: "Geral", show: true },
     { value: "empresa", label: "Empresa", show: isOrgAdmin },
     { value: "equipe", label: "Equipe", show: isOrgAdmin },
-    { value: "usuario", label: "Usuário", show: true },
+    
     { value: "tags", label: "Tags", show: true },
     { value: "campos", label: "Campos", show: true },
     { value: "departamentos", label: "Departamentos", show: true },
@@ -1030,7 +1031,7 @@ export function SettingsScreen() {
       `ConectaChat — seu acesso\n` +
       `E-mail: ${createdCreds.email}\n` +
       `Senha provisória: ${createdCreds.password}\n\n` +
-      `Entre e troque a senha em Configurações > Usuário.`;
+      `Entre e troque a senha em Configurações > Geral.`;
     try {
       await navigator.clipboard.writeText(txt);
       toast.success("Acesso copiado!");
@@ -1050,7 +1051,7 @@ export function SettingsScreen() {
             <TabsTrigger value="geral">Geral</TabsTrigger>
             {isOrgAdmin && <TabsTrigger value="empresa">Empresa</TabsTrigger>}
             {isOrgAdmin && <TabsTrigger value="equipe">Equipe</TabsTrigger>}
-            <TabsTrigger value="usuario">Usuário</TabsTrigger>
+            
             <TabsTrigger value="tags">Tags</TabsTrigger>
             <TabsTrigger value="campos">Campos</TabsTrigger>
             <TabsTrigger value="departamentos">Departamentos</TabsTrigger>
@@ -1254,6 +1255,55 @@ export function SettingsScreen() {
                   </Button>
                 </div>
               </section>
+
+              <section className="rounded-lg border border-border bg-card p-5">
+                <h2 className="text-sm font-medium text-foreground">Preferências do Usuário</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="user-fuso">Meu fuso horário</Label>
+                    <Select
+                      value={userTimezone ? userTimezone : TZ_INHERIT}
+                      onValueChange={(v) => setUserTimezone(v === TZ_INHERIT ? "" : v)}
+                    >
+                      <SelectTrigger id="user-fuso">
+                        <SelectValue placeholder="Selecione o fuso" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        <SelectItem value={TZ_INHERIT}>Usar o fuso da empresa ({orgTimezone})</SelectItem>
+                        {tzOptions.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">É este fuso que vale na hora de agendar mensagens.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="user-idioma">Idioma</Label>
+                    <Select value={userLanguage} onValueChange={setUserLanguage}>
+                      <SelectTrigger id="user-idioma">
+                        <SelectValue placeholder="Selecione o idioma" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LANGUAGES.map((l) => (
+                          <SelectItem key={l.value} value={l.value}>
+                            {l.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      O app ainda está em português; a tradução será ativada em breve.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleSaveUserPrefs} disabled={savingPrefs} size="sm">
+                    {savingPrefs ? "Salvando..." : "Salvar"}
+                  </Button>
+                </div>
+              </section>
             </TabsContent>
 
             {/* Bloco E.0 — Empresa (só dono/admin) */}
@@ -1299,6 +1349,8 @@ export function SettingsScreen() {
                     </Button>
                   </div>
                 </section>
+
+                <CompanyDetailsCard orgId={orgId} />
 
                 {/* Plano e cobrança ------------------------------------------------ */}
                 <section className="rounded-lg border border-border bg-card p-5">
@@ -1522,7 +1574,7 @@ export function SettingsScreen() {
                       <p className="text-sm text-muted-foreground">
                         Anote e envie estes dados ao novo usuário.{" "}
                         <strong className="text-foreground">A senha provisória só aparece agora.</strong> Ele deve
-                        trocá-la após entrar (Configurações &gt; Usuário).
+                        trocá-la após entrar (Configurações &gt; Geral).
                       </p>
                       <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
                         <div>
@@ -1550,57 +1602,6 @@ export function SettingsScreen() {
               </TabsContent>
             )}
 
-            {/* Bloco E.0 — Usuário (fuso + idioma) */}
-            <TabsContent value="usuario" className="mt-4 space-y-6">
-              <section className="rounded-lg border border-border bg-card p-5">
-                <h2 className="text-sm font-medium text-foreground">Preferências do Usuário</h2>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="user-fuso">Meu fuso horário</Label>
-                    <Select
-                      value={userTimezone ? userTimezone : TZ_INHERIT}
-                      onValueChange={(v) => setUserTimezone(v === TZ_INHERIT ? "" : v)}
-                    >
-                      <SelectTrigger id="user-fuso">
-                        <SelectValue placeholder="Selecione o fuso" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        <SelectItem value={TZ_INHERIT}>Usar o fuso da empresa ({orgTimezone})</SelectItem>
-                        {tzOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">É este fuso que vale na hora de agendar mensagens.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="user-idioma">Idioma</Label>
-                    <Select value={userLanguage} onValueChange={setUserLanguage}>
-                      <SelectTrigger id="user-idioma">
-                        <SelectValue placeholder="Selecione o idioma" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {LANGUAGES.map((l) => (
-                          <SelectItem key={l.value} value={l.value}>
-                            {l.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      O app ainda está em português; a tradução será ativada em breve.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-end">
-                  <Button onClick={handleSaveUserPrefs} disabled={savingPrefs} size="sm">
-                    {savingPrefs ? "Salvando..." : "Salvar"}
-                  </Button>
-                </div>
-              </section>
-            </TabsContent>
 
             <TabsContent value="tags" className="mt-4 space-y-4">
               {/* Cards */}

@@ -15,7 +15,8 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
       <div className="flex min-w-0 items-start gap-2">
         <SidebarTrigger className="mt-0.5 shrink-0 md:hidden" />
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+          {/* AZ1.4: título um pouco mais firme e compacto (font-bold + tracking-tight). */}
+          <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
         </div>
       </div>

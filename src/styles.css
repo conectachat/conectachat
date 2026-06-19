@@ -196,3 +196,64 @@
     color: var(--color-foreground);
   }
 }
+
+/* =====================================================================
+   AZ1.5 — Acabamento do modo ESCURO para telas feitas com cores fixas
+   ---------------------------------------------------------------------
+   Algumas telas (ex.: Contatos) foram construídas com cores FIXAS do
+   Tailwind (text-gray-*, bg-white, border-gray-*) em vez dos tokens do
+   tema. No modo claro elas ficam perfeitas; no escuro, porém, não
+   acompanhavam o tema (texto escuro sumindo, blocos brancos).
+
+   As regras abaixo SÓ valem dentro de .dark — portanto o MODO CLARO
+   continua exatamente igual. Ficam de propósito FORA de @layer, para
+   terem prioridade sobre os utilitários do Tailwind.
+
+   Observação honesta: alguns selos coloridos (ex.: status "Ativo" verde /
+   "Bloqueado" vermelho) e hovers bem específicos ainda podem pedir um
+   retoque fino tela a tela — isso é esperado e a gente acerta depois.
+   ===================================================================== */
+
+/* Textos cinza fixos -> cor de texto do tema */
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700 {
+  color: var(--foreground);
+}
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: var(--muted-foreground);
+}
+.dark .hover\:text-gray-900:hover,
+.dark .hover\:text-gray-700:hover {
+  color: var(--foreground);
+}
+
+/* Fundos brancos/claros fixos -> superfícies do tema */
+.dark .bg-white {
+  background-color: var(--card);
+}
+.dark .bg-gray-100 {
+  background-color: var(--muted);
+}
+.dark .bg-gray-200 {
+  background-color: var(--muted);
+}
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover {
+  background-color: var(--muted);
+}
+
+/* Bordas cinza fixas -> borda do tema */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: var(--border);
+}
+
+/* Divisores de tabela/lista -> borda do tema */
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--border);
+}

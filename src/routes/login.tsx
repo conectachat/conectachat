@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Logo } from "@/components/shared/logo";
 import { toast } from "sonner";
@@ -39,10 +39,7 @@ function LoginPage() {
     setSubmitting(false);
     if (error) {
       toast.error("Não foi possível entrar", {
-        description:
-          error.message === "Invalid login credentials"
-            ? "Email ou senha incorretos."
-            : error.message,
+        description: error.message === "Invalid login credentials" ? "Email ou senha incorretos." : error.message,
       });
       return;
     }
@@ -89,6 +86,13 @@ function LoginPage() {
               {submitting ? "Entrando..." : "Entrar"}
             </Button>
           </form>
+
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Não tem conta?{" "}
+            <Link to="/cadastro" className="font-medium text-primary hover:underline">
+              Criar conta
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>

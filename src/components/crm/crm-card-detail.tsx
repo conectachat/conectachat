@@ -15,9 +15,20 @@ import {
   type CrmCard,
   type CrmStage,
 } from "@/hooks/use-crm";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // -------------------------------------------------------------------
 //  Ajudantes
@@ -60,11 +71,12 @@ function fmtDateTime(iso: string): string {
   }
 }
 
-const selectCls =
-  "mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground disabled:opacity-60";
+// Valor interno usado no Select de responsável para representar "ninguém".
+// (O Select do shadcn não aceita item com value="" .)
+const NO_ASSIGNEE = "_none";
 
 // ===================================================================
-//  DETALHE DO CARTÃO
+//  DETALHE DO CARTÃO — painel lateral (Sheet) com abas (Dados / Notas)
 // ===================================================================
 export function CrmCardDetail({
   card,
@@ -93,6 +105,7 @@ export function CrmCardDetail({
   const addNote = useAddCardNote();
   const delNote = useDeleteCardNote();
 
+  const [tab, setTab] = useState("dados");
   const [valueText, setValueText] = useState("");
   const [noteText, setNoteText] = useState("");
   const [lostOpen, setLostOpen] = useState(false);
@@ -114,6 +127,7 @@ export function CrmCardDetail({
 
   // Reset ao trocar de cartão.
   useEffect(() => {
+    setTab("dados");
     setValueText(card?.value_cents != null ? centsToInput(card.value_cents) : "");
     setNoteText("");
     setLostOpen(false);
@@ -231,19 +245,23 @@ export function CrmCardDetail({
   const status = card?.status ?? "open";
 
   return (
-    <Dialog open={!!card} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-lg">
+    <Sheet open={!!card} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent
+        side="right"
+        className="w-full gap-0 overflow-y-auto border-l border-hairline bg-panel p-0 sm:max-w-xl"
+      >
         {card && (
           <>
-            <DialogHeader className="border-b border-border px-4 py-3">
-              <DialogTitle className="flex items-center gap-2 text-left">
-                <Avatar className="h-9 w-9">
+            {/* Cabeçalho */}
+            <SheetHeader className="border-b border-hairline px-5 py-4 pr-12 text-left">
+              <SheetTitle className="flex items-center gap-3 text-left">
+                <Avatar className="h-10 w-10">
                   <AvatarImage src={card.contact?.avatar_url ?? undefined} alt={label} />
                   <AvatarFallback className="text-xs">
                     {initials(card.contact?.name, card.contact?.external_id ?? "?")}
                   </AvatarFallback>
                 </Avatar>
-                <span className="min-w-0 flex-1 truncate">{label}</span>
+                <span className="min-w-0 flex-1 truncate text-base font-semibold">{label}</span>
                 {status === "won" && (
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                     Ganho
@@ -254,156 +272,203 @@ export function CrmCardDetail({
                     Perdido
                   </span>
                 )}
-              </DialogTitle>
-            </DialogHeader>
+              </SheetTitle>
+            </SheetHeader>
 
-            <div className="space-y-4 px-4 py-4">
-              {/* Atalho: abrir a conversa ligada */}
-              {card.conversation_id && (
-                <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onOpenConversation(card)}>
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  Abrir conversa na Caixa de entrada
-                </Button>
-              )}
-
-              {/* Valor */}
-              <div>
-                <label className="text-xs font-medium text-gray-500">Valor</label>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">R$</span>
-                  <input
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    value={valueText}
-                    disabled={busy}
-                    onChange={(e) => setValueText(e.target.value)}
-                    className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground disabled:opacity-60"
-                  />
-                  <Button size="sm" variant="secondary" onClick={saveValue} disabled={busy}>
-                    Salvar
-                  </Button>
-                </div>
+            {/* Abas */}
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+              <div className="px-5 pt-4">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="dados">Dados</TabsTrigger>
+                  <TabsTrigger value="notas">Notas</TabsTrigger>
+                </TabsList>
               </div>
 
-              {/* Responsável */}
-              <div>
-                <label className="text-xs font-medium text-gray-500">Responsável</label>
-                <select
-                  className={selectCls}
-                  value={card.assigned_user_id ?? ""}
-                  disabled={busy || usersQuery.isLoading}
-                  onChange={(e) => changeAssignee(e.target.value)}
-                >
-                  <option value="">Sem responsável</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Etapa (mover entre etapas abertas) / status do negócio */}
-              <div>
-                <label className="text-xs font-medium text-gray-500">Etapa</label>
-                {status === "open" ? (
-                  <select
-                    className={selectCls}
-                    value={card.stage_id}
-                    disabled={busy}
-                    onChange={(e) => moveToOpenStage(e.target.value)}
+              {/* ----------------------------- ABA: DADOS ----------------------------- */}
+              <TabsContent value="dados" className="mt-0 space-y-4 px-5 pb-8 pt-4">
+                {/* Atalho: abrir a conversa ligada */}
+                {card.conversation_id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => onOpenConversation(card)}
                   >
-                    {openStages.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="mt-1 text-sm text-foreground">
-                    {currentStage?.name ?? "—"}{" "}
-                    <span className="text-muted-foreground">(negócio fechado — use Reabrir para mover)</span>
-                  </p>
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Abrir conversa na Caixa de entrada
+                  </Button>
                 )}
-              </div>
 
-              {/* Fechamento: Ganho / Perdido / Reabrir */}
-              <div className="rounded-lg border border-border p-3">
-                {status === "open" ? (
-                  <>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
-                        onClick={markWon}
-                        disabled={busy}
-                      >
-                        <Trophy className="mr-1 h-4 w-4" />
-                        Ganho
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 border-red-300 text-red-700 hover:bg-red-50"
-                        onClick={() => setLostOpen((v) => !v)}
-                        disabled={busy}
-                      >
-                        <XCircle className="mr-1 h-4 w-4" />
-                        Perdido
-                      </Button>
-                    </div>
-                    {lostOpen && (
-                      <div className="mt-2 space-y-2">
-                        <textarea
-                          rows={2}
-                          placeholder="Motivo da perda (opcional)"
-                          value={lostReason}
-                          onChange={(e) => setLostReason(e.target.value)}
-                          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
-                        />
-                        <Button
-                          size="sm"
-                          className="w-full bg-red-600 text-white hover:bg-red-700"
-                          onClick={confirmLost}
-                          disabled={busy}
-                        >
-                          Confirmar perda
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="space-y-2">
-                    {status === "lost" && card.lost_reason && (
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">Motivo:</span> {card.lost_reason}
-                      </p>
-                    )}
-                    <Button size="sm" variant="outline" className="w-full" onClick={reopen} disabled={busy}>
-                      <RotateCcw className="mr-1 h-4 w-4" />
-                      Reabrir negócio
+                {/* Valor */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="card-value">Valor</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">R$</span>
+                    <Input
+                      id="card-value"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={valueText}
+                      disabled={busy}
+                      onChange={(e) => setValueText(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button size="sm" variant="secondary" onClick={saveValue} disabled={busy}>
+                      Salvar
                     </Button>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Anotações (histórico) */}
-              <div>
-                <label className="text-xs font-medium text-gray-500">Anotações</label>
-                <div className="mt-1 space-y-2">
-                  <textarea
-                    rows={2}
+                {/* Responsável */}
+                <div className="space-y-1.5">
+                  <Label>Responsável</Label>
+                  <Select
+                    value={card.assigned_user_id ?? NO_ASSIGNEE}
+                    disabled={busy || usersQuery.isLoading}
+                    onValueChange={(v) => changeAssignee(v === NO_ASSIGNEE ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sem responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_ASSIGNEE}>Sem responsável</SelectItem>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Etapa (mover entre etapas abertas) / status do negócio */}
+                <div className="space-y-1.5">
+                  <Label>Etapa</Label>
+                  {status === "open" ? (
+                    <Select value={card.stage_id} disabled={busy} onValueChange={(v) => moveToOpenStage(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {openStages.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm text-foreground">
+                      {currentStage?.name ?? "—"}{" "}
+                      <span className="text-muted-foreground">(negócio fechado — use Reabrir para mover)</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Fechamento: Ganho / Perdido / Reabrir */}
+                <div className="rounded-xl border border-hairline bg-panel-2 p-3 shadow-[var(--shadow-card)]">
+                  {status === "open" ? (
+                    <>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
+                          onClick={markWon}
+                          disabled={busy}
+                        >
+                          <Trophy className="mr-1 h-4 w-4" />
+                          Ganho
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 border-red-300 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+                          onClick={() => setLostOpen((v) => !v)}
+                          disabled={busy}
+                        >
+                          <XCircle className="mr-1 h-4 w-4" />
+                          Perdido
+                        </Button>
+                      </div>
+                      {lostOpen && (
+                        <div className="mt-2 space-y-2">
+                          <Textarea
+                            rows={2}
+                            placeholder="Motivo da perda (opcional)"
+                            value={lostReason}
+                            onChange={(e) => setLostReason(e.target.value)}
+                          />
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="w-full"
+                            onClick={confirmLost}
+                            disabled={busy}
+                          >
+                            Confirmar perda
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      {status === "lost" && card.lost_reason && (
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">Motivo:</span> {card.lost_reason}
+                        </p>
+                      )}
+                      <Button size="sm" variant="outline" className="w-full" onClick={reopen} disabled={busy}>
+                        <RotateCcw className="mr-1 h-4 w-4" />
+                        Reabrir negócio
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Excluir cartão */}
+                <div className="border-t border-hairline pt-3">
+                  {confirmDelete ? (
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1 text-sm text-muted-foreground">
+                        Excluir este cartão? Não dá pra desfazer.
+                      </span>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)} disabled={busy}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={doDelete} disabled={busy}>
+                        Excluir
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
+                      onClick={() => setConfirmDelete(true)}
+                      disabled={busy}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      Excluir cartão
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* ----------------------------- ABA: NOTAS ----------------------------- */}
+              <TabsContent value="notas" className="mt-0 space-y-3 px-5 pb-8 pt-4">
+                <div className="space-y-2">
+                  <Textarea
+                    rows={3}
                     placeholder="Escreva uma anotação…"
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
                   />
                   <Button size="sm" onClick={submitNote} disabled={addNote.isPending || !noteText.trim()}>
                     {addNote.isPending ? "Salvando…" : "Adicionar anotação"}
                   </Button>
                 </div>
 
-                <div className="mt-3 space-y-2">
+                <div className="space-y-2">
                   {notesQuery.isLoading ? (
                     <p className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
@@ -412,7 +477,7 @@ export function CrmCardDetail({
                     <p className="text-sm text-muted-foreground">Nenhuma anotação ainda.</p>
                   ) : (
                     notes.map((n) => (
-                      <div key={n.id} className="rounded-lg border border-border bg-muted/30 p-2">
+                      <div key={n.id} className="rounded-xl border border-hairline bg-panel-2 p-3">
                         <div className="flex items-center gap-2">
                           <span className="truncate text-xs font-medium text-foreground">
                             {n.author?.full_name?.trim() || n.author?.email || "Usuário"}
@@ -435,37 +500,11 @@ export function CrmCardDetail({
                     ))
                   )}
                 </div>
-              </div>
-
-              {/* Excluir cartão */}
-              <div className="border-t border-border pt-3">
-                {confirmDelete ? (
-                  <div className="flex items-center gap-2">
-                    <span className="flex-1 text-sm text-muted-foreground">Excluir este cartão? Não dá pra desfazer.</span>
-                    <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)} disabled={busy}>
-                      Cancelar
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={doDelete} disabled={busy}>
-                      Excluir
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => setConfirmDelete(true)}
-                    disabled={busy}
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    Excluir cartão
-                  </Button>
-                )}
-              </div>
-            </div>
+              </TabsContent>
+            </Tabs>
           </>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

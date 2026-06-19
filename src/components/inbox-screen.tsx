@@ -1430,7 +1430,7 @@ export function InboxScreen() {
       {/* Bloco O — Camadas até 1024px: o painel da conversa só aparece quando
           há uma conversa selecionada (senão a lista ocupa a tela). A partir de
           1024px (lg) ele fica sempre visível, ao lado da lista. */}
-      <section className={`${selected ? "flex" : "hidden lg:flex"} min-w-0 flex-1 flex-col overflow-hidden bg-gray-50`}>
+      <section className={`${selected ? "flex" : "hidden lg:flex"} min-w-0 flex-1 flex-col overflow-hidden bg-gray-50 dark:bg-background`}>
         {!selected ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <Logo variant="horizontal" className="h-14 w-auto opacity-40" />
@@ -1645,7 +1645,7 @@ export function InboxScreen() {
                         >
                           {!m.deleted_at && m.reply_to_external_id && (
                             <div
-                              className={`mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] ${out ? "border-white/60 bg-white/15" : "border-brand-blue/50 bg-gray-50"}`}
+                              className={`mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] ${out ? "border-white/60 bg-white/15" : "border-brand-blue/50 bg-gray-50 dark:bg-background"}`}
                             >
                               {quotedSender && (
                                 <p className={`font-semibold ${out ? "text-white/90" : "text-brand-blue"}`}>
@@ -1736,7 +1736,7 @@ export function InboxScreen() {
 
             <div className="relative border-t border-gray-200 bg-white px-4 py-3">
               {replyTo && (
-                <div className="mb-2 flex items-start gap-2 rounded-md border-l-2 border-brand-blue/60 bg-gray-50 px-2 py-1.5">
+                <div className="mb-2 flex items-start gap-2 rounded-md border-l-2 border-brand-blue/60 bg-gray-50 dark:bg-background px-2 py-1.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] font-semibold text-brand-blue">Respondendo {replyTo.sender}</p>
                     <p className="truncate text-xs text-gray-600">{replyTo.preview}</p>
@@ -1991,7 +1991,7 @@ export function InboxScreen() {
                   <input
                     value={formatPhone(contact.external_id) ?? ""}
                     disabled
-                    className="mt-1 w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-500"
+                    className="mt-1 w-full rounded border border-gray-200 bg-gray-50 dark:bg-background px-2 py-1.5 text-sm text-gray-500"
                   />
                 </div>
                 <div>
@@ -2017,7 +2017,7 @@ export function InboxScreen() {
                   <input
                     value={contact.id}
                     disabled
-                    className="mt-1 w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-[11px] text-gray-500"
+                    className="mt-1 w-full rounded border border-gray-200 bg-gray-50 dark:bg-background px-2 py-1.5 text-[11px] text-gray-500"
                   />
                 </div>
                 <div className="flex justify-end gap-2 pt-1">
@@ -2319,7 +2319,7 @@ export function InboxScreen() {
                   className="mx-auto max-h-[45vh] rounded-lg object-contain"
                 />
               ) : (
-                <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-4">
+                <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 dark:bg-background px-3 py-4">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-200 text-gray-600">
                     <FileIcon size={20} />
                   </span>

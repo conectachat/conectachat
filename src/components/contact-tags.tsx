@@ -171,7 +171,7 @@ export function TagsManagerDialog({
 
         <div className="space-y-4 text-sm">
           {/* Create */}
-          <div className="rounded border border-gray-200 bg-gray-50 p-3">
+          <div className="rounded border border-gray-200 bg-gray-50 dark:bg-background p-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Nova tag</p>
             <div className="flex items-center gap-2">
               <input

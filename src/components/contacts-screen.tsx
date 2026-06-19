@@ -614,7 +614,7 @@ export function ContactsScreen() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-background">
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-6xl">
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -682,7 +682,7 @@ export function ContactsScreen() {
           {/* Table */}
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              <thead className="border-b border-gray-200 bg-gray-50 dark:bg-background text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-4 py-2.5">Contato</th>
                   <th className="px-4 py-2.5">Telefone</th>
@@ -886,7 +886,7 @@ export function ContactsScreen() {
             <DialogTitle>Importar contatos</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm">
-            <div className="flex items-center justify-between rounded border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
+            <div className="flex items-center justify-between rounded border border-dashed border-gray-300 bg-gray-50 dark:bg-background px-3 py-2">
               <span className="text-xs text-gray-600">Use o modelo para evitar erros de cabeçalho.</span>
               <button onClick={downloadTemplate} className="text-xs font-medium text-primary hover:underline">
                 Baixar modelo
@@ -923,7 +923,7 @@ export function ContactsScreen() {
             {importBusy && <p className="text-xs text-gray-500">Processando…</p>}
 
             {(previewValid.length > 0 || previewSuspect.length > 0 || previewInvalid.length > 0) && (
-              <div className="space-y-3 rounded border border-gray-200 bg-gray-50 p-3">
+              <div className="space-y-3 rounded border border-gray-200 bg-gray-50 dark:bg-background p-3">
                 <p className="text-xs text-gray-700">
                   <strong>{importStats.novos}</strong> serão adicionados (novos),{" "}
                   <strong>{importStats.jaExistem}</strong> já existem, <strong>{importStats.invalidos}</strong> com
@@ -1031,7 +1031,7 @@ export function ContactsScreen() {
                   <input
                     value={formatPhone(editing.external_id)}
                     disabled
-                    className="mt-1 w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-500"
+                    className="mt-1 w-full rounded border border-gray-200 bg-gray-50 dark:bg-background px-2 py-1.5 text-sm text-gray-500"
                   />
                 </div>
                 <div>

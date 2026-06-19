@@ -8,6 +8,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 
+// Anti-flash de tema: roda no <head>, ANTES da tela aparecer. Lê a preferência
+// salva e aplica a classe "dark" no <html> na hora — sem o "pisca" de cor.
+// Padrão = claro (só ativa o escuro se a pessoa escolheu antes).
+const themeInitScript = `(function(){try{var t=localStorage.getItem('conectachat-theme');var d=document.documentElement;if(t==='dark'){d.classList.add('dark');}else{d.classList.remove('dark');}}catch(e){}})();`;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -96,6 +101,8 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {/* Anti-flash de tema: tem que vir ANTES do conteúdo carregar. */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <HeadContent />
       </head>
       <body>

@@ -13,6 +13,29 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/login" });
+
+    // Trava de onboarding: se o usuário tem uma empresa e ela ainda não concluiu
+    // o assistente (onboarding_completed = false), força ir para /onboarding antes
+    // de usar o app. Quem não tem empresa segue normal (cai na tela "sem empresa").
+    const { data: members } = await supabase
+      .from("org_members")
+      .select("org_id, created_at")
+      .eq("user_id", data.user.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const orgId = members?.[0]?.org_id;
+    if (orgId) {
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("onboarding_completed")
+        .eq("id", orgId)
+        .maybeSingle();
+      if (org && org.onboarding_completed === false) {
+        throw redirect({ to: "/onboarding" });
+      }
+    }
+
     return { user: data.user };
   },
   component: AuthenticatedLayout,

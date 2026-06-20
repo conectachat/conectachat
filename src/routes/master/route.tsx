@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  createFileRoute,
-  redirect,
-  Outlet,
-  Link,
-  useRouterState,
-} from "@tanstack/react-router";
+import { createFileRoute, redirect, Outlet, Link, useRouterState } from "@tanstack/react-router";
 import {
   Shield,
   LayoutDashboard,
@@ -35,15 +29,12 @@ export const Route = createFileRoute("/master")({
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/login" });
 
-    // Só entra quem é da equipe da plataforma (platform_staff). A RLS deixa cada
-    // um ler apenas a PRÓPRIA linha — então esta checagem é segura.
     const { data: staff } = await supabase
       .from("platform_staff")
       .select("role")
       .eq("user_id", data.user.id)
       .maybeSingle();
 
-    // Não é da equipe? Volta para o app do cliente.
     if (!staff) throw redirect({ to: "/inbox" });
 
     return { user: data.user, role: staff.role };
@@ -51,8 +42,6 @@ export const Route = createFileRoute("/master")({
   component: MasterLayout,
 });
 
-// Itens do menu. ROTAS em inglês; RÓTULOS em português.
-// ready:false = ainda não construído (aparece "em breve", sem link, sem 404).
 type MasterNavItem = { to: string; label: string; icon: LucideIcon; ready: boolean };
 
 const SECTIONS: { label: string; items: MasterNavItem[] }[] = [
@@ -60,13 +49,13 @@ const SECTIONS: { label: string; items: MasterNavItem[] }[] = [
     label: "Operação",
     items: [
       { to: "/master/dashboard", label: "Painel", icon: LayoutDashboard, ready: true },
-      { to: "/master/companies", label: "Empresas", icon: Building2, ready: false },
+      { to: "/master/companies", label: "Empresas", icon: Building2, ready: true },
       { to: "/master/subscriptions", label: "Assinaturas", icon: CreditCard, ready: false },
     ],
   },
   {
     label: "Catálogo",
-    items: [{ to: "/master/plans", label: "Planos", icon: Package, ready: false }],
+    items: [{ to: "/master/plans", label: "Planos", icon: Package, ready: true }],
   },
   {
     label: "Administração",
@@ -77,7 +66,6 @@ const SECTIONS: { label: string; items: MasterNavItem[] }[] = [
   },
 ];
 
-// Caixa azul do logo (degradê na cor da marca ConectaChat #0055A6).
 const BLUE_BOX = { background: "linear-gradient(135deg, #0055A6, #003D73)" } as const;
 
 async function logout() {
@@ -164,7 +152,7 @@ function UserBox() {
   const { user, profile } = useCurrentUser();
   const { role } = usePlatformStaff();
   const name = profile?.full_name || user?.email?.split("@")[0] || "Master";
-  const roleLabel = role === "super_admin" ? "Super admin" : role ?? "Equipe";
+  const roleLabel = role === "super_admin" ? "Super admin" : (role ?? "Equipe");
   return (
     <div className="flex items-center gap-3 rounded-xl border border-hairline bg-muted/40 px-2 py-2">
       <div className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-blue/10 text-[13px] font-bold text-brand-blue">
@@ -204,7 +192,7 @@ function MasterLayout() {
   const [drawer, setDrawer] = useState(false);
 
   return (
-    <div className="flex min-h-screen w-full text-foreground">
+    <div className="flex h-screen w-full overflow-hidden text-foreground">
       {/* Sidebar fixa (computador) */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-hairline bg-card md:flex">
         <div className="border-b border-hairline px-5 py-5">
@@ -232,7 +220,7 @@ function MasterLayout() {
         </header>
 
         {/* Topo (computador) */}
-        <header className="hidden items-center justify-between gap-3 px-8 pt-6 md:flex">
+        <header className="hidden shrink-0 items-center justify-between gap-3 px-8 pt-6 md:flex">
           <div className="flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3 py-1.5 text-[13.5px] font-medium text-brand-blue">
             <span className="size-1.5 rounded-full bg-brand-blue" />
             Modo super admin
@@ -240,7 +228,10 @@ function MasterLayout() {
           <ThemeButton />
         </header>
 
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-8 md:py-6">
+        {/* Área de conteúdo: recipiente de altura definida (cada página cuida da
+            própria rolagem; o Painel rola aqui, as telas de Empresas/Planos rolam
+            internamente). */}
+        <main className="min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>

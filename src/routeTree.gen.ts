@@ -18,6 +18,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MasterIndexRouteImport } from './routes/master/index'
 import { Route as MasterSubscriptionsRouteImport } from './routes/master/subscriptions'
+import { Route as MasterSettingsRouteImport } from './routes/master/settings'
 import { Route as MasterDashboardRouteImport } from './routes/master/dashboard'
 import { Route as MasterCompaniesRouteImport } from './routes/master/companies'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -71,6 +72,11 @@ const MasterIndexRoute = MasterIndexRouteImport.update({
 const MasterSubscriptionsRoute = MasterSubscriptionsRouteImport.update({
   id: '/subscriptions',
   path: '/subscriptions',
+  getParentRoute: () => MasterRouteRoute,
+} as any)
+const MasterSettingsRoute = MasterSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => MasterRouteRoute,
 } as any)
 const MasterDashboardRoute = MasterDashboardRouteImport.update({
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/master/companies': typeof MasterCompaniesRoute
   '/master/dashboard': typeof MasterDashboardRoute
+  '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
   '/platform/clients': typeof AuthenticatedPlatformClientsRoute
@@ -161,6 +168,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/master/companies': typeof MasterCompaniesRoute
   '/master/dashboard': typeof MasterDashboardRoute
+  '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master': typeof MasterIndexRoute
   '/platform/clients': typeof AuthenticatedPlatformClientsRoute
@@ -183,6 +191,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/master/companies': typeof MasterCompaniesRoute
   '/master/dashboard': typeof MasterDashboardRoute
+  '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
   '/_authenticated/platform/clients': typeof AuthenticatedPlatformClientsRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/master/companies'
     | '/master/dashboard'
+    | '/master/settings'
     | '/master/subscriptions'
     | '/master/'
     | '/platform/clients'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/master/companies'
     | '/master/dashboard'
+    | '/master/settings'
     | '/master/subscriptions'
     | '/master'
     | '/platform/clients'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/master/companies'
     | '/master/dashboard'
+    | '/master/settings'
     | '/master/subscriptions'
     | '/master/'
     | '/_authenticated/platform/clients'
@@ -324,6 +336,13 @@ declare module '@tanstack/react-router' {
       path: '/subscriptions'
       fullPath: '/master/subscriptions'
       preLoaderRoute: typeof MasterSubscriptionsRouteImport
+      parentRoute: typeof MasterRouteRoute
+    }
+    '/master/settings': {
+      id: '/master/settings'
+      path: '/settings'
+      fullPath: '/master/settings'
+      preLoaderRoute: typeof MasterSettingsRouteImport
       parentRoute: typeof MasterRouteRoute
     }
     '/master/dashboard': {
@@ -427,6 +446,7 @@ const AuthenticatedRouteRouteWithChildren =
 interface MasterRouteRouteChildren {
   MasterCompaniesRoute: typeof MasterCompaniesRoute
   MasterDashboardRoute: typeof MasterDashboardRoute
+  MasterSettingsRoute: typeof MasterSettingsRoute
   MasterSubscriptionsRoute: typeof MasterSubscriptionsRoute
   MasterIndexRoute: typeof MasterIndexRoute
 }
@@ -434,6 +454,7 @@ interface MasterRouteRouteChildren {
 const MasterRouteRouteChildren: MasterRouteRouteChildren = {
   MasterCompaniesRoute: MasterCompaniesRoute,
   MasterDashboardRoute: MasterDashboardRoute,
+  MasterSettingsRoute: MasterSettingsRoute,
   MasterSubscriptionsRoute: MasterSubscriptionsRoute,
   MasterIndexRoute: MasterIndexRoute,
 }

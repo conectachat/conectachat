@@ -18,6 +18,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MasterIndexRouteImport } from './routes/master/index'
 import { Route as MasterDashboardRouteImport } from './routes/master/dashboard'
+import { Route as MasterCompaniesRouteImport } from './routes/master/companies'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSchedulesRouteImport } from './routes/_authenticated/schedules'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
@@ -69,6 +70,11 @@ const MasterIndexRoute = MasterIndexRouteImport.update({
 const MasterDashboardRoute = MasterDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => MasterRouteRoute,
+} as any)
+const MasterCompaniesRoute = MasterCompaniesRouteImport.update({
+  id: '/companies',
+  path: '/companies',
   getParentRoute: () => MasterRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/master/companies': typeof MasterCompaniesRoute
   '/master/dashboard': typeof MasterDashboardRoute
   '/master/': typeof MasterIndexRoute
   '/platform/clients': typeof AuthenticatedPlatformClientsRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/master/companies': typeof MasterCompaniesRoute
   '/master/dashboard': typeof MasterDashboardRoute
   '/master': typeof MasterIndexRoute
   '/platform/clients': typeof AuthenticatedPlatformClientsRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/schedules': typeof AuthenticatedSchedulesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/master/companies': typeof MasterCompaniesRoute
   '/master/dashboard': typeof MasterDashboardRoute
   '/master/': typeof MasterIndexRoute
   '/_authenticated/platform/clients': typeof AuthenticatedPlatformClientsRoute
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/schedules'
     | '/settings'
+    | '/master/companies'
     | '/master/dashboard'
     | '/master/'
     | '/platform/clients'
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/schedules'
     | '/settings'
+    | '/master/companies'
     | '/master/dashboard'
     | '/master'
     | '/platform/clients'
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/_authenticated/inbox'
     | '/_authenticated/schedules'
     | '/_authenticated/settings'
+    | '/master/companies'
     | '/master/dashboard'
     | '/master/'
     | '/_authenticated/platform/clients'
@@ -300,6 +312,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/master/dashboard'
       preLoaderRoute: typeof MasterDashboardRouteImport
+      parentRoute: typeof MasterRouteRoute
+    }
+    '/master/companies': {
+      id: '/master/companies'
+      path: '/companies'
+      fullPath: '/master/companies'
+      preLoaderRoute: typeof MasterCompaniesRouteImport
       parentRoute: typeof MasterRouteRoute
     }
     '/_authenticated/settings': {
@@ -387,11 +406,13 @@ const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface MasterRouteRouteChildren {
+  MasterCompaniesRoute: typeof MasterCompaniesRoute
   MasterDashboardRoute: typeof MasterDashboardRoute
   MasterIndexRoute: typeof MasterIndexRoute
 }
 
 const MasterRouteRouteChildren: MasterRouteRouteChildren = {
+  MasterCompaniesRoute: MasterCompaniesRoute,
   MasterDashboardRoute: MasterDashboardRoute,
   MasterIndexRoute: MasterIndexRoute,
 }

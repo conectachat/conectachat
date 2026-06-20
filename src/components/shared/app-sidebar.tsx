@@ -9,8 +9,7 @@ import {
   Plug,
   ChevronLeft,
   ChevronRight,
-  Layers,
-  Building2,
+  Shield,
   SquareKanban,
   Sun,
   Moon,
@@ -49,12 +48,6 @@ const items: NavItemData[] = [
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
-// Itens da ÁREA DA PLATAFORMA (só aparecem para o super_admin da ConectaChat).
-const platformItems: NavItemData[] = [
-  { title: "Planos", url: "/platform/plans", icon: Layers },
-  { title: "Clientes", url: "/platform/clients", icon: Building2 },
-];
-
 const ROLE_LABEL: Record<string, string> = {
   owner: "Proprietário",
   admin: "Administrador",
@@ -68,10 +61,6 @@ function initials(name: string | null | undefined, email: string | null | undefi
   return letters.toUpperCase();
 }
 
-// Item do menu com o acabamento AZ1.3: quando ativo, ganha fundo verde suave
-// (--brand-soft), texto/ícone na cor da marca (--brand-text), um brilho leve
-// (--shadow-glow) e a barrinha verde à esquerda. Usa style inline para vencer
-// o realce padrão do componente sem precisar mexer no ui/sidebar.tsx.
 function NavItem({ item, active, collapsed }: { item: NavItemData; active: boolean; collapsed: boolean }) {
   const Icon = item.icon;
   return (
@@ -127,7 +116,6 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         {collapsed ? (
-          // Recolhida: mantém o logo (ícone) e uma seta para expandir.
           <div className="flex flex-col items-center gap-1 py-1.5">
             <Logo variant="icon" className="h-8 w-8" />
             <button
@@ -140,7 +128,6 @@ export function AppSidebar() {
             </button>
           </div>
         ) : (
-          // Expandida: logo completo + seta para recolher.
           <div className="flex items-center justify-between gap-2 px-2 py-1.5">
             <Logo variant="horizontal" className="h-7 w-auto" />
             <button
@@ -166,20 +153,6 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* Grupo PLATAFORMA — só para a equipe interna da ConectaChat (super_admin). */}
-        {isSuperAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {platformItems.map((item) => (
-                  <NavItem key={item.url} item={item} active={pathname === item.url} collapsed={collapsed} />
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
       </SidebarContent>
 
       <SidebarFooter>
@@ -200,7 +173,18 @@ export function AppSidebar() {
           </div>
         )}
         <SidebarMenu>
-          {/* Botão de tema (sol/lua) — alterna claro/escuro e lembra a escolha. */}
+          {/* Atalho para o Painel Master — só aparece para a equipe da plataforma. */}
+          {isSuperAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild title="Painel Master">
+                <Link to="/master" className="flex items-center gap-2 text-brand-blue">
+                  <Shield className="h-4 w-4 shrink-0" />
+                  {!collapsed && <span className="font-medium">Painel Master</span>}
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {/* Botão de tema (sol/lua). */}
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={toggleTheme}

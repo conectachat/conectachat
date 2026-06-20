@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { usePlatformStaff } from "@/hooks/use-platform-staff";
 import { useTheme } from "@/hooks/use-theme";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 // Namespace próprio do Painel Master. NÃO usa o shell (sidebar) do app do cliente.
 export const Route = createFileRoute("/master")({
@@ -192,71 +193,71 @@ function MasterLayout() {
   const [drawer, setDrawer] = useState(false);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden text-foreground">
-      {/* Sidebar fixa (computador) */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-hairline bg-card md:flex">
-        <div className="border-b border-hairline px-5 py-5">
-          <Brand />
-        </div>
-        <NavItems pathname={pathname} />
-        <div className="border-t border-hairline p-3">
-          <UserBox />
-        </div>
-      </aside>
-
-      {/* Coluna principal */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Topo (celular) */}
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-hairline bg-card/80 px-4 py-3 backdrop-blur md:hidden">
-          <button
-            onClick={() => setDrawer(true)}
-            title="Menu"
-            className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:text-foreground"
-          >
-            <Menu className="size-5" />
-          </button>
-          <Brand />
-          <ThemeButton />
-        </header>
-
-        {/* Topo (computador) */}
-        <header className="hidden shrink-0 items-center justify-between gap-3 px-8 pt-6 md:flex">
-          <div className="flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3 py-1.5 text-[13.5px] font-medium text-brand-blue">
-            <span className="size-1.5 rounded-full bg-brand-blue" />
-            Modo super admin
+    <SidebarProvider>
+      <div className="flex h-screen w-full overflow-hidden text-foreground">
+        {/* Sidebar fixa (computador) */}
+        <aside className="hidden w-64 shrink-0 flex-col border-r border-hairline bg-card md:flex">
+          <div className="border-b border-hairline px-5 py-5">
+            <Brand />
           </div>
-          <ThemeButton />
-        </header>
+          <NavItems pathname={pathname} />
+          <div className="border-t border-hairline p-3">
+            <UserBox />
+          </div>
+        </aside>
 
-        {/* Área de conteúdo: recipiente de altura definida (cada página cuida da
-            própria rolagem; o Painel rola aqui, as telas de Empresas/Planos rolam
-            internamente). */}
-        <main className="min-h-0 flex-1 overflow-y-auto">
-          <Outlet />
-        </main>
+        {/* Coluna principal */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Topo (celular) */}
+          <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-hairline bg-card/80 px-4 py-3 backdrop-blur md:hidden">
+            <button
+              onClick={() => setDrawer(true)}
+              title="Menu"
+              className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:text-foreground"
+            >
+              <Menu className="size-5" />
+            </button>
+            <Brand />
+            <ThemeButton />
+          </header>
+
+          {/* Topo (computador) */}
+          <header className="hidden shrink-0 items-center justify-between gap-3 px-8 pt-6 md:flex">
+            <div className="flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3 py-1.5 text-[13.5px] font-medium text-brand-blue">
+              <span className="size-1.5 rounded-full bg-brand-blue" />
+              Modo super admin
+            </div>
+            <ThemeButton />
+          </header>
+
+          {/* Conteúdo (cada página cuida da própria rolagem). */}
+          <main className="min-h-0 flex-1 overflow-y-auto">
+            <Outlet />
+          </main>
+        </div>
+
+        {/* Menu deslizante (celular) */}
+        {drawer && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} />
+            <div className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-hairline bg-card">
+              <div className="flex items-center justify-between border-b border-hairline px-4 py-4">
+                <Brand />
+                <button
+                  onClick={() => setDrawer(false)}
+                  className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+              <NavItems pathname={pathname} onNavigate={() => setDrawer(false)} />
+              <div className="border-t border-hairline p-3">
+                <UserBox />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Menu deslizante (celular) */}
-      {drawer && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} />
-          <div className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-hairline bg-card">
-            <div className="flex items-center justify-between border-b border-hairline px-4 py-4">
-              <Brand />
-              <button
-                onClick={() => setDrawer(false)}
-                className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-            <NavItems pathname={pathname} onNavigate={() => setDrawer(false)} />
-            <div className="border-t border-hairline p-3">
-              <UserBox />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </SidebarProvider>
   );
 }

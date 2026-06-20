@@ -153,7 +153,7 @@ export function PlatformClientsScreen() {
         <div className="mx-auto max-w-5xl">
           <PageHeader
             title="Clientes"
-            subtitle="Área da plataforma — as empresas que usam o ConectaChat."
+            subtitle="Área da plataforma — os clientes que usam o ConectaChat."
             actions={
               <Button size="sm" onClick={openCreate}>
                 <Plus className="h-4 w-4" />
@@ -264,7 +264,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         <Building2 className="h-5 w-5" style={{ color: "#0055A6" }} />
       </div>
       <h3 className="text-base font-semibold text-foreground">Nenhum cliente ainda</h3>
-      <p className="mt-1 text-sm text-muted-foreground">Cadastre a primeira empresa-cliente.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Cadastre o primeiro cliente.</p>
       <Button className="mt-4" size="sm" onClick={onCreate}>
         <Plus className="h-4 w-4" />
         <span className="ml-1">Novo cliente</span>

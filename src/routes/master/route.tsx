@@ -65,7 +65,7 @@ const SECTIONS: { label: string; items: MasterNavItem[] }[] = [
   },
   {
     label: "Administração",
-    items: [{ to: "/master/settings", label: "Configurações", icon: Settings, ready: false }],
+    items: [{ to: "/master/settings", label: "Configurações", icon: Settings, ready: true }],
   },
 ];
 

@@ -343,7 +343,6 @@ function ClientFormDialog({
         toast.error("Não foi possível salvar", { description: data?.error ?? error?.message });
         return;
       }
-      toast.success("Cliente updated");
       toast.success("Cliente atualizado");
       onSaved();
       return;

@@ -1,12 +1,17 @@
 import { useState } from "react";
-import { createFileRoute, redirect, Outlet, Link, useRouterState } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  redirect,
+  Outlet,
+  Link,
+  useRouterState,
+} from "@tanstack/react-router";
 import {
   Shield,
   LayoutDashboard,
   Building2,
   CreditCard,
   Package,
-  Plus,
   Settings,
   ArrowLeft,
   LogOut,
@@ -50,7 +55,7 @@ const SECTIONS: { label: string; items: MasterNavItem[] }[] = [
     label: "Operação",
     items: [
       { to: "/master/dashboard", label: "Painel", icon: LayoutDashboard, ready: true },
-      { to: "/master/companies", label: "Empresas", icon: Building2, ready: true },
+      { to: "/master/companies", label: "Clientes", icon: Building2, ready: true },
       { to: "/master/subscriptions", label: "Assinaturas", icon: CreditCard, ready: true },
     ],
   },
@@ -60,10 +65,7 @@ const SECTIONS: { label: string; items: MasterNavItem[] }[] = [
   },
   {
     label: "Administração",
-    items: [
-      { to: "/master/new-company", label: "Nova empresa", icon: Plus, ready: false },
-      { to: "/master/settings", label: "Configurações", icon: Settings, ready: false },
-    ],
+    items: [{ to: "/master/settings", label: "Configurações", icon: Settings, ready: false }],
   },
 ];
 
@@ -153,7 +155,7 @@ function UserBox() {
   const { user, profile } = useCurrentUser();
   const { role } = usePlatformStaff();
   const name = profile?.full_name || user?.email?.split("@")[0] || "Master";
-  const roleLabel = role === "super_admin" ? "Super admin" : (role ?? "Equipe");
+  const roleLabel = role === "super_admin" ? "Super admin" : role ?? "Equipe";
   return (
     <div className="flex items-center gap-3 rounded-xl border border-hairline bg-muted/40 px-2 py-2">
       <div className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-blue/10 text-[13px] font-bold text-brand-blue">

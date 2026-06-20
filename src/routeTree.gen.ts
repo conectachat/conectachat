@@ -27,8 +27,6 @@ import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
-import { Route as AuthenticatedPlatformPlansRouteImport } from './routes/_authenticated/platform/plans'
-import { Route as AuthenticatedPlatformClientsRouteImport } from './routes/_authenticated/platform/clients'
 
 const SetPasswordRoute = SetPasswordRouteImport.update({
   id: '/set-password',
@@ -120,18 +118,6 @@ const AuthenticatedConnectionsRoute =
     path: '/connections',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedPlatformPlansRoute =
-  AuthenticatedPlatformPlansRouteImport.update({
-    id: '/platform/plans',
-    path: '/platform/plans',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedPlatformClientsRoute =
-  AuthenticatedPlatformClientsRouteImport.update({
-    id: '/platform/clients',
-    path: '/platform/clients',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -151,8 +137,6 @@ export interface FileRoutesByFullPath {
   '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
-  '/platform/clients': typeof AuthenticatedPlatformClientsRoute
-  '/platform/plans': typeof AuthenticatedPlatformPlansRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -171,8 +155,6 @@ export interface FileRoutesByTo {
   '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master': typeof MasterIndexRoute
-  '/platform/clients': typeof AuthenticatedPlatformClientsRoute
-  '/platform/plans': typeof AuthenticatedPlatformPlansRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -194,8 +176,6 @@ export interface FileRoutesById {
   '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
-  '/_authenticated/platform/clients': typeof AuthenticatedPlatformClientsRoute
-  '/_authenticated/platform/plans': typeof AuthenticatedPlatformPlansRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -217,8 +197,6 @@ export interface FileRouteTypes {
     | '/master/settings'
     | '/master/subscriptions'
     | '/master/'
-    | '/platform/clients'
-    | '/platform/plans'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -237,8 +215,6 @@ export interface FileRouteTypes {
     | '/master/settings'
     | '/master/subscriptions'
     | '/master'
-    | '/platform/clients'
-    | '/platform/plans'
   id:
     | '__root__'
     | '/'
@@ -259,8 +235,6 @@ export interface FileRouteTypes {
     | '/master/settings'
     | '/master/subscriptions'
     | '/master/'
-    | '/_authenticated/platform/clients'
-    | '/_authenticated/platform/plans'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -401,20 +375,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConnectionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/platform/plans': {
-      id: '/_authenticated/platform/plans'
-      path: '/platform/plans'
-      fullPath: '/platform/plans'
-      preLoaderRoute: typeof AuthenticatedPlatformPlansRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/platform/clients': {
-      id: '/_authenticated/platform/clients'
-      path: '/platform/clients'
-      fullPath: '/platform/clients'
-      preLoaderRoute: typeof AuthenticatedPlatformClientsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
@@ -425,8 +385,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedSchedulesRoute: typeof AuthenticatedSchedulesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
-  AuthenticatedPlatformClientsRoute: typeof AuthenticatedPlatformClientsRoute
-  AuthenticatedPlatformPlansRoute: typeof AuthenticatedPlatformPlansRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -436,8 +394,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedSchedulesRoute: AuthenticatedSchedulesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
-  AuthenticatedPlatformClientsRoute: AuthenticatedPlatformClientsRoute,
-  AuthenticatedPlatformPlansRoute: AuthenticatedPlatformPlansRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -475,3 +431,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

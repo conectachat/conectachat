@@ -293,42 +293,44 @@ function ClientFormDialog({
 }) {
   const isEdit = !!client;
 
+  // Edição: nome do cliente + plano + status.
   const [companyName, setCompanyName] = useState("");
-  const [ownerName, setOwnerName] = useState("");
-  const [ownerEmail, setOwnerEmail] = useState("");
   const [planId, setPlanId] = useState<string>(NO_PLAN);
   const [status, setStatus] = useState<string>("trialing");
+
+  // Criação: só nome e e-mail do dono (o resto ele preenche no onboarding).
+  const [ownerName, setOwnerName] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
+
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     if (client) {
       setCompanyName(client.name);
-      setOwnerName("");
-      setOwnerEmail("");
-      // Pré-seleciona o plano atual casando pelo nome (o resumo não traz o id).
       const match = plans.find((p) => p.name === client.plan);
       setPlanId(match ? match.id : NO_PLAN);
       setStatus(client.subscription_status ?? "trialing");
     } else {
       setCompanyName("");
-      setOwnerName("");
-      setOwnerEmail("");
       setPlanId(NO_PLAN);
       setStatus("trialing");
+      setOwnerName("");
+      setOwnerEmail("");
     }
   }, [open, client, plans]);
 
   async function handleSave() {
-    const name = companyName.trim();
-    if (!name) {
-      toast.error("Informe o nome da empresa.");
-      return;
-    }
-    const planArg = planId === NO_PLAN ? null : planId;
-
     setSaving(true);
+
     if (isEdit) {
+      const name = companyName.trim();
+      if (!name) {
+        setSaving(false);
+        toast.error("Informe o nome do cliente.");
+        return;
+      }
+      const planArg = planId === NO_PLAN ? null : planId;
       const { data, error } = await callFn({
         action: "update-client",
         orgId: client!.id,
@@ -343,36 +345,38 @@ function ClientFormDialog({
       }
       toast.success("Cliente atualizado");
       onSaved();
-    } else {
-      const oName = ownerName.trim();
-      const oEmail = ownerEmail.trim().toLowerCase();
-      if (!oName) {
-        setSaving(false);
-        toast.error("Informe o nome do dono.");
-        return;
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(oEmail)) {
-        setSaving(false);
-        toast.error("E-mail do dono inválido.");
-        return;
-      }
-      const { data, error } = await callFn({
-        action: "create-client",
-        companyName: name,
-        ownerName: oName,
-        ownerEmail: oEmail,
-        planId: planArg,
-        status,
-        appUrl: window.location.origin,
-      });
-      setSaving(false);
-      if (error || !data?.ok) {
-        toast.error("Não foi possível criar o cliente", { description: data?.error ?? error?.message });
-        return;
-      }
-      toast.success("Cliente criado", { description: `Convite enviado para ${oEmail}.` });
-      onSaved();
+      return;
     }
+
+    // Criação: apenas o dono (nome + e-mail). A empresa nasce com o nome do dono
+    // como provisório; ele define o nome real e o tipo (PF/PJ) no onboarding.
+    const oName = ownerName.trim();
+    const oEmail = ownerEmail.trim().toLowerCase();
+    if (!oName) {
+      setSaving(false);
+      toast.error("Informe o nome do dono.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(oEmail)) {
+      setSaving(false);
+      toast.error("E-mail do dono inválido.");
+      return;
+    }
+    const { data, error } = await callFn({
+      action: "create-client",
+      companyName: oName, // nome provisório da empresa = nome do dono
+      ownerName: oName,
+      ownerEmail: oEmail,
+      planId: null,
+      status: "trialing",
+    });
+    setSaving(false);
+    if (error || !data?.ok) {
+      toast.error("Não foi possível criar o cliente", { description: data?.error ?? error?.message });
+      return;
+    }
+    toast.success("Cliente criado", { description: `Convite enviado para ${oEmail}.` });
+    onSaved();
   }
 
   return (
@@ -383,17 +387,54 @@ function ClientFormDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
-          <div className="space-y-1.5">
-            <Label htmlFor="c-name">Nome da empresa</Label>
-            <Input
-              id="c-name"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="Ex.: Duli Consulting"
-            />
-          </div>
+          {isEdit ? (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="c-name">Nome do cliente</Label>
+                <Input
+                  id="c-name"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Ex.: Duli Consulting"
+                />
+              </div>
 
-          {!isEdit && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="c-plan">Plano</Label>
+                  <Select value={planId} onValueChange={setPlanId}>
+                    <SelectTrigger id="c-plan">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_PLAN}>Sem plano</SelectItem>
+                      {plans.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                          {!p.is_active ? " (inativo)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="c-status">Assinatura</Label>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger id="c-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUB_OPTIONS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {SUB_META[s].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          ) : (
             <>
               <div className="space-y-1.5">
                 <Label htmlFor="c-owner">Nome do dono</Label>
@@ -401,7 +442,7 @@ function ClientFormDialog({
                   id="c-owner"
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}
-                  placeholder="Ex.: Renato"
+                  placeholder="Ex.: Renato Drumond"
                 />
               </div>
               <div className="space-y-1.5">
@@ -414,46 +455,12 @@ function ClientFormDialog({
                   placeholder="dono@empresa.com"
                 />
                 <p className="text-xs text-muted-foreground">
-                  O dono vai receber um e-mail com um link para definir a própria senha e acessar.
+                  O dono recebe um e-mail para definir a senha. No primeiro acesso, ele completa o
+                  cadastro (empresa ou pessoa física, documento, etc.) no onboarding.
                 </p>
               </div>
             </>
           )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="c-plan">Plano</Label>
-              <Select value={planId} onValueChange={setPlanId}>
-                <SelectTrigger id="c-plan">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_PLAN}>Sem plano</SelectItem>
-                  {plans.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                      {!p.is_active ? " (inativo)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="c-status">Assinatura</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger id="c-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUB_OPTIONS.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {SUB_META[s].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
         </div>
 
         <DialogFooter>

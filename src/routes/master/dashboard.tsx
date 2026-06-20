@@ -11,7 +11,6 @@ export const Route = createFileRoute("/master/dashboard")({
   component: MasterDashboardPage,
 });
 
-// Azul da marca ConectaChat (usado na linha do gráfico e nos destaques).
 const BLUE = "#0055A6";
 
 type Stats = {
@@ -27,7 +26,6 @@ type Stats = {
 type Metrics = { stats: Stats; series: { mes: string; total: number }[] };
 
 function MasterDashboardPage() {
-  // Busca as métricas na Edge Function master-metrics (já manda o login junto).
   const q = useQuery({
     queryKey: ["master-metrics"],
     queryFn: async (): Promise<Metrics> => {
@@ -41,7 +39,7 @@ function MasterDashboardPage() {
   const s = q.data?.stats;
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 md:px-8 md:py-8">
       <div>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Painel Master</h1>
         <p className="text-sm text-muted-foreground">Visão geral de toda a plataforma.</p>
@@ -53,7 +51,6 @@ function MasterDashboardPage() {
         </div>
       ) : (
         <>
-          {/* Linha 1 — situação das empresas */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <Kpi
               accent
@@ -74,7 +71,6 @@ function MasterDashboardPage() {
             <Kpi loading={q.isLoading} icon={<Pause className="size-4" />} label="Suspensas" value={s?.suspensas} />
           </div>
 
-          {/* Linha 2 — volume da plataforma */}
           <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
             <Kpi
               loading={q.isLoading}
@@ -96,7 +92,6 @@ function MasterDashboardPage() {
             />
           </div>
 
-          {/* Gráfico de crescimento */}
           <div className="rounded-2xl border border-hairline bg-card p-5 shadow-[var(--shadow-card)]">
             <h2 className="text-[15px] font-semibold">Crescimento de empresas</h2>
             <p className="mb-3 text-xs text-muted-foreground">últimos 12 meses (acumulado)</p>

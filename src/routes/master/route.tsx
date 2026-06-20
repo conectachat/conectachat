@@ -50,7 +50,7 @@ const SECTIONS: { label: string; items: MasterNavItem[] }[] = [
     items: [
       { to: "/master/dashboard", label: "Painel", icon: LayoutDashboard, ready: true },
       { to: "/master/companies", label: "Empresas", icon: Building2, ready: true },
-      { to: "/master/subscriptions", label: "Assinaturas", icon: CreditCard, ready: false },
+      { to: "/master/subscriptions", label: "Assinaturas", icon: CreditCard, ready: true },
     ],
   },
   {

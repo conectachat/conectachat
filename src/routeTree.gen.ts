@@ -13,8 +13,11 @@ import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CadastroRouteImport } from './routes/cadastro'
+import { Route as MasterRouteRouteImport } from './routes/master/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MasterIndexRouteImport } from './routes/master/index'
+import { Route as MasterDashboardRouteImport } from './routes/master/dashboard'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSchedulesRouteImport } from './routes/_authenticated/schedules'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
@@ -44,6 +47,11 @@ const CadastroRoute = CadastroRouteImport.update({
   path: '/cadastro',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MasterRouteRoute = MasterRouteRouteImport.update({
+  id: '/master',
+  path: '/master',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -52,6 +60,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const MasterIndexRoute = MasterIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MasterRouteRoute,
+} as any)
+const MasterDashboardRoute = MasterDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => MasterRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
@@ -99,6 +117,7 @@ const AuthenticatedPlatformClientsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/master': typeof MasterRouteRouteWithChildren
   '/cadastro': typeof CadastroRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -109,6 +128,8 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/master/dashboard': typeof MasterDashboardRoute
+  '/master/': typeof MasterIndexRoute
   '/platform/clients': typeof AuthenticatedPlatformClientsRoute
   '/platform/plans': typeof AuthenticatedPlatformPlansRoute
 }
@@ -124,6 +145,8 @@ export interface FileRoutesByTo {
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/master/dashboard': typeof MasterDashboardRoute
+  '/master': typeof MasterIndexRoute
   '/platform/clients': typeof AuthenticatedPlatformClientsRoute
   '/platform/plans': typeof AuthenticatedPlatformPlansRoute
 }
@@ -131,6 +154,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/master': typeof MasterRouteRouteWithChildren
   '/cadastro': typeof CadastroRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -141,6 +165,8 @@ export interface FileRoutesById {
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/schedules': typeof AuthenticatedSchedulesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/master/dashboard': typeof MasterDashboardRoute
+  '/master/': typeof MasterIndexRoute
   '/_authenticated/platform/clients': typeof AuthenticatedPlatformClientsRoute
   '/_authenticated/platform/plans': typeof AuthenticatedPlatformPlansRoute
 }
@@ -148,6 +174,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/master'
     | '/cadastro'
     | '/login'
     | '/onboarding'
@@ -158,6 +185,8 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/schedules'
     | '/settings'
+    | '/master/dashboard'
+    | '/master/'
     | '/platform/clients'
     | '/platform/plans'
   fileRoutesByTo: FileRoutesByTo
@@ -173,12 +202,15 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/schedules'
     | '/settings'
+    | '/master/dashboard'
+    | '/master'
     | '/platform/clients'
     | '/platform/plans'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/master'
     | '/cadastro'
     | '/login'
     | '/onboarding'
@@ -189,6 +221,8 @@ export interface FileRouteTypes {
     | '/_authenticated/inbox'
     | '/_authenticated/schedules'
     | '/_authenticated/settings'
+    | '/master/dashboard'
+    | '/master/'
     | '/_authenticated/platform/clients'
     | '/_authenticated/platform/plans'
   fileRoutesById: FileRoutesById
@@ -196,6 +230,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  MasterRouteRoute: typeof MasterRouteRouteWithChildren
   CadastroRoute: typeof CadastroRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -232,6 +267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CadastroRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/master': {
+      id: '/master'
+      path: '/master'
+      fullPath: '/master'
+      preLoaderRoute: typeof MasterRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -245,6 +287,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/master/': {
+      id: '/master/'
+      path: '/'
+      fullPath: '/master/'
+      preLoaderRoute: typeof MasterIndexRouteImport
+      parentRoute: typeof MasterRouteRoute
+    }
+    '/master/dashboard': {
+      id: '/master/dashboard'
+      path: '/dashboard'
+      fullPath: '/master/dashboard'
+      preLoaderRoute: typeof MasterDashboardRouteImport
+      parentRoute: typeof MasterRouteRoute
     }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
@@ -330,9 +386,24 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface MasterRouteRouteChildren {
+  MasterDashboardRoute: typeof MasterDashboardRoute
+  MasterIndexRoute: typeof MasterIndexRoute
+}
+
+const MasterRouteRouteChildren: MasterRouteRouteChildren = {
+  MasterDashboardRoute: MasterDashboardRoute,
+  MasterIndexRoute: MasterIndexRoute,
+}
+
+const MasterRouteRouteWithChildren = MasterRouteRoute._addFileChildren(
+  MasterRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  MasterRouteRoute: MasterRouteRouteWithChildren,
   CadastroRoute: CadastroRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,

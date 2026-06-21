@@ -500,6 +500,25 @@ export function InboxScreen() {
   const { user, activeMembership } = useCurrentUser();
   const orgId = activeMembership?.org_id ?? null;
 
+  // Nomes dos atendentes da empresa (user_id -> nome) para mostrar quem ENVIOU cada mensagem.
+  const memberNamesQuery = useQuery({
+    queryKey: ["org-member-names", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data, error } = await supabase
+        .from("org_members")
+        .select("user_id, profiles(full_name, email)")
+        .eq("org_id", orgId!);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const m of (data ?? []) as any[]) {
+        map[m.user_id] = m.profiles?.full_name || m.profiles?.email || "Atendente";
+      }
+      return map;
+    },
+  });
+  const memberNames = memberNamesQuery.data ?? {};
+
   // H.3b-1 — "Atender": atribui (ou libera) a conversa para o usuário atual.
   async function assignConversation(uid: string | null) {
     if (!selectedId) return;

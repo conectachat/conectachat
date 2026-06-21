@@ -1367,10 +1367,17 @@ export function InboxScreen() {
       >
         <div className="shrink-0 border-b border-border">
           <div className="flex h-14 items-center gap-2 px-3 md:px-4">
-            {/* Bloco O — Mobile (<768px): botão do menu lateral ao lado do título.
-                A partir de 768px o menu já é coluna fixa, então o botão some. */}
             <SidebarTrigger className="md:hidden" />
             <h2 className="text-base font-semibold text-foreground">Conversas</h2>
+            <button
+              type="button"
+              onClick={openNewConv}
+              title="Nova conversa"
+              aria-label="Nova conversa"
+              className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              <Plus size={18} />
+            </button>
           </div>
           <div className="px-3 pb-3">
             <div className="relative">

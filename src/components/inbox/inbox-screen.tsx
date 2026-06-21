@@ -1185,30 +1185,42 @@ export function InboxScreen() {
       .limit(1)
       .maybeSingle();
     if (!canal) return null;
-    let { data: conv } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("contact_id", contactId)
-      .eq("channel_id", canal.id)
-      .neq("status", "closed")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!conv) {
-      const { data: nova } = await supabase
+
+    // Procura uma conversa existente (não fechada) para este contato neste canal.
+    const buscarConversa = async (): Promise<string | null> => {
+      const { data } = await supabase
         .from("conversations")
-        .insert({
-          org_id: orgId,
-          contact_id: contactId,
-          channel_id: canal.id,
-          status: "open",
-          last_message_at: new Date().toISOString(),
-        })
         .select("id")
-        .single();
-      conv = nova ?? null;
+        .eq("contact_id", contactId)
+        .eq("channel_id", canal.id)
+        .neq("status", "closed")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data?.id ?? null;
+    };
+
+    const existente = await buscarConversa();
+    if (existente) return existente;
+
+    // Cria a conversa JÁ ATRIBUÍDA a mim: assim ela entra em "Minhas" e a regra
+    // de leitura (can_see_conversation) consegue enxergá-la. Não usamos .select()
+    // aqui de propósito — a leitura imediata pós-insert esbarra na política RLS,
+    // então lemos o id numa consulta separada logo abaixo.
+    const { error: insErr } = await supabase.from("conversations").insert({
+      org_id: orgId,
+      contact_id: contactId,
+      channel_id: canal.id,
+      status: "open",
+      assigned_user_id: user?.id ?? null,
+      last_message_at: new Date().toISOString(),
+    });
+    if (insErr) {
+      console.error("Erro ao criar conversa:", insErr.message);
+      return null;
     }
-    return conv?.id ?? null;
+
+    return await buscarConversa();
   }
 
   async function doForward(contact: { id: string; name: string | null; external_id: string }) {

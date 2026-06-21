@@ -728,6 +728,7 @@ export function InboxScreen() {
       status: "queued",
       sender_name: null,
       sender_external_id: null,
+      sender_user_id: user?.id ?? null,
       reactions: null,
       external_message_id: null,
       reply_to_external_id: reply?.id ?? null,

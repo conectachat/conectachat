@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, BellOff, Loader2 } from "lucide-react";
+import { Bell, BellOff, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +53,7 @@ export function NotificationsCard() {
   );
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export function NotificationsCard() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as any,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as ArrayBuffer,
       });
       const asJson = sub.toJSON();
       const { data, error } = await supabase.functions.invoke("push-subscribe", {
@@ -139,6 +140,28 @@ export function NotificationsCard() {
     }
   }
 
+  async function sendTest() {
+    setTesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("push-send", { body: { action: "test" } });
+      if (error || !data?.ok) {
+        toast.error("Não foi possível enviar o teste", { description: data?.error ?? error?.message });
+        return;
+      }
+      if ((data.sent ?? 0) > 0) {
+        toast.success("Teste enviado — a notificação deve aparecer em instantes.");
+      } else {
+        toast.message("Nenhum aparelho recebeu o teste", {
+          description: "Tente desativar e ativar novamente neste aparelho.",
+        });
+      }
+    } catch (e) {
+      toast.error("Não foi possível enviar o teste", { description: String((e as Error)?.message ?? e) });
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return (
     <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-start gap-3">
@@ -160,7 +183,11 @@ export function NotificationsCard() {
               <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600">
                 <Bell className="h-4 w-4" /> Ativadas neste aparelho
               </span>
-              <Button variant="outline" size="sm" onClick={disable} disabled={busy}>
+              <Button variant="outline" size="sm" onClick={sendTest} disabled={testing}>
+                {testing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
+                Enviar teste
+              </Button>
+              <Button variant="ghost" size="sm" onClick={disable} disabled={busy}>
                 {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <BellOff className="mr-1 h-4 w-4" />}
                 Desativar
               </Button>

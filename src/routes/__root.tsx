@@ -82,9 +82,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "ConectaChat — atendimento ao cliente" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "theme-color", content: "#0055A6" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-title", content: "ConectaChat" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "icon", type: "image/svg+xml", href: "/ConectaChat_icon.svg" },
       { rel: "icon", type: "image/png", sizes: "32x32", href: "/conectachat-favicon-32.png" },
       { rel: "apple-touch-icon", href: "/conectachat-180.png" },
@@ -127,6 +133,16 @@ function RootComponent() {
     });
     return () => data.subscription.unsubscribe();
   }, [router, queryClient]);
+
+  // Registra o service worker (necessário para instalar como app e, depois, receber push).
+  // Este SW NÃO faz cache, então não há risco de versão presa.
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        /* silencioso: se falhar, o app segue funcionando normalmente */
+      });
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

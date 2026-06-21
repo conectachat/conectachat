@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TAG_PALETTE, ColorPicker, type Tag as TagType } from "@/components/contacts/contact-tags";
 import { CompanyDetailsCard } from "@/components/settings/company-details-card";
+import { NotificationsCard } from "@/components/settings/notifications-card";
 
 type FieldType = "text" | "number" | "date";
 type CustomField = {
@@ -1304,6 +1305,8 @@ export function SettingsScreen() {
                   </Button>
                 </div>
               </section>
+
+              <NotificationsCard />
             </TabsContent>
 
             {/* Bloco E.0 — Empresa (só dono/admin) */}

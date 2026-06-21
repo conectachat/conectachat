@@ -2476,6 +2476,124 @@ export function InboxScreen() {
         </div>
       )}
 
+      {/* Nova conversa (iniciar atendimento) */}
+      {newConvOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !ncSaving && !newConvStarting && setNewConvOpen(false)}
+        >
+          <div
+            className="flex max-h-[80vh] w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">{newConvAdding ? "Novo contato" : "Nova conversa"}</h3>
+              <button
+                onClick={() => !ncSaving && !newConvStarting && setNewConvOpen(false)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {!newConvAdding ? (
+              <>
+                <div className="border-b border-gray-100 p-3">
+                  <input
+                    value={newConvSearch}
+                    onChange={(e) => setNewConvSearch(e.target.value)}
+                    placeholder="Buscar contato por nome ou telefone…"
+                    autoFocus
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-brand-blue focus:outline-none lg:text-sm"
+                  />
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                  {newConvResults.length === 0 ? (
+                    <p className="px-2 py-4 text-center text-sm text-gray-400">Nenhum contato encontrado.</p>
+                  ) : (
+                    newConvResults.map((c) => (
+                      <button
+                        key={c.id}
+                        disabled={newConvStarting}
+                        onClick={() => startConversationWithContact(c.id)}
+                        className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          {initials(c.name || c.external_id)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
+                          {c.name?.trim() || formatPhone(c.external_id) || c.external_id}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="border-t border-gray-100 p-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewConvAdding(true);
+                      setNcName("");
+                      setNcPhone(newConvSearch.replace(/\D/g, ""));
+                      setNcError(null);
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    <Plus size={16} /> Adicionar novo contato
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Nome</label>
+                    <input
+                      value={ncName}
+                      onChange={(e) => setNcName(e.target.value)}
+                      className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-base focus:border-primary focus:outline-none lg:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">
+                      Telefone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      value={ncPhone}
+                      onChange={(e) => setNcPhone(e.target.value)}
+                      placeholder="55 47 99999 8888"
+                      inputMode="tel"
+                      className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-base focus:border-primary focus:outline-none lg:text-sm"
+                    />
+                    <p className="mt-1 text-[11px] text-gray-500">Inclua o código do país (ex.: 5547999998888).</p>
+                  </div>
+                  {ncError && <p className="text-xs text-red-600">{ncError}</p>}
+                </div>
+                <div className="flex justify-between gap-2 border-t border-gray-100 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setNewConvAdding(false)}
+                    disabled={ncSaving}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={createContactAndStart}
+                    disabled={ncSaving}
+                    className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {ncSaving ? "Salvando…" : "Criar e abrir conversa"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Bloco N — Modal de transferência */}
       {transferOpen && (
         <div

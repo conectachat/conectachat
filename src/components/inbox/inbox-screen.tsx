@@ -1264,6 +1264,96 @@ export function InboxScreen() {
     }
   }
 
+  // Busca de contatos para a janela "Nova conversa" (debounce).
+  useEffect(() => {
+    if (!newConvOpen || !orgId) return;
+    let active = true;
+    const t = setTimeout(async () => {
+      let q = supabase
+        .from("contacts")
+        .select("id, name, external_id")
+        .eq("is_group", false)
+        .order("name", { ascending: true })
+        .limit(20);
+      const term = newConvSearch.trim();
+      if (term) q = q.or(`name.ilike.%${term}%,external_id.ilike.%${term}%`);
+      const { data } = await q;
+      if (active) setNewConvResults((data ?? []) as { id: string; name: string | null; external_id: string }[]);
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [newConvSearch, newConvOpen, orgId]);
+
+  function openNewConv() {
+    setNewConvSearch("");
+    setNewConvResults([]);
+    setNewConvAdding(false);
+    setNcName("");
+    setNcPhone("");
+    setNcError(null);
+    setNewConvOpen(true);
+  }
+
+  // Abre (ou cria) a conversa do contato e seleciona na tela.
+  async function startConversationWithContact(contactId: string) {
+    setNewConvStarting(true);
+    try {
+      const convId = await resolveConversation(contactId);
+      if (!convId) {
+        toast.error("Nenhum canal WhatsApp conectado.");
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      setSelectedId(convId);
+      setNewConvOpen(false);
+      setNewConvSearch("");
+      setNewConvAdding(false);
+    } finally {
+      setNewConvStarting(false);
+    }
+  }
+
+  // Cria o contato (mesmo padrão da tela de Contatos) e já abre a conversa.
+  async function createContactAndStart() {
+    setNcError(null);
+    const telefone = ncPhone.replace(/\D/g, "");
+    if (telefone.length < 10) {
+      setNcError("Número inválido. Use o código do país (ex.: 5547999998888).");
+      return;
+    }
+    if (!orgId) {
+      setNcError("Sem empresa vinculada.");
+      return;
+    }
+    setNcSaving(true);
+    const nome = ncName.trim();
+    const { data, error } = await supabase
+      .from("contacts")
+      .upsert(
+        {
+          org_id: orgId,
+          channel_type: "whatsapp_baileys",
+          external_id: telefone,
+          name: nome || null,
+          name_locked: nome.length > 0,
+        },
+        { onConflict: "org_id,channel_type,external_id" },
+      )
+      .select("id")
+      .single();
+    setNcSaving(false);
+    if (error || !data) {
+      setNcError("Não foi possível salvar o contato.");
+      return;
+    }
+    setNcName("");
+    setNcPhone("");
+    setNewConvAdding(false);
+    await startConversationWithContact(data.id);
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}

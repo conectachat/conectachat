@@ -1892,14 +1892,67 @@ export function InboxScreen() {
               )}
               {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
               <div className="flex items-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={sendingMedia}
-                  className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                {/* CELULAR (< lg): botão "+" com Emoji + Anexar */}
+                <Popover
+                  open={plusOpen}
+                  onOpenChange={(o) => {
+                    setPlusOpen(o);
+                    if (!o) setPlusShowEmoji(false);
+                  }}
                 >
-                  <Paperclip size={18} />
-                </button>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={sendingMedia}
+                      title="Mais"
+                      className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 lg:hidden"
+                    >
+                      <Plus size={20} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="top" align="start" className="w-auto p-2">
+                    {plusShowEmoji ? (
+                      <EmojiPicker
+                        onEmojiClick={(emojiData: EmojiClickData) => {
+                          const textarea = textareaRef.current;
+                          const start = textarea ? textarea.selectionStart : draft.length;
+                          const end = textarea ? textarea.selectionEnd : draft.length;
+                          const newValue = draft.slice(0, start) + emojiData.emoji + draft.slice(end);
+                          setDraft(newValue);
+                          setPendingCursor(start + emojiData.emoji.length);
+                          setPlusOpen(false);
+                          setPlusShowEmoji(false);
+                        }}
+                        height={350}
+                        width={300}
+                        lazyLoadEmojis
+                        previewConfig={{ showPreview: false }}
+                      />
+                    ) : (
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => setPlusShowEmoji(true)}
+                          className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Smile size={16} /> Emoji
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPlusOpen(false);
+                            fileInputRef.current?.click();
+                          }}
+                          className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Paperclip size={16} /> Anexar
+                        </button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+
+                {/* input de arquivo escondido (compartilhado por "+" do celular e clipe do desktop) */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1907,17 +1960,29 @@ export function InboxScreen() {
                   className="hidden"
                   onChange={handleFileSelected}
                 />
+
+                {/* DESKTOP (>= lg): clipe */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sendingMedia}
+                  className="mb-0.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 lg:flex"
+                >
+                  <Paperclip size={18} />
+                </button>
+
+                {/* DESKTOP (>= lg): microfone OU controles de gravação */}
                 {!recording ? (
                   <button
                     type="button"
                     onClick={startRecording}
                     disabled={sendingAudio}
-                    className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    className="mb-0.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 lg:flex"
                   >
                     <Mic size={18} />
                   </button>
                 ) : (
-                  <div className="mb-0.5 flex shrink-0 items-center gap-2">
+                  <div className="mb-0.5 hidden shrink-0 items-center gap-2 lg:flex">
                     <span className="flex items-center gap-1.5 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-600">
                       <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-600" />
                       Gravando…
@@ -1938,11 +2003,13 @@ export function InboxScreen() {
                     </button>
                   </div>
                 )}
+
+                {/* DESKTOP (>= lg): emoji */}
                 <Popover open={openEmoji} onOpenChange={setOpenEmoji}>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                      className="mb-0.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 lg:flex"
                     >
                       <Smile size={18} />
                     </button>
@@ -1963,6 +2030,8 @@ export function InboxScreen() {
                     />
                   </PopoverContent>
                 </Popover>
+
+                {/* Campo de texto (compartilhado celular + desktop) */}
                 <textarea
                   ref={textareaRef}
                   value={draft}
@@ -1998,12 +2067,60 @@ export function InboxScreen() {
                   }}
                   rows={1}
                   placeholder="Escreva uma mensagem ou digite / para respostas rápidas…"
-                  className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring lg:text-sm"
                 />
+
+                {/* CELULAR (< lg): gravação / aviãozinho (com texto) / microfone (sem texto) */}
+                {recording ? (
+                  <div className="mb-0.5 flex shrink-0 items-center gap-2 lg:hidden">
+                    <button
+                      type="button"
+                      onClick={stopAndSend}
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-green-600 text-white hover:bg-green-700"
+                      title="Enviar áudio"
+                      aria-label="Enviar áudio"
+                    >
+                      <Square size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelRecording}
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50"
+                      title="Cancelar"
+                      aria-label="Cancelar gravação"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                ) : draft.trim() ? (
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={sending}
+                    title="Enviar"
+                    aria-label="Enviar"
+                    className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 lg:hidden"
+                  >
+                    <Send size={18} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    disabled={sendingAudio}
+                    title="Gravar áudio"
+                    aria-label="Gravar áudio"
+                    className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 lg:hidden"
+                  >
+                    <Mic size={18} />
+                  </button>
+                )}
+
+                {/* DESKTOP (>= lg): botão Enviar (texto) */}
                 <button
                   onClick={handleSend}
                   disabled={!draft.trim() || sending}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  className="hidden rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 lg:block"
                 >
                   {sending ? "Enviando…" : "Enviar"}
                 </button>

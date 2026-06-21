@@ -926,6 +926,9 @@ export function InboxScreen() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [openEmoji, setOpenEmoji] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [plusShowEmoji, setPlusShowEmoji] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [pendingCursor, setPendingCursor] = useState<number | null>(null);
 
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);

@@ -1142,6 +1142,17 @@ export function InboxScreen() {
   const [fwdResults, setFwdResults] = useState<{ id: string; name: string | null; external_id: string }[]>([]);
   const [forwarding, setForwarding] = useState(false);
 
+  // Nova conversa (iniciar atendimento a partir de um contato).
+  const [newConvOpen, setNewConvOpen] = useState(false);
+  const [newConvSearch, setNewConvSearch] = useState("");
+  const [newConvResults, setNewConvResults] = useState<{ id: string; name: string | null; external_id: string }[]>([]);
+  const [newConvStarting, setNewConvStarting] = useState(false);
+  const [newConvAdding, setNewConvAdding] = useState(false);
+  const [ncName, setNcName] = useState("");
+  const [ncPhone, setNcPhone] = useState("");
+  const [ncError, setNcError] = useState<string | null>(null);
+  const [ncSaving, setNcSaving] = useState(false);
+
   useEffect(() => {
     if (!forwardMsg || !orgId) return;
     let active = true;

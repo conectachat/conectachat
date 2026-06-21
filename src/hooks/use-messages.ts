@@ -10,6 +10,7 @@ export type Message = {
   media_name: string | null;
   media_size: number | null;
   status: string;
+  sender_user_id: string | null;
   sender_name: string | null;
   sender_external_id: string | null;
   reactions: Record<string, string> | null;
@@ -30,7 +31,7 @@ export function useMessages(conversationId: string | null) {
       const { data, error } = await supabase
         .from("messages")
         .select(
-          "id, direction, content_type, content, media_url, media_name, media_size, status, sender_name, sender_external_id, reactions, external_message_id, reply_to_external_id, reply_to_preview, deleted_at, pinned_at, starred_at, created_at",
+          "id, direction, content_type, content, media_url, media_name, media_size, status, sender_user_id, sender_name, sender_external_id, reactions, external_message_id, reply_to_external_id, reply_to_preview, deleted_at, pinned_at, starred_at, created_at",
         )
         .eq("conversation_id", conversationId!)
         .order("created_at", { ascending: true });

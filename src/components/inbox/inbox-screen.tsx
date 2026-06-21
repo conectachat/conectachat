@@ -43,6 +43,8 @@ import {
   ArrowRightLeft,
   Users,
   Building2,
+  Send,
+  MoreVertical,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";

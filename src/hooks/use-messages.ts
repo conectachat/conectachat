@@ -10,6 +10,7 @@ export type Message = {
   media_name: string | null;
   media_size: number | null;
   status: string;
+  sender_user_id: string | null;
   sender_name: string | null;
   sender_external_id: string | null;
   reactions: Record<string, string> | null;

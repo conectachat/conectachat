@@ -1770,6 +1770,11 @@ export function InboxScreen() {
                           {!m.deleted_at && !out && selected.contact?.is_group && m.sender_name && (
                             <p className="mb-0.5 text-[11px] font-semibold text-brand-blue">{m.sender_name}</p>
                           )}
+                          {!m.deleted_at && out && m.sender_user_id && memberNames[m.sender_user_id] && (
+                            <p className="mb-0.5 text-[11px] font-semibold text-primary-foreground/90">
+                              {memberNames[m.sender_user_id]}
+                            </p>
+                          )}
                           {m.deleted_at ? (
                             <p className={`italic ${out ? "text-primary-foreground/70" : "text-gray-400"}`}>
                               🚫 Mensagem apagada

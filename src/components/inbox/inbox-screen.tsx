@@ -1142,6 +1142,17 @@ export function InboxScreen() {
   const [fwdResults, setFwdResults] = useState<{ id: string; name: string | null; external_id: string }[]>([]);
   const [forwarding, setForwarding] = useState(false);
 
+  // Nova conversa (iniciar atendimento a partir de um contato).
+  const [newConvOpen, setNewConvOpen] = useState(false);
+  const [newConvSearch, setNewConvSearch] = useState("");
+  const [newConvResults, setNewConvResults] = useState<{ id: string; name: string | null; external_id: string }[]>([]);
+  const [newConvStarting, setNewConvStarting] = useState(false);
+  const [newConvAdding, setNewConvAdding] = useState(false);
+  const [ncName, setNcName] = useState("");
+  const [ncPhone, setNcPhone] = useState("");
+  const [ncError, setNcError] = useState<string | null>(null);
+  const [ncSaving, setNcSaving] = useState(false);
+
   useEffect(() => {
     if (!forwardMsg || !orgId) return;
     let active = true;
@@ -1253,6 +1264,96 @@ export function InboxScreen() {
     }
   }
 
+  // Busca de contatos para a janela "Nova conversa" (debounce).
+  useEffect(() => {
+    if (!newConvOpen || !orgId) return;
+    let active = true;
+    const t = setTimeout(async () => {
+      let q = supabase
+        .from("contacts")
+        .select("id, name, external_id")
+        .eq("is_group", false)
+        .order("name", { ascending: true })
+        .limit(20);
+      const term = newConvSearch.trim();
+      if (term) q = q.or(`name.ilike.%${term}%,external_id.ilike.%${term}%`);
+      const { data } = await q;
+      if (active) setNewConvResults((data ?? []) as { id: string; name: string | null; external_id: string }[]);
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [newConvSearch, newConvOpen, orgId]);
+
+  function openNewConv() {
+    setNewConvSearch("");
+    setNewConvResults([]);
+    setNewConvAdding(false);
+    setNcName("");
+    setNcPhone("");
+    setNcError(null);
+    setNewConvOpen(true);
+  }
+
+  // Abre (ou cria) a conversa do contato e seleciona na tela.
+  async function startConversationWithContact(contactId: string) {
+    setNewConvStarting(true);
+    try {
+      const convId = await resolveConversation(contactId);
+      if (!convId) {
+        toast.error("Nenhum canal WhatsApp conectado.");
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      setSelectedId(convId);
+      setNewConvOpen(false);
+      setNewConvSearch("");
+      setNewConvAdding(false);
+    } finally {
+      setNewConvStarting(false);
+    }
+  }
+
+  // Cria o contato (mesmo padrão da tela de Contatos) e já abre a conversa.
+  async function createContactAndStart() {
+    setNcError(null);
+    const telefone = ncPhone.replace(/\D/g, "");
+    if (telefone.length < 10) {
+      setNcError("Número inválido. Use o código do país (ex.: 5547999998888).");
+      return;
+    }
+    if (!orgId) {
+      setNcError("Sem empresa vinculada.");
+      return;
+    }
+    setNcSaving(true);
+    const nome = ncName.trim();
+    const { data, error } = await supabase
+      .from("contacts")
+      .upsert(
+        {
+          org_id: orgId,
+          channel_type: "whatsapp_baileys",
+          external_id: telefone,
+          name: nome || null,
+          name_locked: nome.length > 0,
+        },
+        { onConflict: "org_id,channel_type,external_id" },
+      )
+      .select("id")
+      .single();
+    setNcSaving(false);
+    if (error || !data) {
+      setNcError("Não foi possível salvar o contato.");
+      return;
+    }
+    setNcName("");
+    setNcPhone("");
+    setNewConvAdding(false);
+    await startConversationWithContact(data.id);
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Lista de conversas */}
@@ -1266,10 +1367,17 @@ export function InboxScreen() {
       >
         <div className="shrink-0 border-b border-border">
           <div className="flex h-14 items-center gap-2 px-3 md:px-4">
-            {/* Bloco O — Mobile (<768px): botão do menu lateral ao lado do título.
-                A partir de 768px o menu já é coluna fixa, então o botão some. */}
             <SidebarTrigger className="md:hidden" />
             <h2 className="text-base font-semibold text-foreground">Conversas</h2>
+            <button
+              type="button"
+              onClick={openNewConv}
+              title="Nova conversa"
+              aria-label="Nova conversa"
+              className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              <Plus size={18} />
+            </button>
           </div>
           <div className="px-3 pb-3">
             <div className="relative">
@@ -2363,6 +2471,124 @@ export function InboxScreen() {
             </div>
             {forwarding && (
               <div className="border-t border-gray-100 px-4 py-2 text-center text-xs text-gray-500">Encaminhando…</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Nova conversa (iniciar atendimento) */}
+      {newConvOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !ncSaving && !newConvStarting && setNewConvOpen(false)}
+        >
+          <div
+            className="flex max-h-[80vh] w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">{newConvAdding ? "Novo contato" : "Nova conversa"}</h3>
+              <button
+                onClick={() => !ncSaving && !newConvStarting && setNewConvOpen(false)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {!newConvAdding ? (
+              <>
+                <div className="border-b border-gray-100 p-3">
+                  <input
+                    value={newConvSearch}
+                    onChange={(e) => setNewConvSearch(e.target.value)}
+                    placeholder="Buscar contato por nome ou telefone…"
+                    autoFocus
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-brand-blue focus:outline-none lg:text-sm"
+                  />
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                  {newConvResults.length === 0 ? (
+                    <p className="px-2 py-4 text-center text-sm text-gray-400">Nenhum contato encontrado.</p>
+                  ) : (
+                    newConvResults.map((c) => (
+                      <button
+                        key={c.id}
+                        disabled={newConvStarting}
+                        onClick={() => startConversationWithContact(c.id)}
+                        className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          {initials(c.name || c.external_id)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
+                          {c.name?.trim() || formatPhone(c.external_id) || c.external_id}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="border-t border-gray-100 p-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewConvAdding(true);
+                      setNcName("");
+                      setNcPhone(newConvSearch.replace(/\D/g, ""));
+                      setNcError(null);
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    <Plus size={16} /> Adicionar novo contato
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Nome</label>
+                    <input
+                      value={ncName}
+                      onChange={(e) => setNcName(e.target.value)}
+                      className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-base focus:border-primary focus:outline-none lg:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">
+                      Telefone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      value={ncPhone}
+                      onChange={(e) => setNcPhone(e.target.value)}
+                      placeholder="55 47 99999 8888"
+                      inputMode="tel"
+                      className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-base focus:border-primary focus:outline-none lg:text-sm"
+                    />
+                    <p className="mt-1 text-[11px] text-gray-500">Inclua o código do país (ex.: 5547999998888).</p>
+                  </div>
+                  {ncError && <p className="text-xs text-red-600">{ncError}</p>}
+                </div>
+                <div className="flex justify-between gap-2 border-t border-gray-100 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setNewConvAdding(false)}
+                    disabled={ncSaving}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={createContactAndStart}
+                    disabled={ncSaving}
+                    className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {ncSaving ? "Salvando…" : "Criar e abrir conversa"}
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

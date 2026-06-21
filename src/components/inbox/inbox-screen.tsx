@@ -1501,6 +1501,7 @@ export function InboxScreen() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <div className="hidden items-center gap-2 lg:flex">
                 <button
                   onClick={() => setShowStarredOnly((v) => !v)}
                   title={showStarredOnly ? "Mostrar todas" : "Mostrar só favoritas"}
@@ -1552,6 +1553,92 @@ export function InboxScreen() {
                     <Check size={16} /> <span className="hidden lg:inline">Atender</span>
                   </button>
                 )}
+                </div>
+                <div className="lg:hidden">
+                  <Popover open={headerMenuOpen} onOpenChange={setHeaderMenuOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        title="Mais opções"
+                        aria-label="Mais opções"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-60 p-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowStarredOnly((v) => !v);
+                          setHeaderMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Star size={15} className={showStarredOnly ? "fill-amber-400 text-amber-400" : ""} />
+                        {showStarredOnly ? "Mostrar todas" : "Só favoritas"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!selectedId) return;
+                          await supabase.from("conversations").update({ unread_count: 1 }).eq("id", selectedId);
+                          setSelectedId(null);
+                          setHeaderMenuOpen(false);
+                          queryClient.invalidateQueries({ queryKey: ["conversations"] });
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Mail size={15} /> Marcar como não lida
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          openTransfer();
+                          setHeaderMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <ArrowRightLeft size={15} /> Transferir
+                      </button>
+                      <div className="my-1 border-t border-gray-100" />
+                      {selected.assigned_user_id && selected.assigned_user_id === user?.id ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            assignConversation(null);
+                            setHeaderMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm font-medium text-brand-green hover:bg-brand-green/10"
+                        >
+                          <Check size={15} /> Você está atendendo (liberar)
+                        </button>
+                      ) : selected.assigned_user_id ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            assignConversation(user?.id ?? null);
+                            setHeaderMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
+                        >
+                          <Check size={15} /> Assumir atendimento
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            assignConversation(user?.id ?? null);
+                            setHeaderMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm font-medium text-brand-green hover:bg-brand-green/10"
+                        >
+                          <Check size={15} /> Atender
+                        </button>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </header>
 

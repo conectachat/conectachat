@@ -106,7 +106,7 @@ export function useCreateFlow() {
           org_id: orgId,
           name,
           is_active: false,
-          definition: startingDefinition(),
+          definition: startingDefinition() as any,
         })
         .select("id")
         .single();

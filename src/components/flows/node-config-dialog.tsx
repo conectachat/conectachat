@@ -516,46 +516,79 @@ export function NodeConfigDialog({
       case "tag_add":
         return (
           <div className="space-y-2">
-            <Label htmlFor="cfg-tagadd">Nome da tag a adicionar</Label>
-            <Input
-              id="cfg-tagadd"
-              value={config.tag ?? ""}
-              onChange={(e) => set("tag", e.target.value)}
-              placeholder="ex.: lead-quente"
-            />
-            <p className="text-xs text-muted-foreground">
-              Em breve será possível escolher de uma lista das suas tags.
-            </p>
+            <Label>Tag a adicionar</Label>
+            <Select
+              value={config.tagId ?? ""}
+              onValueChange={(v) => set("tagId", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma tag..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(tags.data ?? []).map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(tags.data?.length ?? 0) === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhuma tag cadastrada ainda.
+              </p>
+            ) : null}
           </div>
         );
       case "tag_remove":
         return (
           <div className="space-y-2">
-            <Label htmlFor="cfg-tagrem">Nome da tag a remover</Label>
-            <Input
-              id="cfg-tagrem"
-              value={config.tag ?? ""}
-              onChange={(e) => set("tag", e.target.value)}
-              placeholder="ex.: lead-quente"
-            />
-            <p className="text-xs text-muted-foreground">
-              Em breve será possível escolher de uma lista das suas tags.
-            </p>
+            <Label>Tag a remover</Label>
+            <Select
+              value={config.tagId ?? ""}
+              onValueChange={(v) => set("tagId", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma tag..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(tags.data ?? []).map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(tags.data?.length ?? 0) === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhuma tag cadastrada ainda.
+              </p>
+            ) : null}
           </div>
         );
       case "queue":
         return (
           <div className="space-y-2">
-            <Label htmlFor="cfg-queue">Departamento / Fila de destino</Label>
-            <Input
-              id="cfg-queue"
-              value={config.department ?? ""}
-              onChange={(e) => set("department", e.target.value)}
-              placeholder="ex.: Comercial"
-            />
-            <p className="text-xs text-muted-foreground">
-              Em breve será possível escolher de uma lista dos seus departamentos.
-            </p>
+            <Label>Departamento / Fila de destino</Label>
+            <Select
+              value={config.departmentId ?? ""}
+              onValueChange={(v) => set("departmentId", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um departamento..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(departments.data ?? []).map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(departments.data?.length ?? 0) === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhum departamento cadastrado ainda.
+              </p>
+            ) : null}
           </div>
         );
       case "attendant":
@@ -578,33 +611,55 @@ export function NodeConfigDialog({
             </div>
             {config.target === "specific" ? (
               <div className="space-y-2">
-                <Label htmlFor="cfg-attendant">Identificador do atendente</Label>
-                <Input
-                  id="cfg-attendant"
-                  value={config.attendant ?? ""}
-                  onChange={(e) => set("attendant", e.target.value)}
-                  placeholder="ex.: e-mail ou nome do atendente"
-                />
+                <Label>Atendente</Label>
+                <Select
+                  value={config.agentId ?? ""}
+                  onValueChange={(v) => set("agentId", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um atendente..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(agents.data ?? []).map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(agents.data?.length ?? 0) === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Nenhum atendente encontrado.
+                  </p>
+                ) : null}
               </div>
             ) : null}
-            <p className="text-xs text-muted-foreground">
-              Em breve será possível escolher de uma lista dos seus atendentes.
-            </p>
           </div>
         );
       case "switch_flow":
         return (
           <div className="space-y-2">
-            <Label htmlFor="cfg-switchflow">Fluxo de destino</Label>
-            <Input
-              id="cfg-switchflow"
-              value={config.targetFlow ?? ""}
-              onChange={(e) => set("targetFlow", e.target.value)}
-              placeholder="ex.: Pós-venda"
-            />
-            <p className="text-xs text-muted-foreground">
-              Em breve será possível escolher de uma lista dos seus fluxos.
-            </p>
+            <Label>Fluxo de destino</Label>
+            <Select
+              value={config.targetFlowId ?? ""}
+              onValueChange={(v) => set("targetFlowId", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um fluxo..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(otherFlows.data ?? []).map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(otherFlows.data?.length ?? 0) === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhum outro fluxo disponível.
+              </p>
+            ) : null}
           </div>
         );
       case "end":

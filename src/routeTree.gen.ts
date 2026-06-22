@@ -24,6 +24,7 @@ import { Route as MasterCompaniesRouteImport } from './routes/master/companies'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSchedulesRouteImport } from './routes/_authenticated/schedules'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedFlowsRouteImport } from './routes/_authenticated/flows'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
@@ -102,6 +103,11 @@ const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFlowsRoute = AuthenticatedFlowsRouteImport.update({
+  id: '/flows',
+  path: '/flows',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedCrmRoute = AuthenticatedCrmRouteImport.update({
   id: '/crm',
   path: '/crm',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/crm': typeof AuthenticatedCrmRoute
+  '/flows': typeof AuthenticatedFlowsRoute
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/crm': typeof AuthenticatedCrmRoute
+  '/flows': typeof AuthenticatedFlowsRoute
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/_authenticated/connections': typeof AuthenticatedConnectionsRoute
   '/_authenticated/contacts': typeof AuthenticatedContactsRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
+  '/_authenticated/flows': typeof AuthenticatedFlowsRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/schedules': typeof AuthenticatedSchedulesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/contacts'
     | '/crm'
+    | '/flows'
     | '/inbox'
     | '/schedules'
     | '/settings'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/contacts'
     | '/crm'
+    | '/flows'
     | '/inbox'
     | '/schedules'
     | '/settings'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/_authenticated/connections'
     | '/_authenticated/contacts'
     | '/_authenticated/crm'
+    | '/_authenticated/flows'
     | '/_authenticated/inbox'
     | '/_authenticated/schedules'
     | '/_authenticated/settings'
@@ -354,6 +366,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/flows': {
+      id: '/_authenticated/flows'
+      path: '/flows'
+      fullPath: '/flows'
+      preLoaderRoute: typeof AuthenticatedFlowsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/crm': {
       id: '/_authenticated/crm'
       path: '/crm'
@@ -382,6 +401,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedConnectionsRoute: typeof AuthenticatedConnectionsRoute
   AuthenticatedContactsRoute: typeof AuthenticatedContactsRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
+  AuthenticatedFlowsRoute: typeof AuthenticatedFlowsRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedSchedulesRoute: typeof AuthenticatedSchedulesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -391,6 +411,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConnectionsRoute: AuthenticatedConnectionsRoute,
   AuthenticatedContactsRoute: AuthenticatedContactsRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
+  AuthenticatedFlowsRoute: AuthenticatedFlowsRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedSchedulesRoute: AuthenticatedSchedulesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

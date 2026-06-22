@@ -1,20 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { FlowsScreen } from "@/components/flows/flows-screen";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/flows")({
-  head: () => ({
-    meta: [
-      { title: "Fluxos — ConectaChat" },
-      { name: "description", content: "Construtor de fluxos de chatbot." },
-    ],
-  }),
-  component: FlowsPage,
+  component: FlowsLayout,
 });
 
-function FlowsPage() {
-  return (
-    <div className="h-full">
-      <FlowsScreen />
-    </div>
-  );
+function FlowsLayout() {
+  return <Outlet />;
 }

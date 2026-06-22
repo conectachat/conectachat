@@ -358,6 +358,147 @@ export function NodeConfigDialog({
             </div>
           </div>
         );
+      case "condition":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-cond-var">Variável a verificar</Label>
+              <Input
+                id="cfg-cond-var"
+                value={config.variable ?? ""}
+                onChange={(e) => set("variable", e.target.value)}
+                placeholder="ex.: email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Operador</Label>
+              <Select
+                value={config.operator ?? ""}
+                onValueChange={(v) => set("operator", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="equals">É igual a</SelectItem>
+                  <SelectItem value="not_equals">É diferente de</SelectItem>
+                  <SelectItem value="contains">Contém</SelectItem>
+                  <SelectItem value="greater">Maior que</SelectItem>
+                  <SelectItem value="less">Menor que</SelectItem>
+                  <SelectItem value="empty">Está vazio</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-cond-val">Valor de comparação</Label>
+              <Input
+                id="cfg-cond-val"
+                value={config.value ?? ""}
+                onChange={(e) => set("value", e.target.value)}
+                placeholder="ex.: sim"
+                disabled={config.operator === "empty"}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              As saídas Verdadeiro/Falso poderão seguir caminhos diferentes do fluxo (configuração das conexões em breve).
+            </p>
+          </div>
+        );
+      case "schedule":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="cfg-sched-start">Início do expediente</Label>
+                <Input
+                  id="cfg-sched-start"
+                  type="time"
+                  value={config.startTime ?? ""}
+                  onChange={(e) => set("startTime", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cfg-sched-end">Fim do expediente</Label>
+                <Input
+                  id="cfg-sched-end"
+                  type="time"
+                  value={config.endTime ?? ""}
+                  onChange={(e) => set("endTime", e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-sched-days">Dias de atendimento</Label>
+              <Input
+                id="cfg-sched-days"
+                value={config.days ?? ""}
+                onChange={(e) => set("days", e.target.value)}
+                placeholder="ex.: seg, ter, qua, qui, sex"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Fora do horário/dias definidos, o fluxo poderá seguir um caminho diferente (configuração das conexões em breve).
+            </p>
+          </div>
+        );
+      case "delay":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-delay-amount">Duração</Label>
+              <Input
+                id="cfg-delay-amount"
+                type="number"
+                min={0}
+                value={config.amount ?? ""}
+                onChange={(e) => set("amount", e.target.value)}
+                placeholder="ex.: 5"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Unidade</Label>
+              <Select
+                value={config.unit ?? ""}
+                onValueChange={(v) => set("unit", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="seconds">Segundos</SelectItem>
+                  <SelectItem value="minutes">Minutos</SelectItem>
+                  <SelectItem value="hours">Horas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+      case "variable":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-var-name">Nome da variável</Label>
+              <Input
+                id="cfg-var-name"
+                value={config.name ?? ""}
+                onChange={(e) => set("name", e.target.value)}
+                placeholder="ex.: status"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-var-value">Valor</Label>
+              <Input
+                id="cfg-var-value"
+                value={config.value ?? ""}
+                onChange={(e) => set("value", e.target.value)}
+                placeholder="ex.: lead_qualificado"
+              />
+              <p className="text-xs text-muted-foreground">
+                Você pode usar outras variáveis, como {"{nome}"}.
+              </p>
+            </div>
+          </div>
+        );
       default:
         return (
           <p className="text-sm text-muted-foreground">

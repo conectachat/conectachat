@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -496,6 +497,128 @@ export function NodeConfigDialog({
               <p className="text-xs text-muted-foreground">
                 Você pode usar outras variáveis, como {"{nome}"}.
               </p>
+            </div>
+          </div>
+        );
+      case "tag_add":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="cfg-tagadd">Nome da tag a adicionar</Label>
+            <Input
+              id="cfg-tagadd"
+              value={config.tag ?? ""}
+              onChange={(e) => set("tag", e.target.value)}
+              placeholder="ex.: lead-quente"
+            />
+            <p className="text-xs text-muted-foreground">
+              Em breve será possível escolher de uma lista das suas tags.
+            </p>
+          </div>
+        );
+      case "tag_remove":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="cfg-tagrem">Nome da tag a remover</Label>
+            <Input
+              id="cfg-tagrem"
+              value={config.tag ?? ""}
+              onChange={(e) => set("tag", e.target.value)}
+              placeholder="ex.: lead-quente"
+            />
+            <p className="text-xs text-muted-foreground">
+              Em breve será possível escolher de uma lista das suas tags.
+            </p>
+          </div>
+        );
+      case "queue":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="cfg-queue">Departamento / Fila de destino</Label>
+            <Input
+              id="cfg-queue"
+              value={config.department ?? ""}
+              onChange={(e) => set("department", e.target.value)}
+              placeholder="ex.: Comercial"
+            />
+            <p className="text-xs text-muted-foreground">
+              Em breve será possível escolher de uma lista dos seus departamentos.
+            </p>
+          </div>
+        );
+      case "attendant":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Transferir para</Label>
+              <Select
+                value={config.target ?? ""}
+                onValueChange={(v) => set("target", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Qualquer atendente disponível</SelectItem>
+                  <SelectItem value="specific">Atendente específico</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {config.target === "specific" ? (
+              <div className="space-y-2">
+                <Label htmlFor="cfg-attendant">Identificador do atendente</Label>
+                <Input
+                  id="cfg-attendant"
+                  value={config.attendant ?? ""}
+                  onChange={(e) => set("attendant", e.target.value)}
+                  placeholder="ex.: e-mail ou nome do atendente"
+                />
+              </div>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              Em breve será possível escolher de uma lista dos seus atendentes.
+            </p>
+          </div>
+        );
+      case "switch_flow":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="cfg-switchflow">Fluxo de destino</Label>
+            <Input
+              id="cfg-switchflow"
+              value={config.targetFlow ?? ""}
+              onChange={(e) => set("targetFlow", e.target.value)}
+              placeholder="ex.: Pós-venda"
+            />
+            <p className="text-xs text-muted-foreground">
+              Em breve será possível escolher de uma lista dos seus fluxos.
+            </p>
+          </div>
+        );
+      case "end":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-end-msg">Mensagem de despedida (opcional)</Label>
+              <Textarea
+                id="cfg-end-msg"
+                value={config.farewell ?? ""}
+                onChange={(e) => set("farewell", e.target.value)}
+                rows={3}
+                placeholder="ex.: Obrigado pelo contato! Até logo."
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="cfg-end-resolve">Marcar conversa como resolvida</Label>
+                <p className="text-xs text-muted-foreground">
+                  Encerra e marca a conversa como finalizada.
+                </p>
+              </div>
+              <Switch
+                id="cfg-end-resolve"
+                checked={!!config.markResolved}
+                onCheckedChange={(v) => set("markResolved", v)}
+              />
             </div>
           </div>
         );

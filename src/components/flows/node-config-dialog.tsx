@@ -46,6 +46,7 @@ type NodeConfigDialogProps = {
   canDelete: boolean;
   onSave: (nodeId: string, config: Record<string, any>) => void;
   onDelete: (nodeId: string) => void;
+  currentFlowId?: string | null;
 };
 
 export function NodeConfigDialog({
@@ -57,8 +58,14 @@ export function NodeConfigDialog({
   canDelete,
   onSave,
   onDelete,
+  currentFlowId,
 }: NodeConfigDialogProps) {
   const [config, setConfig] = useState<Record<string, any>>({});
+
+  const tags = useOrgTags();
+  const departments = useOrgDepartments();
+  const agents = useOrgAgents();
+  const otherFlows = useOtherFlows(currentFlowId ?? null);
 
   useEffect(() => {
     if (open) {

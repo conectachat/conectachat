@@ -251,6 +251,11 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
             onDrop={onDrop}
             onDragOver={onDragOver}
             nodeTypes={nodeTypes}
+            defaultEdgeOptions={{
+              type: "smoothstep",
+              markerEnd: { type: MarkerType.ArrowClosed, color: "#8FC549" },
+              style: { stroke: "#8FC549", strokeWidth: 2 },
+            }}
             fitView
           >
             <Background />

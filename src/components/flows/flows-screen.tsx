@@ -246,9 +246,7 @@ function FlowCard({ flow }: { flow: FlowListItem }) {
         </div>
         <Button
           variant="secondary"
-          onClick={() =>
-            navigate({ to: `/flows/${flow.id}` as unknown as "/flows" })
-          }
+          onClick={() => navigate({ to: "/flows/$flowId", params: { flowId: flow.id } })}
         >
           Abrir
         </Button>

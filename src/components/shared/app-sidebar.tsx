@@ -14,6 +14,7 @@ import {
   Sun,
   Moon,
   Workflow,
+  Blocks,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
@@ -47,6 +48,7 @@ const items: NavItemData[] = [
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },
   { title: "Conexões", url: "/connections", icon: Plug },
+  { title: "Integrações", url: "/integracoes", icon: Blocks },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 

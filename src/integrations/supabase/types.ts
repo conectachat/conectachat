@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_credentials: {
+        Row: {
+          api_key: string
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string | null
+          org_id: string
+          provider: Database["public"]["Enums"]["ai_provider"]
+          updated_at: string
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          org_id: string
+          provider: Database["public"]["Enums"]["ai_provider"]
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          org_id?: string
+          provider?: Database["public"]["Enums"]["ai_provider"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credentials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channels: {
         Row: {
           created_at: string
@@ -666,6 +707,173 @@ export type Database = {
           },
         ]
       }
+      flow_sessions: {
+        Row: {
+          contact_id: string
+          conversation_id: string
+          created_at: string
+          current_node_id: string | null
+          flow_id: string
+          id: string
+          org_id: string
+          status: Database["public"]["Enums"]["flow_session_status"]
+          updated_at: string
+          variables: Json
+        }
+        Insert: {
+          contact_id: string
+          conversation_id: string
+          created_at?: string
+          current_node_id?: string | null
+          flow_id: string
+          id?: string
+          org_id: string
+          status?: Database["public"]["Enums"]["flow_session_status"]
+          updated_at?: string
+          variables?: Json
+        }
+        Update: {
+          contact_id?: string
+          conversation_id?: string
+          created_at?: string
+          current_node_id?: string | null
+          flow_id?: string
+          id?: string
+          org_id?: string
+          status?: Database["public"]["Enums"]["flow_session_status"]
+          updated_at?: string
+          variables?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_sessions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_sessions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_sessions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_sessions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_triggers: {
+        Row: {
+          channel_id: string | null
+          created_at: string
+          flow_id: string
+          id: string
+          is_active: boolean
+          keyword: string | null
+          org_id: string
+          priority: number
+          type: Database["public"]["Enums"]["flow_trigger_type"]
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string
+          flow_id: string
+          id?: string
+          is_active?: boolean
+          keyword?: string | null
+          org_id: string
+          priority?: number
+          type: Database["public"]["Enums"]["flow_trigger_type"]
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string
+          flow_id?: string
+          id?: string
+          is_active?: boolean
+          keyword?: string | null
+          org_id?: string
+          priority?: number
+          type?: Database["public"]["Enums"]["flow_trigger_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_triggers_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_triggers_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_triggers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flows: {
+        Row: {
+          created_at: string
+          definition: Json
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          definition?: Json
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          definition?: Json
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flows_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string | null
@@ -1272,6 +1480,7 @@ export type Database = {
       shares_org_with: { Args: { p_user: string }; Returns: boolean }
     }
     Enums: {
+      ai_provider: "openai" | "gemini" | "claude"
       channel_status: "disconnected" | "connecting" | "connected" | "error"
       channel_type:
         | "whatsapp_baileys"
@@ -1282,6 +1491,8 @@ export type Database = {
       conversation_status: "open" | "pending" | "closed"
       crm_card_status: "open" | "won" | "lost"
       crm_stage_kind: "open" | "won" | "lost"
+      flow_session_status: "active" | "ended"
+      flow_trigger_type: "welcome" | "keyword" | "default"
       msg_content_type:
         | "text"
         | "image"
@@ -1427,6 +1638,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ai_provider: ["openai", "gemini", "claude"],
       channel_status: ["disconnected", "connecting", "connected", "error"],
       channel_type: [
         "whatsapp_baileys",
@@ -1438,6 +1650,8 @@ export const Constants = {
       conversation_status: ["open", "pending", "closed"],
       crm_card_status: ["open", "won", "lost"],
       crm_stage_kind: ["open", "won", "lost"],
+      flow_session_status: ["active", "ended"],
+      flow_trigger_type: ["welcome", "keyword", "default"],
       msg_content_type: [
         "text",
         "image",

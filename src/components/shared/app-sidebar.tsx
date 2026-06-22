@@ -43,6 +43,7 @@ type NavItemData = { title: string; url: string; icon: LucideIcon };
 const items: NavItemData[] = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
   { title: "CRM", url: "/crm", icon: SquareKanban },
+  { title: "Fluxos", url: "/flows", icon: Workflow },
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },
   { title: "Conexões", url: "/connections", icon: Plug },

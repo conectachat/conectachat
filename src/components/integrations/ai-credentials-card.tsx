@@ -216,7 +216,7 @@ export function AiCredentialsCard({ orgId }: { orgId: string | null }) {
                           Salvar
                         </Button>
                       </div>
-                      
+                      <a
                         href={p.link}
                         target="_blank"
                         rel="noreferrer"

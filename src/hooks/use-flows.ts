@@ -170,7 +170,7 @@ export function useSaveFlowDefinition() {
     mutationFn: async (input: { id: string; definition: FlowDefinition }) => {
       const { error } = await supabase
         .from("flows")
-        .update({ definition: input.definition, updated_at: new Date().toISOString() })
+        .update({ definition: input.definition as any, updated_at: new Date().toISOString() })
         .eq("id", input.id);
       if (error) throw error;
     },

@@ -341,6 +341,7 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
         canDelete={true}
         onSave={handleConfigSave}
         onDelete={handleConfigDelete}
+        currentFlowId={flowId}
       />
     </div>
   );

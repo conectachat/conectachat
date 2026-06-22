@@ -28,6 +28,7 @@ import { Route as AuthenticatedFlowsRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
+import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 
 const SetPasswordRoute = SetPasswordRouteImport.update({
   id: '/set-password',
@@ -124,6 +125,12 @@ const AuthenticatedConnectionsRoute =
     path: '/connections',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFlowsFlowIdRoute =
+  AuthenticatedFlowsFlowIdRouteImport.update({
+    id: '/$flowId',
+    path: '/$flowId',
+    getParentRoute: () => AuthenticatedFlowsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -135,7 +142,7 @@ export interface FileRoutesByFullPath {
   '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/crm': typeof AuthenticatedCrmRoute
-  '/flows': typeof AuthenticatedFlowsRoute
+  '/flows': typeof AuthenticatedFlowsRouteWithChildren
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -144,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
+  '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -154,7 +162,7 @@ export interface FileRoutesByTo {
   '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/crm': typeof AuthenticatedCrmRoute
-  '/flows': typeof AuthenticatedFlowsRoute
+  '/flows': typeof AuthenticatedFlowsRouteWithChildren
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -163,6 +171,7 @@ export interface FileRoutesByTo {
   '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master': typeof MasterIndexRoute
+  '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -176,7 +185,7 @@ export interface FileRoutesById {
   '/_authenticated/connections': typeof AuthenticatedConnectionsRoute
   '/_authenticated/contacts': typeof AuthenticatedContactsRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
-  '/_authenticated/flows': typeof AuthenticatedFlowsRoute
+  '/_authenticated/flows': typeof AuthenticatedFlowsRouteWithChildren
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/schedules': typeof AuthenticatedSchedulesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -185,6 +194,7 @@ export interface FileRoutesById {
   '/master/settings': typeof MasterSettingsRoute
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
+  '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/master/settings'
     | '/master/subscriptions'
     | '/master/'
+    | '/flows/$flowId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/master/settings'
     | '/master/subscriptions'
     | '/master'
+    | '/flows/$flowId'
   id:
     | '__root__'
     | '/'
@@ -247,6 +259,7 @@ export interface FileRouteTypes {
     | '/master/settings'
     | '/master/subscriptions'
     | '/master/'
+    | '/_authenticated/flows/$flowId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -394,14 +407,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConnectionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/flows/$flowId': {
+      id: '/_authenticated/flows/$flowId'
+      path: '/$flowId'
+      fullPath: '/flows/$flowId'
+      preLoaderRoute: typeof AuthenticatedFlowsFlowIdRouteImport
+      parentRoute: typeof AuthenticatedFlowsRoute
+    }
   }
 }
+
+interface AuthenticatedFlowsRouteChildren {
+  AuthenticatedFlowsFlowIdRoute: typeof AuthenticatedFlowsFlowIdRoute
+}
+
+const AuthenticatedFlowsRouteChildren: AuthenticatedFlowsRouteChildren = {
+  AuthenticatedFlowsFlowIdRoute: AuthenticatedFlowsFlowIdRoute,
+}
+
+const AuthenticatedFlowsRouteWithChildren =
+  AuthenticatedFlowsRoute._addFileChildren(AuthenticatedFlowsRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedConnectionsRoute: typeof AuthenticatedConnectionsRoute
   AuthenticatedContactsRoute: typeof AuthenticatedContactsRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
-  AuthenticatedFlowsRoute: typeof AuthenticatedFlowsRoute
+  AuthenticatedFlowsRoute: typeof AuthenticatedFlowsRouteWithChildren
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedSchedulesRoute: typeof AuthenticatedSchedulesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -411,7 +442,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConnectionsRoute: AuthenticatedConnectionsRoute,
   AuthenticatedContactsRoute: AuthenticatedContactsRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
-  AuthenticatedFlowsRoute: AuthenticatedFlowsRoute,
+  AuthenticatedFlowsRoute: AuthenticatedFlowsRouteWithChildren,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedSchedulesRoute: AuthenticatedSchedulesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

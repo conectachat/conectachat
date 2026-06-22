@@ -304,6 +304,7 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
             onConnect={onConnect}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             defaultEdgeOptions={{
               type: "smoothstep",
@@ -325,6 +326,22 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
           />
         </div>
       </div>
+
+      <NodeConfigDialog
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        nodeId={selectedNode?.id ?? null}
+        nodeType={selectedNode?.type ?? null}
+        initialConfig={
+          selectedNode
+            ? ((nodes.find((n) => n.id === selectedNode.id)?.data as any)
+                ?.config ?? {})
+            : {}
+        }
+        canDelete={true}
+        onSave={handleConfigSave}
+        onDelete={handleConfigDelete}
+      />
     </div>
   );
 }

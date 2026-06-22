@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -689,6 +690,166 @@ export function NodeConfigDialog({
               />
             </div>
           </div>
+        );
+      case "http":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Método</Label>
+              <Select
+                value={config.method ?? "GET"}
+                onValueChange={(v) => set("method", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                  <SelectItem value="PUT">PUT</SelectItem>
+                  <SelectItem value="DELETE">DELETE</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-http-url">URL</Label>
+              <Input
+                id="cfg-http-url"
+                value={config.url ?? ""}
+                onChange={(e) => set("url", e.target.value)}
+                placeholder="https://api.exemplo.com/endpoint"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-http-headers">Cabeçalhos (JSON, opcional)</Label>
+              <Textarea
+                id="cfg-http-headers"
+                value={config.headers ?? ""}
+                onChange={(e) => set("headers", e.target.value)}
+                rows={3}
+                placeholder='{"Authorization": "Bearer ..."}'
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-http-body">Corpo da requisição (JSON, opcional)</Label>
+              <Textarea
+                id="cfg-http-body"
+                value={config.body ?? ""}
+                onChange={(e) => set("body", e.target.value)}
+                rows={3}
+                placeholder='{"nome": "{nome}"}'
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-http-var">Salvar resposta na variável</Label>
+              <Input
+                id="cfg-http-var"
+                value={config.responseVariable ?? ""}
+                onChange={(e) => set("responseVariable", e.target.value)}
+                placeholder="ex.: resposta_api"
+              />
+            </div>
+          </div>
+        );
+      case "ai":
+        return (
+          <Tabs defaultValue="config" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="config">Configuração</TabsTrigger>
+              <TabsTrigger value="advanced">Avançado</TabsTrigger>
+            </TabsList>
+            <TabsContent value="config" className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Provedor de IA</Label>
+                <Select
+                  value={config.provider ?? ""}
+                  onValueChange={(v) => set("provider", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai">OpenAI (ChatGPT)</SelectItem>
+                    <SelectItem value="gemini">Google Gemini</SelectItem>
+                    <SelectItem value="claude">Anthropic Claude</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  A chave de API é configurada em Credenciais de IA (em breve) e usada com segurança no servidor.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cfg-ai-model">Modelo</Label>
+                <Input
+                  id="cfg-ai-model"
+                  value={config.model ?? ""}
+                  onChange={(e) => set("model", e.target.value)}
+                  placeholder="ex.: gpt-4o-mini"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cfg-ai-prompt">Prompt do sistema</Label>
+                <Textarea
+                  id="cfg-ai-prompt"
+                  value={config.systemPrompt ?? ""}
+                  onChange={(e) => set("systemPrompt", e.target.value)}
+                  rows={6}
+                  placeholder="Descreva como a IA deve se comportar..."
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="advanced" className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-ai-temp">Temperatura</Label>
+                  <Input
+                    id="cfg-ai-temp"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    max={2}
+                    value={config.temperature ?? ""}
+                    onChange={(e) => set("temperature", e.target.value)}
+                    placeholder="0.7"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-ai-tokens">Máx. tokens</Label>
+                  <Input
+                    id="cfg-ai-tokens"
+                    type="number"
+                    min={1}
+                    value={config.maxTokens ?? ""}
+                    onChange={(e) => set("maxTokens", e.target.value)}
+                    placeholder="1000"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cfg-ai-history">Histórico de mensagens</Label>
+                <Input
+                  id="cfg-ai-history"
+                  type="number"
+                  min={0}
+                  value={config.history ?? ""}
+                  onChange={(e) => set("history", e.target.value)}
+                  placeholder="ex.: 10"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quantas mensagens anteriores a IA deve lembrar.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cfg-ai-var">Salvar resposta na variável</Label>
+                <Input
+                  id="cfg-ai-var"
+                  value={config.responseVariable ?? ""}
+                  onChange={(e) => set("responseVariable", e.target.value)}
+                  placeholder="ex.: resposta_ia"
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
         );
       default:
         return (

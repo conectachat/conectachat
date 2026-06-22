@@ -63,6 +63,14 @@ export function NodeConfigDialog({
   const set = (key: string, value: any) =>
     setConfig((c) => ({ ...c, [key]: value }));
 
+  const options: any[] = Array.isArray(config.options) ? config.options : [];
+  const setOptions = (next: any[]) => set("options", next);
+  const addOption = (template: any) => setOptions([...options, template]);
+  const updateOption = (idx: number, patch: any) =>
+    setOptions(options.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
+  const removeOption = (idx: number) =>
+    setOptions(options.filter((_, i) => i !== idx));
+
   const found = nodeType ? findCatalogItem(nodeType) : null;
 
   function renderForm() {
@@ -175,6 +183,180 @@ export function NodeConfigDialog({
               />
             </div>
           </>
+        );
+      case "menu_text":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-menu-text">Texto do menu</Label>
+              <Textarea
+                id="cfg-menu-text"
+                value={config.text ?? ""}
+                onChange={(e) => set("text", e.target.value)}
+                rows={4}
+                placeholder="Ex.: Escolha uma opção:"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Opções</Label>
+              <div className="space-y-2">
+                {options.map((option, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      className="w-16 text-center"
+                      value={option.key ?? ""}
+                      onChange={(e) => updateOption(idx, { key: e.target.value })}
+                      placeholder="1"
+                    />
+                    <Input
+                      className="flex-1"
+                      value={option.label ?? ""}
+                      onChange={(e) => updateOption(idx, { label: e.target.value })}
+                      placeholder="Falar com vendas"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive shrink-0"
+                      onClick={() => removeOption(idx)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => addOption({ key: "", label: "" })}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar opção
+              </Button>
+            </div>
+          </div>
+        );
+      case "buttons":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-buttons-text">Texto</Label>
+              <Textarea
+                id="cfg-buttons-text"
+                value={config.text ?? ""}
+                onChange={(e) => set("text", e.target.value)}
+                rows={4}
+                placeholder="Texto antes dos botões..."
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Botões</Label>
+                <span className="text-xs text-muted-foreground">
+                  O WhatsApp permite no máximo 3 botões.
+                </span>
+              </div>
+              <div className="space-y-2">
+                {options.map((option, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      className="flex-1"
+                      value={option.label ?? ""}
+                      onChange={(e) => updateOption(idx, { label: e.target.value })}
+                      placeholder="Texto do botão"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive shrink-0"
+                      onClick={() => removeOption(idx)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                disabled={options.length >= 3}
+                onClick={() => addOption({ label: "" })}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar botão
+              </Button>
+            </div>
+          </div>
+        );
+      case "list":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cfg-list-text">Texto</Label>
+              <Textarea
+                id="cfg-list-text"
+                value={config.text ?? ""}
+                onChange={(e) => set("text", e.target.value)}
+                rows={4}
+                placeholder="Texto antes da lista..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cfg-list-btn-lbl">Rótulo do botão da lista</Label>
+              <Input
+                id="cfg-list-btn-lbl"
+                value={config.buttonLabel ?? ""}
+                onChange={(e) => set("buttonLabel", e.target.value)}
+                placeholder="Ver opções"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Itens da Lista</Label>
+              <div className="space-y-2">
+                {options.map((option, idx) => (
+                  <div key={idx} className="flex items-start gap-2 border rounded-lg p-2 bg-muted/10">
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        value={option.title ?? ""}
+                        onChange={(e) => updateOption(idx, { title: e.target.value })}
+                        placeholder="Título do item"
+                      />
+                      <Input
+                        value={option.description ?? ""}
+                        onChange={(e) => updateOption(idx, { description: e.target.value })}
+                        placeholder="Descrição (opcional)"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive shrink-0 mt-1"
+                      onClick={() => removeOption(idx)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => addOption({ title: "", description: "" })}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar item
+              </Button>
+            </div>
+          </div>
         );
       default:
         return (

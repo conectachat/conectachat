@@ -28,6 +28,7 @@ import { useFlow, useSaveFlowDefinition } from "@/hooks/use-flows";
 
 import { FlowSidebar } from "./flow-sidebar";
 import { findCatalogItem } from "./node-catalog";
+import { NodeConfigDialog } from "./node-config-dialog";
 
 function StartNode(_props: NodeProps) {
   return (
@@ -43,11 +44,26 @@ function StartNode(_props: NodeProps) {
 }
 
 function FlowNode({ id, data, selected }: NodeProps) {
-  const d = data as { nodeType?: string; label?: string; color?: string };
+  const d = data as {
+    nodeType?: string;
+    label?: string;
+    color?: string;
+    config?: Record<string, any>;
+  };
   const color = d.color ?? "#64748b";
   const found = d.nodeType ? findCatalogItem(d.nodeType) : null;
   const Icon = found?.item.icon;
   const { setNodes, setEdges } = useReactFlow();
+
+  const cfg = d.config;
+  let resumo = "Clique para configurar";
+  if (cfg && Object.keys(cfg).length > 0) {
+    if ((d.nodeType === "message" || d.nodeType === "question") && cfg.text) {
+      resumo = String(cfg.text);
+    } else {
+      resumo = "Configurado";
+    }
+  }
 
   const handleDuplicate = () => {
     setNodes((nds) => {
@@ -103,8 +119,8 @@ function FlowNode({ id, data, selected }: NodeProps) {
           {found?.item.label ?? d.label ?? "Nó"}
         </span>
       </div>
-      <div className="px-3 py-2 text-xs text-muted-foreground">
-        Clique para configurar
+      <div className="px-3 py-2 text-xs text-muted-foreground line-clamp-2">
+        {resumo}
       </div>
       <Handle type="source" position={Position.Bottom} />
     </div>
@@ -121,6 +137,44 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [collapsed, setCollapsed] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<{
+    id: string;
+    type: string;
+  } | null>(null);
+
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (node.type === "start") return;
+      const t = (node.data as any)?.nodeType as string | undefined;
+      setSelectedNode({ id: node.id, type: t ?? "" });
+      setConfigOpen(true);
+    },
+    [],
+  );
+
+  const handleConfigSave = useCallback(
+    (nodeId: string, config: Record<string, any>) => {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...(n.data as any), config } }
+            : n,
+        ),
+      );
+    },
+    [setNodes],
+  );
+
+  const handleConfigDelete = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+      setEdges((eds) =>
+        eds.filter((e) => e.source !== nodeId && e.target !== nodeId),
+      );
+    },
+    [setNodes, setEdges],
+  );
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
@@ -250,6 +304,7 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
             onConnect={onConnect}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             defaultEdgeOptions={{
               type: "smoothstep",
@@ -271,6 +326,22 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
           />
         </div>
       </div>
+
+      <NodeConfigDialog
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        nodeId={selectedNode?.id ?? null}
+        nodeType={selectedNode?.type ?? null}
+        initialConfig={
+          selectedNode
+            ? ((nodes.find((n) => n.id === selectedNode.id)?.data as any)
+                ?.config ?? {})
+            : {}
+        }
+        canDelete={true}
+        onSave={handleConfigSave}
+        onDelete={handleConfigDelete}
+      />
     </div>
   );
 }

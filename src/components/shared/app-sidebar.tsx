@@ -14,6 +14,7 @@ import {
   Sun,
   Moon,
   Workflow,
+  Blocks,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";

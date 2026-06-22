@@ -28,6 +28,7 @@ import { Route as AuthenticatedFlowsRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
+import { Route as AuthenticatedFlowsIndexRouteImport } from './routes/_authenticated/flows.index'
 import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 
 const SetPasswordRoute = SetPasswordRouteImport.update({
@@ -125,6 +126,11 @@ const AuthenticatedConnectionsRoute =
     path: '/connections',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFlowsIndexRoute = AuthenticatedFlowsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedFlowsRoute,
+} as any)
 const AuthenticatedFlowsFlowIdRoute =
   AuthenticatedFlowsFlowIdRouteImport.update({
     id: '/$flowId',
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
+  '/flows/': typeof AuthenticatedFlowsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -162,7 +169,6 @@ export interface FileRoutesByTo {
   '/connections': typeof AuthenticatedConnectionsRoute
   '/contacts': typeof AuthenticatedContactsRoute
   '/crm': typeof AuthenticatedCrmRoute
-  '/flows': typeof AuthenticatedFlowsRouteWithChildren
   '/inbox': typeof AuthenticatedInboxRoute
   '/schedules': typeof AuthenticatedSchedulesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -172,6 +178,7 @@ export interface FileRoutesByTo {
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master': typeof MasterIndexRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
+  '/flows': typeof AuthenticatedFlowsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -195,6 +202,7 @@ export interface FileRoutesById {
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
   '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
+  '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -218,6 +226,7 @@ export interface FileRouteTypes {
     | '/master/subscriptions'
     | '/master/'
     | '/flows/$flowId'
+    | '/flows/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -228,7 +237,6 @@ export interface FileRouteTypes {
     | '/connections'
     | '/contacts'
     | '/crm'
-    | '/flows'
     | '/inbox'
     | '/schedules'
     | '/settings'
@@ -238,6 +246,7 @@ export interface FileRouteTypes {
     | '/master/subscriptions'
     | '/master'
     | '/flows/$flowId'
+    | '/flows'
   id:
     | '__root__'
     | '/'
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/master/subscriptions'
     | '/master/'
     | '/_authenticated/flows/$flowId'
+    | '/_authenticated/flows/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -407,6 +417,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConnectionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/flows/': {
+      id: '/_authenticated/flows/'
+      path: '/'
+      fullPath: '/flows/'
+      preLoaderRoute: typeof AuthenticatedFlowsIndexRouteImport
+      parentRoute: typeof AuthenticatedFlowsRoute
+    }
     '/_authenticated/flows/$flowId': {
       id: '/_authenticated/flows/$flowId'
       path: '/$flowId'
@@ -419,10 +436,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedFlowsRouteChildren {
   AuthenticatedFlowsFlowIdRoute: typeof AuthenticatedFlowsFlowIdRoute
+  AuthenticatedFlowsIndexRoute: typeof AuthenticatedFlowsIndexRoute
 }
 
 const AuthenticatedFlowsRouteChildren: AuthenticatedFlowsRouteChildren = {
   AuthenticatedFlowsFlowIdRoute: AuthenticatedFlowsFlowIdRoute,
+  AuthenticatedFlowsIndexRoute: AuthenticatedFlowsIndexRoute,
 }
 
 const AuthenticatedFlowsRouteWithChildren =

@@ -1,8 +1,9 @@
 import "@xyflow/react/dist/style.css";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
   Handle,
@@ -10,6 +11,7 @@ import {
   addEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Node,
   type Edge,
   type NodeProps,
@@ -21,6 +23,9 @@ import { ArrowLeft, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useFlow, useSaveFlowDefinition } from "@/hooks/use-flows";
+
+import { FlowSidebar } from "./flow-sidebar";
+import { findCatalogItem } from "./node-catalog";
 
 function StartNode(_props: NodeProps) {
   return (
@@ -35,15 +40,42 @@ function StartNode(_props: NodeProps) {
   );
 }
 
-const nodeTypes = { start: StartNode };
+function GenericNode({ data }: NodeProps) {
+  const d = data as { label?: string; color?: string };
+  const color = d.color ?? "#64748b";
+  return (
+    <div
+      className="min-w-[180px] rounded-xl border-2 bg-white px-4 py-2 shadow-sm"
+      style={{ borderColor: color }}
+    >
+      <Handle type="target" position={Position.Top} />
+      <div className="flex items-center gap-2">
+        <span
+          className="h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+        <span className="text-sm font-medium text-foreground">
+          {d.label ?? "Nó"}
+        </span>
+      </div>
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+}
 
-export function FlowEditor({ flowId }: { flowId: string }) {
+const nodeTypes = { start: StartNode, generic: GenericNode };
+
+function FlowEditorInner({ flowId }: { flowId: string }) {
   const { data: flow, isLoading } = useFlow(flowId);
   const saveDefinition = useSaveFlowDefinition();
   const navigate = useNavigate();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { screenToFlowPosition } = useReactFlow();
 
   useEffect(() => {
     if (!flow) return;
@@ -68,6 +100,39 @@ export function FlowEditor({ flowId }: { flowId: string }) {
   const onConnect = useCallback(
     (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
     [setEdges],
+  );
+
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const type = event.dataTransfer.getData("application/reactflow");
+      if (!type) return;
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const found = findCatalogItem(type);
+
+      const newNode = {
+        id: `${type}-${Date.now()}`,
+        type: "generic",
+        position,
+        data: {
+          nodeType: type,
+          label: found?.item.label ?? type,
+          color: found?.color ?? "#64748b",
+        },
+      } as any;
+
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [screenToFlowPosition, setNodes],
   );
 
   async function handleSave() {
@@ -116,20 +181,36 @@ export function FlowEditor({ flowId }: { flowId: string }) {
         </Button>
       </div>
 
-      <div className="flex-1">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          fitView
-        >
-          <Background />
-          <Controls />
-        </ReactFlow>
+      <div className="flex flex-1 overflow-hidden">
+        <FlowSidebar
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((c) => !c)}
+        />
+        <div className="flex-1" ref={reactFlowWrapper}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            nodeTypes={nodeTypes}
+            fitView
+          >
+            <Background />
+            <Controls />
+          </ReactFlow>
+        </div>
       </div>
     </div>
+  );
+}
+
+export function FlowEditor({ flowId }: { flowId: string }) {
+  return (
+    <ReactFlowProvider>
+      <FlowEditorInner flowId={flowId} />
+    </ReactFlowProvider>
   );
 }

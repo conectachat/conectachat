@@ -19,7 +19,7 @@ import {
 } from "@xyflow/react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Maximize, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useFlow, useSaveFlowDefinition } from "@/hooks/use-flows";
@@ -75,7 +75,7 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
   const [collapsed, setCollapsed] = useState(false);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
 
   useEffect(() => {
     if (!flow) return;
@@ -157,7 +157,7 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-3">
           <Button
@@ -170,23 +170,30 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
           </Button>
           <div className="text-base font-semibold">{flow?.name}</div>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={saveDefinition.isPending}
-          className="gap-2 text-white hover:opacity-90"
-          style={{ backgroundColor: "#8FC549" }}
-        >
-          <Save className="h-4 w-4" />
-          {saveDefinition.isPending ? "Salvando..." : "Salvar"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => fitView()}
+            aria-label="Ajustar à tela"
+          >
+            <Maximize className="h-4 w-4" />
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saveDefinition.isPending}
+            className="gap-2 text-white hover:opacity-90"
+            style={{ backgroundColor: "#8FC549" }}
+          >
+            <Save className="h-4 w-4" />
+            {saveDefinition.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <FlowSidebar
-          collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed((c) => !c)}
-        />
-        <div className="flex-1" ref={reactFlowWrapper}>
+      <div className="relative flex-1 overflow-hidden">
+        {/* Canvas ocupa todo o fundo */}
+        <div className="absolute inset-0" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -201,6 +208,14 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
             <Background />
             <Controls />
           </ReactFlow>
+        </div>
+
+        {/* Barra de componentes flutuante sobre o canvas */}
+        <div className="absolute left-4 top-4 bottom-4 z-10">
+          <FlowSidebar
+            collapsed={collapsed}
+            onToggleCollapse={() => setCollapsed((c) => !c)}
+          />
         </div>
       </div>
     </div>

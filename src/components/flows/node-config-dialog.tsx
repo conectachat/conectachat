@@ -23,6 +23,12 @@ import {
 } from "@/components/ui/select";
 
 import { findCatalogItem } from "./node-catalog";
+import {
+  useOrgTags,
+  useOrgDepartments,
+  useOrgAgents,
+  useOtherFlows,
+} from "@/hooks/use-flow-resources";
 
 export type FlowNodeData = {
   nodeType?: string;

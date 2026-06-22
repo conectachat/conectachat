@@ -23,7 +23,7 @@ function handleDragStart(event: React.DragEvent<HTMLDivElement>, item: CatalogIt
 export function FlowSidebar({ collapsed, onToggleCollapse }: FlowSidebarProps) {
   if (collapsed) {
     return (
-      <div className="flex h-full w-12 flex-col items-center border-r bg-background py-2">
+      <div className="flex w-12 flex-col items-center rounded-xl border bg-background py-2 shadow-lg">
         <Button
           variant="ghost"
           size="icon"
@@ -37,7 +37,7 @@ export function FlowSidebar({ collapsed, onToggleCollapse }: FlowSidebarProps) {
   }
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-background">
+    <div className="flex h-full w-64 flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
       <div className="flex items-center justify-between border-b px-3 py-2">
         <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Componentes

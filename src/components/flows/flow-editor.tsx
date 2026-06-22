@@ -8,6 +8,8 @@ import {
   Controls,
   Handle,
   Position,
+  NodeToolbar,
+  MarkerType,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -19,7 +21,7 @@ import {
 } from "@xyflow/react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowLeft, Maximize, Save } from "lucide-react";
+import { ArrowLeft, Copy, Maximize, Save, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useFlow, useSaveFlowDefinition } from "@/hooks/use-flows";
@@ -40,30 +42,76 @@ function StartNode(_props: NodeProps) {
   );
 }
 
-function GenericNode({ data }: NodeProps) {
-  const d = data as { label?: string; color?: string };
+function FlowNode({ id, data, selected }: NodeProps) {
+  const d = data as { nodeType?: string; label?: string; color?: string };
   const color = d.color ?? "#64748b";
+  const found = d.nodeType ? findCatalogItem(d.nodeType) : null;
+  const Icon = found?.item.icon;
+  const { setNodes, setEdges } = useReactFlow();
+
+  const handleDuplicate = () => {
+    setNodes((nds) => {
+      const original = nds.find((n) => n.id === id);
+      if (!original) return nds;
+      const copy = {
+        ...original,
+        id: `${d.nodeType ?? "node"}-${Date.now()}`,
+        position: {
+          x: original.position.x + 40,
+          y: original.position.y + 40,
+        },
+        selected: false,
+      };
+      return nds.concat(copy as any);
+    });
+  };
+
+  const handleDelete = () => {
+    setNodes((nds) => nds.filter((n) => n.id !== id));
+    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
+  };
+
   return (
-    <div
-      className="min-w-[180px] rounded-xl border-2 bg-white px-4 py-2 shadow-sm"
-      style={{ borderColor: color }}
-    >
+    <div className="min-w-[200px] overflow-hidden rounded-xl border bg-white shadow-sm">
+      <NodeToolbar
+        isVisible={selected}
+        position={Position.Top}
+        className="flex gap-1"
+      >
+        <button
+          onClick={handleDuplicate}
+          className="rounded-md border bg-white p-1.5 shadow hover:bg-muted"
+          aria-label="Duplicar"
+        >
+          <Copy className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <button
+          onClick={handleDelete}
+          className="rounded-md border bg-white p-1.5 shadow hover:bg-muted"
+          aria-label="Excluir"
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </button>
+      </NodeToolbar>
       <Handle type="target" position={Position.Top} />
-      <div className="flex items-center gap-2">
-        <span
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: color }}
-        />
-        <span className="text-sm font-medium text-foreground">
-          {d.label ?? "Nó"}
+      <div
+        className="flex items-center gap-2 px-3 py-2 text-white"
+        style={{ backgroundColor: color }}
+      >
+        {Icon ? <Icon className="h-4 w-4" /> : null}
+        <span className="text-sm font-semibold">
+          {found?.item.label ?? d.label ?? "Nó"}
         </span>
+      </div>
+      <div className="px-3 py-2 text-xs text-muted-foreground">
+        Clique para configurar
       </div>
       <Handle type="source" position={Position.Bottom} />
     </div>
   );
 }
 
-const nodeTypes = { start: StartNode, generic: GenericNode };
+const nodeTypes = { start: StartNode, generic: FlowNode };
 
 function FlowEditorInner({ flowId }: { flowId: string }) {
   const { data: flow, isLoading } = useFlow(flowId);
@@ -203,6 +251,11 @@ function FlowEditorInner({ flowId }: { flowId: string }) {
             onDrop={onDrop}
             onDragOver={onDragOver}
             nodeTypes={nodeTypes}
+            defaultEdgeOptions={{
+              type: "smoothstep",
+              markerEnd: { type: MarkerType.ArrowClosed, color: "#8FC549" },
+              style: { stroke: "#8FC549", strokeWidth: 2 },
+            }}
             fitView
           >
             <Background />

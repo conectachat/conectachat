@@ -13,6 +13,7 @@ import {
   SquareKanban,
   Sun,
   Moon,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";

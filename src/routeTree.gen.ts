@@ -28,7 +28,9 @@ import { Route as AuthenticatedFlowsRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
+import { Route as AuthenticatedIntegracoesIndexRouteImport } from './routes/_authenticated/integracoes.index'
 import { Route as AuthenticatedFlowsIndexRouteImport } from './routes/_authenticated/flows.index'
+import { Route as AuthenticatedIntegracoesSlugRouteImport } from './routes/_authenticated/integracoes.$slug'
 import { Route as AuthenticatedFlowsFlowIdRouteImport } from './routes/_authenticated/flows.$flowId'
 
 const SetPasswordRoute = SetPasswordRouteImport.update({
@@ -126,11 +128,23 @@ const AuthenticatedConnectionsRoute =
     path: '/connections',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedIntegracoesIndexRoute =
+  AuthenticatedIntegracoesIndexRouteImport.update({
+    id: '/integracoes/',
+    path: '/integracoes/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFlowsIndexRoute = AuthenticatedFlowsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedFlowsRoute,
 } as any)
+const AuthenticatedIntegracoesSlugRoute =
+  AuthenticatedIntegracoesSlugRouteImport.update({
+    id: '/integracoes/$slug',
+    path: '/integracoes/$slug',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFlowsFlowIdRoute =
   AuthenticatedFlowsFlowIdRouteImport.update({
     id: '/$flowId',
@@ -158,7 +172,9 @@ export interface FileRoutesByFullPath {
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
+  '/integracoes/$slug': typeof AuthenticatedIntegracoesSlugRoute
   '/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/integracoes/': typeof AuthenticatedIntegracoesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -178,7 +194,9 @@ export interface FileRoutesByTo {
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master': typeof MasterIndexRoute
   '/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
+  '/integracoes/$slug': typeof AuthenticatedIntegracoesSlugRoute
   '/flows': typeof AuthenticatedFlowsIndexRoute
+  '/integracoes': typeof AuthenticatedIntegracoesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -202,7 +220,9 @@ export interface FileRoutesById {
   '/master/subscriptions': typeof MasterSubscriptionsRoute
   '/master/': typeof MasterIndexRoute
   '/_authenticated/flows/$flowId': typeof AuthenticatedFlowsFlowIdRoute
+  '/_authenticated/integracoes/$slug': typeof AuthenticatedIntegracoesSlugRoute
   '/_authenticated/flows/': typeof AuthenticatedFlowsIndexRoute
+  '/_authenticated/integracoes/': typeof AuthenticatedIntegracoesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -226,7 +246,9 @@ export interface FileRouteTypes {
     | '/master/subscriptions'
     | '/master/'
     | '/flows/$flowId'
+    | '/integracoes/$slug'
     | '/flows/'
+    | '/integracoes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -246,7 +268,9 @@ export interface FileRouteTypes {
     | '/master/subscriptions'
     | '/master'
     | '/flows/$flowId'
+    | '/integracoes/$slug'
     | '/flows'
+    | '/integracoes'
   id:
     | '__root__'
     | '/'
@@ -269,7 +293,9 @@ export interface FileRouteTypes {
     | '/master/subscriptions'
     | '/master/'
     | '/_authenticated/flows/$flowId'
+    | '/_authenticated/integracoes/$slug'
     | '/_authenticated/flows/'
+    | '/_authenticated/integracoes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -417,12 +443,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConnectionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/integracoes/': {
+      id: '/_authenticated/integracoes/'
+      path: '/integracoes'
+      fullPath: '/integracoes/'
+      preLoaderRoute: typeof AuthenticatedIntegracoesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/flows/': {
       id: '/_authenticated/flows/'
       path: '/'
       fullPath: '/flows/'
       preLoaderRoute: typeof AuthenticatedFlowsIndexRouteImport
       parentRoute: typeof AuthenticatedFlowsRoute
+    }
+    '/_authenticated/integracoes/$slug': {
+      id: '/_authenticated/integracoes/$slug'
+      path: '/integracoes/$slug'
+      fullPath: '/integracoes/$slug'
+      preLoaderRoute: typeof AuthenticatedIntegracoesSlugRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/flows/$flowId': {
       id: '/_authenticated/flows/$flowId'
@@ -455,6 +495,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedSchedulesRoute: typeof AuthenticatedSchedulesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedIntegracoesSlugRoute: typeof AuthenticatedIntegracoesSlugRoute
+  AuthenticatedIntegracoesIndexRoute: typeof AuthenticatedIntegracoesIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -465,6 +507,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedSchedulesRoute: AuthenticatedSchedulesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedIntegracoesSlugRoute: AuthenticatedIntegracoesSlugRoute,
+  AuthenticatedIntegracoesIndexRoute: AuthenticatedIntegracoesIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

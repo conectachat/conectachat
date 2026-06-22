@@ -48,6 +48,7 @@ const items: NavItemData[] = [
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },
   { title: "Conexões", url: "/connections", icon: Plug },
+  { title: "Integrações", url: "/integracoes", icon: Blocks },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 

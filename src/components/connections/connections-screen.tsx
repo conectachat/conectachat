@@ -160,6 +160,42 @@ export function ConnectionsScreen() {
   const funnelsQuery = useFunnels();
   const funnels: FunnelRow[] = funnelsQuery.data ?? [];
 
+  // F6 — Fluxos da empresa (para o seletor "Fluxo inicial" no card).
+  const flowsQuery = useQuery({
+    queryKey: ["connections-flows", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<FlowRow[]> => {
+      const { data, error } = await (supabase as any)
+        .from("flows")
+        .select("id, name")
+        .eq("org_id", orgId!)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as FlowRow[];
+    },
+  });
+  const flows: FlowRow[] = flowsQuery.data ?? [];
+
+  // F6 — Mapa canal -> flow_id do gatilho de boas-vindas (type='welcome') ativo.
+  const welcomeQuery = useQuery({
+    queryKey: ["connections-welcome-triggers", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data, error } = await (supabase as any)
+        .from("flow_triggers")
+        .select("channel_id, flow_id, type")
+        .eq("org_id", orgId!)
+        .eq("type", "welcome");
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const t of (data ?? []) as any[]) {
+        if (t.channel_id) map[t.channel_id] = t.flow_id;
+      }
+      return map;
+    },
+  });
+  const welcomeByChannel: Record<string, string> = welcomeQuery.data ?? {};
+
   // Tempo real: a lista reage sozinha quando o status/QR muda no banco.
   useEffect(() => {
     if (!orgId) return;

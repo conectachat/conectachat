@@ -45,6 +45,7 @@ import {
   Building2,
   Send,
   MoreVertical,
+  CircleCheckBig,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";

@@ -1700,6 +1700,13 @@ export function InboxScreen() {
                     <Check size={16} /> <span className="hidden lg:inline">Atender</span>
                   </button>
                 )}
+                <button
+                  onClick={closeConversation}
+                  title="Encerrar atendimento (fecha a conversa)"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  <CircleCheckBig size={16} /> <span className="hidden lg:inline">Encerrar</span>
+                </button>
                 </div>
                 <div className="lg:hidden">
                   <Popover open={headerMenuOpen} onOpenChange={setHeaderMenuOpen}>

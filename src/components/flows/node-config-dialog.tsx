@@ -797,6 +797,42 @@ export function NodeConfigDialog({
                   placeholder="Descreva como a IA deve se comportar..."
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Comportamento</Label>
+                <Select
+                  value={config.behavior ?? "once"}
+                  onValueChange={(v) => set("behavior", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="once">Responder uma vez</SelectItem>
+                    <SelectItem value="permanent">Assumir a conversa</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  "Responder uma vez": a IA responde e o fluxo segue adiante.
+                  "Assumir a conversa": a IA continua respondendo cada mensagem
+                  do cliente até ele pedir um atendente ou um humano assumir.
+                </p>
+              </div>
+              {config.behavior === "permanent" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-ai-exit">Palavras de saída</Label>
+                  <Input
+                    id="cfg-ai-exit"
+                    value={config.exitKeywords ?? ""}
+                    onChange={(e) => set("exitKeywords", e.target.value)}
+                    placeholder="ex.: atendente, humano, pessoa"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Se o cliente digitar uma destas palavras, a IA encerra e o
+                    fluxo segue pela saída do nó (ligue-a a um nó "Transferir
+                    para atendente", por exemplo). Separe por vírgulas.
+                  </p>
+                </div>
+              ) : null}
             </TabsContent>
             <TabsContent value="advanced" className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-3">

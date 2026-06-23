@@ -252,6 +252,35 @@ export function NodeConfigDialog({
                 Adicionar opção
               </Button>
             </div>
+            <div className="space-y-2 rounded-lg border p-3">
+              <Label htmlFor="cfg-menu-invalid">
+                Mensagem de opção inválida (opcional)
+              </Label>
+              <Input
+                id="cfg-menu-invalid"
+                value={config.invalidMessage ?? ""}
+                onChange={(e) => set("invalidMessage", e.target.value)}
+                placeholder="Opção inválida. Por favor, escolha uma das opções."
+              />
+              <div className="pt-2">
+                <Label htmlFor="cfg-menu-maxtries">Máximo de tentativas</Label>
+                <Input
+                  id="cfg-menu-maxtries"
+                  type="number"
+                  min={1}
+                  value={config.maxTries ?? ""}
+                  onChange={(e) => set("maxTries", e.target.value)}
+                  placeholder="3"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Se o contato errar a opção, o bot avisa e repete o menu. Após o
+                número máximo de tentativas, o fluxo segue por uma saída "solta"
+                do menu (uma seta que NÃO sai de uma opção numerada) — ligue-a a
+                um nó "Atendente" ou "Encerrar". Sem essa saída, a conversa do
+                bot é encerrada. Padrão: 3 tentativas.
+              </p>
+            </div>
           </div>
         );
       case "buttons":

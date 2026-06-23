@@ -482,6 +482,9 @@ function ChannelList({
   onDelete,
   onSetDepartment,
   onSetCrm,
+  flows,
+  welcomeByChannel,
+  onSetInitialFlow,
 }: {
   channels: ChannelRow[];
   departments: DeptRow[];
@@ -495,6 +498,9 @@ function ChannelList({
   onDelete: (ch: ChannelRow) => void;
   onSetDepartment: (ch: ChannelRow, deptId: string | null) => void;
   onSetCrm: (ch: ChannelRow, patch: { crm_enabled?: boolean; crm_funnel_id?: string | null }) => void;
+  flows: FlowRow[];
+  welcomeByChannel: Record<string, string>;
+  onSetInitialFlow: (ch: ChannelRow, flowId: string | null) => void;
 }) {
   return (
     <div className="space-y-3">

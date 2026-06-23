@@ -532,6 +532,32 @@ export function InboxScreen() {
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
+  // F6 — "Encerrar atendimento": fecha a conversa (status closed) e libera o
+  // atendente. A conversa sai da lista; a próxima mensagem do cliente abre uma
+  // conversa nova (e volta a permitir o gatilho de boas-vindas do chatbot).
+  async function closeConversation() {
+    if (!selectedId) return;
+    const ok = await confirm({
+      title: "Encerrar atendimento?",
+      description:
+        "A conversa será marcada como encerrada e sairá da sua lista. Se o cliente mandar uma nova mensagem, uma nova conversa será criada.",
+      confirmText: "Encerrar",
+      danger: true,
+    });
+    if (!ok) return;
+    const { error } = await supabase
+      .from("conversations")
+      .update({ status: "closed", assigned_user_id: null })
+      .eq("id", selectedId);
+    if (error) {
+      toast.error("Não foi possível encerrar o atendimento.");
+      return;
+    }
+    toast.success("Atendimento encerrado.");
+    setSelectedId(null);
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
   // Bloco M — "Aceitar": um clique no card de uma conversa Aguardando atribui a mim.
   const myId = user?.id ?? null;
   async function acceptConversation(convId: string) {

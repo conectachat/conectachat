@@ -399,6 +399,9 @@ export function ConnectionsScreen() {
               onDelete={setConfirmDelete}
               onSetDepartment={handleSetDepartment}
               onSetCrm={handleSetCrm}
+              flows={flows}
+              welcomeByChannel={welcomeByChannel}
+              onSetInitialFlow={handleSetInitialFlow}
             />
           )}
         </div>

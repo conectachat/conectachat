@@ -1839,6 +1839,19 @@ export function InboxScreen() {
               {!loadingMsgs &&
                 renderMessages.map((m, idx, arr) => {
                   const out = m.direction === "outbound";
+                  // F6 — marcador de REABERTURA de atendimento: gravado como
+                  // mensagem de texto com external_message_id = "system:reopen".
+                  // Mostramos como uma faixa larga (estilo "#Atendimento"),
+                  // separando visualmente os atendimentos no histórico.
+                  if (m.external_message_id === "system:reopen") {
+                    return (
+                      <div key={m.id} className="my-3 px-2">
+                        <div className="rounded-md bg-brand-green/90 px-3 py-1.5 text-center text-[12px] font-semibold text-white shadow-sm">
+                          {m.content}
+                        </div>
+                      </div>
+                    );
+                  }
                   // Bloco N — "aviso de sistema" (ex.: transferência): gravado como
                   // mensagem de texto com external_message_id = "system:transfer".
                   // Mostramos centralizado/cinza, não como bolha de conversa.

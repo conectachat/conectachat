@@ -1790,6 +1790,17 @@ export function InboxScreen() {
                           <Check size={15} /> Atender
                         </button>
                       )}
+                      <div className="my-1 border-t border-gray-100" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeConversation();
+                          setHeaderMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                      >
+                        <CircleCheckBig size={15} /> Encerrar atendimento
+                      </button>
                     </PopoverContent>
                   </Popover>
                 </div>

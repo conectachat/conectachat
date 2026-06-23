@@ -260,6 +260,45 @@ export function ConnectionsScreen() {
     refetch();
   }
 
+  // F6 — Define (ou remove) o "fluxo inicial" (gatilho welcome) de um canal.
+  // Estratégia simples e idempotente: apaga qualquer gatilho welcome existente
+  // desse canal e, se um fluxo foi escolhido, cria um novo welcome ativo.
+  async function handleSetInitialFlow(ch: ChannelRow, flowId: string | null) {
+    if (!orgId) return;
+    setBusyId(ch.id);
+    // 1) remove welcome(s) atuais deste canal
+    const { error: delErr } = await (supabase as any)
+      .from("flow_triggers")
+      .delete()
+      .eq("org_id", orgId)
+      .eq("channel_id", ch.id)
+      .eq("type", "welcome");
+    if (delErr) {
+      setBusyId(null);
+      toast.error("Não foi possível salvar o fluxo inicial", { description: delErr.message });
+      return;
+    }
+    // 2) se escolheu um fluxo, cria o novo gatilho welcome
+    if (flowId) {
+      const { error: insErr } = await (supabase as any).from("flow_triggers").insert({
+        org_id: orgId,
+        flow_id: flowId,
+        channel_id: ch.id,
+        type: "welcome",
+        is_active: true,
+        priority: 0,
+      });
+      if (insErr) {
+        setBusyId(null);
+        toast.error("Não foi possível salvar o fluxo inicial", { description: insErr.message });
+        return;
+      }
+    }
+    setBusyId(null);
+    toast.success("Fluxo inicial atualizado");
+    queryClient.invalidateQueries({ queryKey: ["connections-welcome-triggers", orgId] });
+  }
+
   async function handleRefresh(ch: ChannelRow) {
     setBusyId(ch.id);
     const { data, error } = await callFn({ action: "status", channelId: ch.id });

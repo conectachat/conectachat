@@ -49,6 +49,7 @@ type ChannelRow = {
 
 type DeptRow = { id: string; name: string };
 type FunnelRow = { id: string; name: string };
+type FlowRow = { id: string; name: string };
 
 type QrTarget = { channelId: string; qr: string | null; pairingCode: string | null };
 

@@ -39,6 +39,7 @@ export function useConversations() {
           department:departments ( id, name )
         `,
         )
+        .neq("status", "closed")
         .order("last_message_at", { ascending: false, nullsFirst: false });
       if (error) throw error;
       return (data ?? []) as unknown as ConversationListItem[];

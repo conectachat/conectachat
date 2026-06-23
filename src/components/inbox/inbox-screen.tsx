@@ -45,6 +45,7 @@ import {
   Building2,
   Send,
   MoreVertical,
+  CircleCheckBig,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -528,6 +529,32 @@ export function InboxScreen() {
       return;
     }
     toast.success(uid ? "Você assumiu o atendimento." : "Atendimento liberado.");
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+  // F6 — "Encerrar atendimento": fecha a conversa (status closed) e libera o
+  // atendente. A conversa sai da lista; a próxima mensagem do cliente abre uma
+  // conversa nova (e volta a permitir o gatilho de boas-vindas do chatbot).
+  async function closeConversation() {
+    if (!selectedId) return;
+    const ok = await confirm({
+      title: "Encerrar atendimento?",
+      description:
+        "A conversa será marcada como encerrada e sairá da sua lista. Se o cliente mandar uma nova mensagem, uma nova conversa será criada.",
+      confirmText: "Encerrar",
+      danger: true,
+    });
+    if (!ok) return;
+    const { error } = await supabase
+      .from("conversations")
+      .update({ status: "closed", assigned_user_id: null })
+      .eq("id", selectedId);
+    if (error) {
+      toast.error("Não foi possível encerrar o atendimento.");
+      return;
+    }
+    toast.success("Atendimento encerrado.");
+    setSelectedId(null);
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
@@ -1673,6 +1700,13 @@ export function InboxScreen() {
                     <Check size={16} /> <span className="hidden lg:inline">Atender</span>
                   </button>
                 )}
+                <button
+                  onClick={closeConversation}
+                  title="Encerrar atendimento (fecha a conversa)"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  <CircleCheckBig size={16} /> <span className="hidden lg:inline">Encerrar</span>
+                </button>
                 </div>
                 <div className="lg:hidden">
                   <Popover open={headerMenuOpen} onOpenChange={setHeaderMenuOpen}>
@@ -1756,6 +1790,17 @@ export function InboxScreen() {
                           <Check size={15} /> Atender
                         </button>
                       )}
+                      <div className="my-1 border-t border-gray-100" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeConversation();
+                          setHeaderMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                      >
+                        <CircleCheckBig size={15} /> Encerrar atendimento
+                      </button>
                     </PopoverContent>
                   </Popover>
                 </div>

@@ -514,6 +514,8 @@ function ChannelList({
         const busy = busyId === ch.id;
         const deptName = departments.find((d) => d.id === ch.default_department_id)?.name ?? null;
         const funnelName = funnels.find((f) => f.id === ch.crm_funnel_id)?.name ?? null;
+        const initialFlowId = welcomeByChannel[ch.id] ?? "";
+        const initialFlowName = flows.find((f) => f.id === initialFlowId)?.name ?? null;
 
         return (
           <div key={ch.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">

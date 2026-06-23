@@ -616,7 +616,37 @@ function ChannelList({
                   </span>
                 )}
               </div>
+
+              {/* F6 — Fluxo inicial (chatbot): dispara quando um número NOVO
+                  inicia conversa neste canal. Grava um gatilho welcome.
+                  Só dono/admin edita; atendente vê em texto. */}
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+                <span className="shrink-0 text-muted-foreground">Fluxo inicial (chatbot):</span>
+                {isAdmin ? (
+                  flows.length > 0 ? (
+                    <select
+                      className="h-7 max-w-[180px] rounded-md border border-border bg-background px-2 text-xs text-foreground disabled:opacity-60"
+                      value={initialFlowId}
+                      onChange={(e) => onSetInitialFlow(ch, e.target.value || null)}
+                      disabled={busy}
+                      title="Fluxo do chatbot que inicia quando um número novo escreve neste canal"
+                    >
+                      <option value="">Nenhum</option>
+                      {flows.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-muted-foreground">Crie um fluxo em Fluxos para usar aqui.</span>
+                  )
+                ) : (
+                  <span className="font-medium text-foreground">{initialFlowName ?? "Nenhum"}</span>
+                )}
+              </div>
             </div>
+
 
             <div className="ml-auto flex items-center gap-1">
               <Button

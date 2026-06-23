@@ -49,6 +49,7 @@ type ChannelRow = {
 
 type DeptRow = { id: string; name: string };
 type FunnelRow = { id: string; name: string };
+type FlowRow = { id: string; name: string };
 
 type QrTarget = { channelId: string; qr: string | null; pairingCode: string | null };
 
@@ -159,6 +160,42 @@ export function ConnectionsScreen() {
   const funnelsQuery = useFunnels();
   const funnels: FunnelRow[] = funnelsQuery.data ?? [];
 
+  // F6 — Fluxos da empresa (para o seletor "Fluxo inicial" no card).
+  const flowsQuery = useQuery({
+    queryKey: ["connections-flows", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<FlowRow[]> => {
+      const { data, error } = await (supabase as any)
+        .from("flows")
+        .select("id, name")
+        .eq("org_id", orgId!)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as FlowRow[];
+    },
+  });
+  const flows: FlowRow[] = flowsQuery.data ?? [];
+
+  // F6 — Mapa canal -> flow_id do gatilho de boas-vindas (type='welcome') ativo.
+  const welcomeQuery = useQuery({
+    queryKey: ["connections-welcome-triggers", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data, error } = await (supabase as any)
+        .from("flow_triggers")
+        .select("channel_id, flow_id, type")
+        .eq("org_id", orgId!)
+        .eq("type", "welcome");
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const t of (data ?? []) as any[]) {
+        if (t.channel_id) map[t.channel_id] = t.flow_id;
+      }
+      return map;
+    },
+  });
+  const welcomeByChannel: Record<string, string> = welcomeQuery.data ?? {};
+
   // Tempo real: a lista reage sozinha quando o status/QR muda no banco.
   useEffect(() => {
     if (!orgId) return;
@@ -221,6 +258,45 @@ export function ConnectionsScreen() {
     }
     toast.success("CRM do canal atualizado");
     refetch();
+  }
+
+  // F6 — Define (ou remove) o "fluxo inicial" (gatilho welcome) de um canal.
+  // Estratégia simples e idempotente: apaga qualquer gatilho welcome existente
+  // desse canal e, se um fluxo foi escolhido, cria um novo welcome ativo.
+  async function handleSetInitialFlow(ch: ChannelRow, flowId: string | null) {
+    if (!orgId) return;
+    setBusyId(ch.id);
+    // 1) remove welcome(s) atuais deste canal
+    const { error: delErr } = await (supabase as any)
+      .from("flow_triggers")
+      .delete()
+      .eq("org_id", orgId)
+      .eq("channel_id", ch.id)
+      .eq("type", "welcome");
+    if (delErr) {
+      setBusyId(null);
+      toast.error("Não foi possível salvar o fluxo inicial", { description: delErr.message });
+      return;
+    }
+    // 2) se escolheu um fluxo, cria o novo gatilho welcome
+    if (flowId) {
+      const { error: insErr } = await (supabase as any).from("flow_triggers").insert({
+        org_id: orgId,
+        flow_id: flowId,
+        channel_id: ch.id,
+        type: "welcome",
+        is_active: true,
+        priority: 0,
+      });
+      if (insErr) {
+        setBusyId(null);
+        toast.error("Não foi possível salvar o fluxo inicial", { description: insErr.message });
+        return;
+      }
+    }
+    setBusyId(null);
+    toast.success("Fluxo inicial atualizado");
+    queryClient.invalidateQueries({ queryKey: ["connections-welcome-triggers", orgId] });
   }
 
   async function handleRefresh(ch: ChannelRow) {
@@ -323,6 +399,9 @@ export function ConnectionsScreen() {
               onDelete={setConfirmDelete}
               onSetDepartment={handleSetDepartment}
               onSetCrm={handleSetCrm}
+              flows={flows}
+              welcomeByChannel={welcomeByChannel}
+              onSetInitialFlow={handleSetInitialFlow}
             />
           )}
         </div>
@@ -403,6 +482,9 @@ function ChannelList({
   onDelete,
   onSetDepartment,
   onSetCrm,
+  flows,
+  welcomeByChannel,
+  onSetInitialFlow,
 }: {
   channels: ChannelRow[];
   departments: DeptRow[];
@@ -416,6 +498,9 @@ function ChannelList({
   onDelete: (ch: ChannelRow) => void;
   onSetDepartment: (ch: ChannelRow, deptId: string | null) => void;
   onSetCrm: (ch: ChannelRow, patch: { crm_enabled?: boolean; crm_funnel_id?: string | null }) => void;
+  flows: FlowRow[];
+  welcomeByChannel: Record<string, string>;
+  onSetInitialFlow: (ch: ChannelRow, flowId: string | null) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -429,6 +514,8 @@ function ChannelList({
         const busy = busyId === ch.id;
         const deptName = departments.find((d) => d.id === ch.default_department_id)?.name ?? null;
         const funnelName = funnels.find((f) => f.id === ch.crm_funnel_id)?.name ?? null;
+        const initialFlowId = welcomeByChannel[ch.id] ?? "";
+        const initialFlowName = flows.find((f) => f.id === initialFlowId)?.name ?? null;
 
         return (
           <div key={ch.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
@@ -529,7 +616,37 @@ function ChannelList({
                   </span>
                 )}
               </div>
+
+              {/* F6 — Fluxo inicial (chatbot): dispara quando um número NOVO
+                  inicia conversa neste canal. Grava um gatilho welcome.
+                  Só dono/admin edita; atendente vê em texto. */}
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+                <span className="shrink-0 text-muted-foreground">Fluxo inicial (chatbot):</span>
+                {isAdmin ? (
+                  flows.length > 0 ? (
+                    <select
+                      className="h-7 max-w-[180px] rounded-md border border-border bg-background px-2 text-xs text-foreground disabled:opacity-60"
+                      value={initialFlowId}
+                      onChange={(e) => onSetInitialFlow(ch, e.target.value || null)}
+                      disabled={busy}
+                      title="Fluxo do chatbot que inicia quando um número novo escreve neste canal"
+                    >
+                      <option value="">Nenhum</option>
+                      {flows.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-muted-foreground">Crie um fluxo em Fluxos para usar aqui.</span>
+                  )
+                ) : (
+                  <span className="font-medium text-foreground">{initialFlowName ?? "Nenhum"}</span>
+                )}
+              </div>
             </div>
+
 
             <div className="ml-auto flex items-center gap-1">
               <Button

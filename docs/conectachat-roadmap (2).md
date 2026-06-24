@@ -1,0 +1,135 @@
+FASE A — CONSTRUTOR DE FLUXOS DE CHATBOT — ✅ CONCLUÍDA (F1–F6)
+
+Construtor visual de chatbot (estilo ManyChat/Typebot) rodando TUDO dentro do ConectaChat.
+Canvas drag-and-drop (React Flow / @xyflow/react v12). Motor COM ESTADO em produção (webhook v34).
+n8n rebaixado a destino opcional do nó HTTP Request.
+
+F1 — Fundação de dados ✅ (MEXEU no banco — ver migrations.sql "FASE A / F1")
+  4 tabelas (org_id + RLS "ALL" is_member_of): flows, flow_triggers, flow_sessions,
+  ai_credentials. Enums: flow_trigger_type, flow_session_status, ai_provider.
+  types.ts NÃO regenerado (frontend usa casts `as any`).
+
+F2 — Lista de Fluxos + canvas React Flow ✅ (só frontend)
+  Rota /flows aninhada (flows.tsx Outlet + index + $flowId). Nó "Início" verde
+  não-deletável. Editor tela cheia (fixed inset-0 z-50).
+
+F3 — Biblioteca de nós + painéis de config ✅ (frontend)
+  node-catalog.ts (6 categorias × 19 nós). flow-sidebar (drag-drop HTML5).
+  node-config-dialog (1 form por nodeType; config em data.config). Nós de Ação com
+  seletores reais (guardam ID). use-flow-resources.ts.
+
+F4 — MOTOR DE EXECUÇÃO ✅ (DEPLOYADO E TESTADO — embutido no whatsapp-webhook)
+  Inicia/retoma flow_session, executa nó-a-nó, lida com Menu/Pergunta que esperam
+  resposta. Disparo em segundo plano (EdgeRuntime.waitUntil). Trava humana
+  (assigned_user_id / closed). Gatilhos keyword→welcome(só conversa nova)→default.
+  Erros engolidos.
+
+F5a — IA REAL + MARKETPLACE DE CHAVES ✅ (DEPLOYADO E TESTADO EM PRODUÇÃO)
+  Edge Function ai-credentials (chaves mascaradas). Marketplace /integracoes (card IA
+  ativo; resto "Em breve"). Execução real da IA no motor: OpenAI/Claude/Gemini via
+  ai_credentials da empresa, com histórico (loadHistory normaliza para evitar 400).
+
+F5b — MODO "IA ASSUME A CONVERSA" (PERMANENTE) ✅ (DEPLOYADO)
+  Config do nó: behavior (once/permanent) + exitKeywords. No modo permanente a sessão
+  ESTACIONA no nó de IA e responde cada mensagem até: (a) o cliente digitar palavra de
+  saída → segue pela saída do nó; ou (b) um humano assumir (trava do F4). Memória
+  automática (loadHistory lê `messages`).
+
+F6 — POLIMENTO ✅ (CONCLUÍDO E TESTADO — webhook v34 no ar)
+  Item 1: botão FECHAR conversa no inbox (confirmado).
+  Item 2: gatilho "Fluxo Inicial" na tela da Conexão (welcome com channel_id).
+  Item 3: SAÍDAS MÚLTIPLAS no editor — 1 handle por saída (empilhados à direita, com
+          rótulo), id = o que o motor espera (menu "a"+tecla/posição; condition
+          true/false; schedule in/out). flow-editor.tsx substituído por completo.
+  Item 4: MENU resposta inválida + limite de tentativas (webhook v34). Avisa "opção
+          inválida" e repete; após maxTries (padrão 3) segue por aresta de ESCAPE
+          (saída solta, sem handle de opção) ou encerra. Campos no nó: invalidMessage,
+          maxTries.
+  Extra F6: REABERTURA de conversa (webhook v33→v34). Conversa fechada que recebe nova
+            mensagem é REABERTA (mesma conversa, histórico contínuo) + faixa verde
+            "Atendimento reaberto — <Depto>" no inbox (marcador 'system:reopen').
+  ADIADO p/ Fase B: número de chamado sequencial #NNNN (precisa migração).
+
+AJUSTES PÓS-FASE A (round de pequenas melhorias, antes da Fase B)
+  Há mais ajustes pequenos pendentes — seguirão em CHAT SEPARADO. Concluído até aqui:
+
+  R1 — RESPOSTAS RÁPIDAS COM MÍDIA + VARIÁVEIS ✅ (MEXEU no banco — ver migrations.sql,
+       bloco do topo "AJUSTES PÓS-FASE A — Respostas Rápidas (mídia)")
+    Banco: 3 colunas novas em quick_replies (media_path/name/type, text, nulas;
+    aditivas; types.ts regenerado pelo Lovable). Arquivos no bucket 'media' em
+    {org_id}/quick-replies/{uuid}.{ext}.
+    Parte A (criar/editar): novo componente quick-replies-settings.tsx, EXTRAÍDO do
+    settings-screen.tsx (~88KB → ~77KB). Anexar arquivo OU gravar áudio (até 16MB),
+    8 variáveis em chips ({{primeiro_nome}}/{{nome}}/{{atendente}}/{{saudacao}}/
+    {{data}}/{{hora}}/{{setor}}/{{conexao}}), permite resposta só de mídia. O
+    settings-screen.tsx agora só monta <QuickRepliesSettings/> na aba.
+    Parte B (usar no atendimento): inbox-screen.tsx resolve as 8 variáveis no envio e,
+    se a resposta tem mídia, baixa do Storage e abre a janela "Enviar arquivo" (legenda
+    = texto) reusando o send-media já existente. Clipe (Paperclip) no item do menu
+    quando tem mídia.
+    CAVEAT (a observar): áudio vai por send-media; se não tocar como nota de voz no
+    WhatsApp, rotear via send-audio (mesmo caminho do microfone do inbox).
+
+  R2 — NOTIFICAÇÕES PUSH POR ATENDENTE/DEPARTAMENTO ✅ (MEXEU no banco — ver
+       migrations.sql, bloco do topo "push_notify_route_by_assignee_and_department")
+    Cada usuário só recebe push das conversas que ATENDE (atribuídas a ele) + das
+    que estão AGUARDANDO no(s) departamento(s) dele. Para de receber conversas de
+    outros atendentes e aguardando de outros departamentos.
+    Mexeu SÓ no gatilho de banco notify_push_on_inbound_message: agora ele resolve
+    os destinatários em SQL (atendido → só o atendente; aguardando com depto →
+    membros do department_members; depto vazio ou sem depto → todos da empresa) e
+    manda { userIds } pronto para a push-send. 0 créditos Lovable, SEM redeploy de
+    Edge Function (push-send já aceitava userIds). Canal entra via department_id da
+    conversa (NÃO há tabela usuário↔canal; o canal define o depto de entrada).
+    Dono/admin TAMBÉM filtrado por departamento. Verificado na Duli (dry-run):
+    aguardando em "Comercial" → Lara + Renato; em "Clientes" → só Renato.
+
+  R3 — INBOX MOBILE: MENU DA MENSAGEM TOCÁVEL ✅ (só frontend, NÃO mexeu no banco)
+    No celular o menu de ações da mensagem (Responder/Copiar/Encaminhar/Fixar/
+    Favoritar/Apagar/Reagir) não aparecia porque a setinha era hover-only. Agora ela
+    fica sempre visível no mobile e segue só no hover no desktop. Edição de 1 linha
+    em src/components/inbox/inbox-screen.tsx (commit 18add76). Cross-check confirmou
+    que era o único recurso faltando no mobile — o resto já tinha equivalente.
+
+  R4 — CHAT INTERNO (colaborador ↔ colaborador) ✅ (MEXEU no banco — ver
+       migrations.sql, bloco do topo "CHAT INTERNO"; publicado via Lovable cc4348f)
+    Colaboradores da mesma empresa conversam entre si dentro do ConectaChat (tipo
+    Slack simplificado), separado das conversas com clientes. Entregue: 1:1 +
+    GRUPOS; texto + ANEXOS; PRESENÇA (online); PUSH. Rota /team-chat + item "Chat
+    interno" no menu. Construído do nosso jeito (Supabase + nossa UI), sem copiar o
+    AtendeZap (Socket.IO).
+    Banco: 3 tabelas novas (internal_chats, internal_chat_members, internal_messages)
+    com RLS POR PARTICIPANTE (helper is_internal_chat_member), RPC create_internal_chat
+    (cria chat+membros atômico; 1:1 reaproveita conversa existente) e 2 gatilhos
+    (last_message_*/unread + push que espelha o do inbox). Realtime nas 3 tabelas.
+    Presença via Supabase Realtime Presence (sem tabela). Anexos no bucket 'media'
+    ({org_id}/internal-chat/...; leitura por empresa, mensagens fechadas por
+    participante). Frontend: src/components/team-chat/* (use-team-chat.ts +
+    team-chat-screen.tsx), rota e item de menu; types.ts via (supabase as any).
+    NOTA: validação local impossível (máquina sem Node/Bun; build no Lovable) —
+    testado na Duli após publicar. v2 possível: editar/apagar msg, "visto",
+    anexos privados por conversa, gerenciar grupo, reações.
+
+DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem soft-launch):
+  Fase B — Relatórios/Dashboards (ref. conceitual: ReportService/Statistics do AtendeChat).
+           Inclui o número de chamado sequencial (#NNNN) adiado do F6.
+  Fase C — Marketplace de integrações reais (Calendly, Google Agenda, HubSpot).
+  Fase D — Atendente de IA.
+  Fase E — Stripe + enforcement de planos + LANÇAMENTO.
+    Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597
+    (anual ~17% off; trial 14 dias sem cartão). Stripe na conta da Duli
+    temporariamente; migrar para a entidade ConectaChat com ~10 pagantes ou 3 meses
+    (migração = trocar chaves de API + product IDs).
+
+Lições Fase A: <Outlet/> em rota-pai; editor fixed inset-0 z-50; drag-drop nativo HTML5;
+  config em data.config; nós de Ação guardam ID; saídas múltiplas = handle por saída
+  com id = o que o motor lê; Edge Functions Deno sem imports externos (helpers
+  embutidos); validar local antes de deploy; verificação pós-deploy sempre; edição na
+  tela do nó só persiste ao clicar Salvar; reabrir conversa (não criar nova) preserva
+  histórico; marcadores de sistema = mensagens external_message_id 'system:*'.
+
+Lições do round pós-Fase A: Lovable send_message pode reportar SUCESSO (commit + créditos)
+  e NÃO persistir — confiar no `edit_id` da resposta + get_diff(message_id); verificar
+  sempre e repetir se falhou. Arquivos grandes (settings-screen ~88KB, inbox ~124KB):
+  extrair features novas em componentes próprios e fazer edições cirúrgicas (achar/
+  substituir blocos exatos), nunca colar o arquivo inteiro.

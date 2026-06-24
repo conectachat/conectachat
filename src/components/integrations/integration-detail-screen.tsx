@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { findIntegration } from "@/components/integrations/integration-catalog";
 import { AiCredentialsCard } from "@/components/integrations/ai-credentials-card";
+import { CalendlyCard } from "@/components/integrations/calendly-card";
 
 export function IntegrationDetailScreen({ slug }: { slug: string }) {
   const { activeMembership } = useCurrentUser();
@@ -56,6 +57,8 @@ export function IntegrationDetailScreen({ slug }: { slug: string }) {
         <div className="mt-6">
           {slug === "ai" ? (
             <AiCredentialsCard orgId={orgId} />
+          ) : slug === "calendly" ? (
+            <CalendlyCard orgId={orgId} />
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
               Esta integração estará disponível em breve.

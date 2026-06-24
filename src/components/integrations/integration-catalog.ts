@@ -55,13 +55,13 @@ export const INTEGRATIONS: IntegrationItem[] = [
   },
   {
     slug: "calendly",
-    name: "Calendly / Agenda",
-    blurb: "Ofereça horários e marque reuniões direto na conversa, sincronizando com sua agenda.",
+    name: "Calendly",
+    blurb: "Conecte sua conta Calendly para agendar reuniões na conversa e enviar confirmação e lembrete pelo WhatsApp.",
     category: "Agendamento",
     icon: CalendarClock,
-    iconBg: "bg-muted",
-    iconColor: "text-muted-foreground",
-    status: "soon",
+    iconBg: "bg-brand-green/10",
+    iconColor: "text-brand-green",
+    status: "active",
   },
   {
     slug: "hubspot",

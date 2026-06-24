@@ -346,7 +346,7 @@ function MessageActions({
         <button
           type="button"
           title="Mais"
-          className="shrink-0 rounded-full p-1 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100 data-[state=open]:opacity-100"
+          className="shrink-0 rounded-full p-1 text-gray-400 opacity-100 transition-opacity hover:bg-gray-100 hover:text-gray-600 lg:opacity-0 lg:group-hover:opacity-100 data-[state=open]:opacity-100"
         >
           <ChevronDown size={16} />
         </button>

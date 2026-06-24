@@ -81,8 +81,16 @@ export function CalendlyAppointmentPanel({
   const [types, setTypes] = useState<EventType[] | null>(null);
   const [loadingTypes, setLoadingTypes] = useState(false);
   const [chosen, setChosen] = useState<EventType | null>(null);
+  const [rescheduleUrl, setRescheduleUrl] = useState<string | null>(null);
+  const reschedulingRef = useRef<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const embedRef = useRef<HTMLDivElement | null>(null);
+
+  function resetDialog() {
+    setChosen(null);
+    setRescheduleUrl(null);
+    reschedulingRef.current = null;
+  }
 
   async function loadAppointments() {
     const { data } = await sb
@@ -139,15 +147,23 @@ export function CalendlyAppointmentPanel({
   async function capture(eventUri: string, inviteeUri: string) {
     try {
       const { data, error } = await supabase.functions.invoke("calendly-api", {
-        body: { action: "capture_booking", orgId, conversationId, contactId, eventUri, inviteeUri },
+        body: {
+          action: "capture_booking",
+          orgId,
+          conversationId,
+          contactId,
+          eventUri,
+          inviteeUri,
+          rescheduledFromId: reschedulingRef.current,
+        },
       });
       if (error || !data?.ok) {
         toast.error("Agendou no Calendly, mas falhou ao registrar aqui.", { description: data?.error ?? error?.message });
         return;
       }
-      toast.success("Agendamento registrado!");
+      toast.success(reschedulingRef.current ? "Reunião remarcada!" : "Agendamento registrado!");
       setOpen(false);
-      setChosen(null);
+      resetDialog();
       await loadAppointments();
     } catch (e) {
       toast.error("Falha ao registrar o agendamento", { description: String((e as Error)?.message ?? e) });
@@ -176,25 +192,32 @@ export function CalendlyAppointmentPanel({
     }
   }
 
-  // Monta o embed quando um tipo de evento é escolhido.
+  // Monta o embed: remarcação usa o reschedule_url; agendamento usa o tipo escolhido.
   useEffect(() => {
-    if (!open || !chosen || !embedRef.current) return;
+    if (!open || !embedRef.current) return;
+    let url: string | null = null;
+    if (rescheduleUrl) {
+      url = rescheduleUrl;
+    } else if (chosen) {
+      // encodeURIComponent → espaço vira %20 (URLSearchParams usaria "+", que o Calendly exibe literal).
+      const parts: string[] = [];
+      if (contactName) parts.push(`name=${encodeURIComponent(contactName)}`);
+      if (contactEmail) parts.push(`email=${encodeURIComponent(contactEmail)}`);
+      const sep = chosen.scheduling_url.includes("?") ? "&" : "?";
+      url = parts.length ? `${chosen.scheduling_url}${sep}${parts.join("&")}` : chosen.scheduling_url;
+    }
+    if (!url) return;
+    const target = url;
     let cancelled = false;
-    // encodeURIComponent → espaço vira %20 (URLSearchParams usaria "+", que o Calendly exibe literal).
-    const parts: string[] = [];
-    if (contactName) parts.push(`name=${encodeURIComponent(contactName)}`);
-    if (contactEmail) parts.push(`email=${encodeURIComponent(contactEmail)}`);
-    const sep = chosen.scheduling_url.includes("?") ? "&" : "?";
-    const url = parts.length ? `${chosen.scheduling_url}${sep}${parts.join("&")}` : chosen.scheduling_url;
     loadCalendlyScript().then(() => {
       if (cancelled || !embedRef.current) return;
       embedRef.current.innerHTML = "";
-      (window as any).Calendly?.initInlineWidget({ url, parentElement: embedRef.current });
+      (window as any).Calendly?.initInlineWidget({ url: target, parentElement: embedRef.current });
     });
     return () => {
       cancelled = true;
     };
-  }, [open, chosen, contactName, contactEmail]);
+  }, [open, chosen, rescheduleUrl, contactName, contactEmail]);
 
   async function cancelar(appointmentId: string) {
     setBusyId(appointmentId);
@@ -257,14 +280,17 @@ export function CalendlyAppointmentPanel({
                   </a>
                 )}
                 {a.reschedule_url && (
-                  <a
-                    href={a.reschedule_url}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={() => {
+                      reschedulingRef.current = a.id;
+                      setChosen(null);
+                      setRescheduleUrl(a.reschedule_url);
+                      setOpen(true);
+                    }}
                     className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
                   >
                     <CalendarClock className="h-3 w-3" /> Remarcar
-                  </a>
+                  </button>
                 )}
                 <button
                   onClick={() => cancelar(a.id)}
@@ -279,13 +305,21 @@ export function CalendlyAppointmentPanel({
         </ul>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) resetDialog();
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Agendar reunião</DialogTitle>
+            <DialogTitle>{rescheduleUrl ? "Remarcar reunião" : "Agendar reunião"}</DialogTitle>
           </DialogHeader>
 
-          {loadingTypes ? (
+          {rescheduleUrl ? (
+            <div ref={embedRef} style={{ minWidth: "320px", height: "640px" }} />
+          ) : loadingTypes ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Carregando tipos de evento…</p>
           ) : !chosen ? (
             <div className="space-y-2">

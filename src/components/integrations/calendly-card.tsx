@@ -29,6 +29,8 @@ export function CalendlyCard({ orgId }: { orgId: string | null }) {
   const [loading, setLoading] = useState(true);
   const [conn, setConn] = useState<Connection | null>(null);
   const [busy, setBusy] = useState(false);
+  const [types, setTypes] = useState<any[] | null>(null);
+  const [typesLoading, setTypesLoading] = useState(false);
 
   async function carregar() {
     if (!orgId) return;
@@ -68,6 +70,32 @@ export function CalendlyCard({ orgId }: { orgId: string | null }) {
     carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId]);
+
+  // Quando conectado, busca os tipos de evento (valida a leitura da API).
+  useEffect(() => {
+    if (!conn || !orgId) {
+      setTypes(null);
+      return;
+    }
+    let active = true;
+    setTypesLoading(true);
+    supabase.functions
+      .invoke("calendly-api", { body: { action: "event_types", orgId } })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error || !data?.ok) {
+          setTypes([]);
+          return;
+        }
+        setTypes((data.event_types ?? []) as any[]);
+      })
+      .finally(() => {
+        if (active) setTypesLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [conn, orgId]);
 
   async function conectar() {
     if (!orgId) return;
@@ -153,6 +181,28 @@ export function CalendlyCard({ orgId }: { orgId: string | null }) {
                   ? "Conta paga: agendamento nativo, sincronização instantânea e automação no fluxo ficam disponíveis."
                   : "Conta grátis: agendar pela página do Calendly na conversa + confirmação e lembrete pelo WhatsApp. Conecte um Calendly pago para liberar agendamento nativo e sincronização instantânea."}
               </p>
+
+              <div className="rounded-md border border-border bg-background/50 p-3">
+                <p className="text-xs font-medium text-foreground">Tipos de evento</p>
+                {typesLoading ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Carregando…</p>
+                ) : types && types.length > 0 ? (
+                  <ul className="mt-1 space-y-1">
+                    {types.map((t) => (
+                      <li key={t.uri} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate text-foreground">{t.name}</span>
+                        {t.duration != null && (
+                          <span className="shrink-0 text-muted-foreground">{t.duration} min</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Nenhum tipo de evento ativo encontrado nesta conta.
+                  </p>
+                )}
+              </div>
 
               <Button variant="outline" size="sm" onClick={desconectar} disabled={busy} className="gap-1">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}

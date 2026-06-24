@@ -1,4 +1,44 @@
 /* ============================================================
+ * FASE C — INTEGRAÇÃO CALENDLY (C1–C4) — ✅ ENTREGUE e testado na Duli
+ * (próximo: C5 Pro nativo). Plano e progresso completos:
+ * docs/conectachat-calendly-plano.md (seção 0). Resumo:
+ * ============================================================
+ * Card único adaptativo no Marketplace (/integracoes/calendly): conecta a conta
+ * Calendly da empresa (OAuth) e DETECTA o plano — Light (grátis) ou Pro (pago).
+ *
+ * C1 — Conexão (OAuth + Vault): tabela calendly_connections; tokens OAuth no
+ *   Supabase VAULT (a tabela guarda só os IDs; funções calendly_* só service_role).
+ *   Detecção de plano: POST /webhook_subscriptions → 201 (apaga na hora) = Pro / 403 = Light.
+ *   Edge Functions: calendly-oauth-start (jwt on; state HMAC c/ a service key),
+ *   calendly-oauth-callback (jwt off; valida state; troca code; grava no Vault; redireciona
+ *   p/ app.conectachat.online/integracoes/calendly), calendly-disconnect (jwt on).
+ *   Secrets no Supabase: CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY.
+ * C2 — Leitura: Edge calendly-api (jwt on): event_types + available_times
+ *   (paginação de 7 dias) + RENOVAÇÃO de token com rotação de refresh. Card lista os
+ *   tipos de evento. Sem cache (ao vivo).
+ * C3 — Agendamento + card: tabela appointments (RLS+realtime; índice único
+ *   NÃO-parcial em calendly_invitee_uri — parcial quebra o upsert). calendly-api ganhou
+ *   capture_booking e cancel. Frontend: painel "Agendar" no painel de dados do contato
+ *   (src/components/inbox/calendly-appointment-panel.tsx) — botão Agendar abre o EMBED do
+ *   Calendly (script assets.calendly.com), captura calendly.event_scheduled, mostra card
+ *   (data/hora no fuso, Entrar, Remarcar, Cancelar). Remarcar abre o reschedule_url no
+ *   MESMO embed (não há API de remarcação) e marca o antigo como rescheduled. Prefill com %20.
+ * C4 — Mensagens automáticas (WhatsApp): REUSA scheduled_messages + a Edge run-scheduled
+ *   (cron 1 min; já resolve {{nome}}/{{primeiro_nome}}). NÃO criar fila nova. calendly-api (v4)
+ *   gera confirmação/lembrete ao capturar (variáveis Calendly resolvidas na geração:
+ *   {{tipo_evento}}/{{data_reuniao}}/{{hora_reuniao}}/{{link_reuniao}}/{{link_remarcar}}/
+ *   {{link_cancelar}}; scheduled_at = início − offset; só se habilitado e no futuro) e cancela
+ *   pendentes em cancelar/remarcar. Banco: calendly_message_settings (por org) + colunas
+ *   appointment_id/kind em scheduled_messages. Config na página da integração Calendly
+ *   (calendly-messages-settings.tsx): toggles, tempos, textos com chips, aviso sobre lembretes nativos.
+ *
+ * EM ABERTO (anotado): trava de renovação simultânea de token (cenário raro); C5 Pro nativo
+ *   (Scheduling API, sem iframe, tratar location); C6 sync (webhook Pro + polling Light 5min);
+ *   C7 nó no fluxo (depende do F4); C8 relatórios. Decisões fixadas: tokens=Vault; polling
+ *   Light=5min; tempos padrão conf 24h/lembrete 2h; lembretes nativos = empresa decide na config.
+ */
+
+/* ============================================================
  * FASE B — RELATÓRIOS/DASHBOARDS + Nº DE CHAMADO #NNNN — ✅ ENTREGUE (v1)
  * ============================================================
  * Telas de métricas de atendimento + número de chamado sequencial por empresa

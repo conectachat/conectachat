@@ -117,7 +117,11 @@ DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem s
            filtros + CSV, e número de chamado #NNNN por empresa (no inbox). Períodos e quebra por
            dia calculados no FUSO DA EMPRESA (organizations.timezone). Em aberto p/ evoluir:
            restringir /dashboard a dono/admin.
-  Fase C — Marketplace de integrações reais (Calendly, Google Agenda, HubSpot).
+  Fase C — Integrações reais. CALENDLY: C0–C4 ✅ ENTREGUES e testados (conexão OAuth + Vault com
+           detecção Light/Pro; leitura; agendamento via embed com card/cancelar/remarcar; confirmação
+           e lembrete automáticos pelo WhatsApp reusando scheduled_messages + run-scheduled). Próximo:
+           C5 (Pro nativo via Scheduling API), depois C6 (sync webhook/poll), C7 (nó no fluxo — depende
+           do F4), C8 (relatórios). Detalhe: docs/conectachat-calendly-plano.md. Depois: Google Agenda, HubSpot.
   Fase D — Atendente de IA.
   Fase E — Stripe + enforcement de planos + LANÇAMENTO.
     Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597

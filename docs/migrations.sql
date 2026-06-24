@@ -1,4 +1,86 @@
 -- ---------------------------------------------------------------------
+--  FASE C — INTEGRAÇÃO CALENDLY (C1–C4)  (APLICADAS em produção, 2026-06-24)
+--  Migrações: calendly_connections_with_vault, appointments,
+--  appointments_invitee_unique_full, calendly_message_settings_and_queue_link.
+--  Só objetos novos / colunas aditivas. Tokens OAuth no Supabase VAULT.
+--  Detalhe completo do bloco: docs/conectachat-calendly-plano.md.
+-- ---------------------------------------------------------------------
+
+-- (C1) Conexão por empresa — tokens no Vault (a tabela guarda só os IDs)
+create table public.calendly_connections (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations(id) on delete cascade,
+  access_token_secret_id uuid not null,   -- vault.secrets.id
+  refresh_token_secret_id uuid not null,  -- vault.secrets.id
+  token_expires_at timestamptz not null,
+  calendly_user_uri text not null,
+  organization_uri text not null,
+  scope text,
+  plan_tier text not null default 'light',   -- 'light' | 'pro'
+  webhook_subscription_uri text,
+  status text not null default 'active',      -- 'active' | 'revoked' | 'error'
+  last_plan_check_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (org_id)
+);
+alter table public.calendly_connections enable row level security;
+create policy calendly_conn_select on public.calendly_connections
+  for select using (is_member_of(org_id));
+-- Funções SECURITY DEFINER; REVOKE de public/anon/authenticated; GRANT só a service_role
+-- (corpo completo na migração calendly_connections_with_vault):
+--   calendly_save_connection(org,access,refresh,expires,user_uri,org_uri,scope,tier,webhook)
+--     → cria/atualiza segredos no Vault (vault.create_secret/update_secret) + upsert da conexão.
+--   calendly_read_tokens(org) → access/refresh decifrados (vault.decrypted_secrets) + expires/tier/status.
+--   calendly_update_tokens(org,access,refresh,expires) → rotação do refresh.
+--   calendly_set_status(org,status) | calendly_disconnect(org) → apaga conexão + segredos do Vault.
+
+-- (C3) Agendamento ligado à conversa
+create table public.appointments (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations(id) on delete cascade,
+  conversation_id uuid references public.conversations(id) on delete set null,
+  contact_id uuid references public.contacts(id) on delete set null,
+  calendly_event_uri text, calendly_invitee_uri text, event_type_name text,
+  start_time timestamptz not null, end_time timestamptz,
+  status text not null default 'active',   -- 'active' | 'canceled' | 'rescheduled'
+  join_url text, cancel_url text, reschedule_url text,
+  invitee_name text, invitee_email text, invitee_timezone text,
+  created_by uuid, source text, raw jsonb,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create index on public.appointments (org_id);
+create index on public.appointments (conversation_id);
+create index on public.appointments (contact_id);
+-- ATENÇÃO: índice único NÃO-parcial (um índice PARCIAL quebra o upsert onConflict):
+create unique index appointments_calendly_invitee_uri_idx on public.appointments (calendly_invitee_uri);
+alter table public.appointments enable row level security;
+create policy appointments_select on public.appointments for select using (is_member_of(org_id));
+alter table public.appointments replica identity full;
+alter publication supabase_realtime add table public.appointments;
+
+-- (C4) Config de mensagens automáticas + ligação com a fila EXISTENTE (scheduled_messages)
+create table public.calendly_message_settings (
+  org_id uuid primary key references public.organizations(id) on delete cascade,
+  confirmation_enabled boolean not null default true,
+  confirmation_offset_minutes int not null default 1440,
+  confirmation_template text not null default '... {{primeiro_nome}} ... {{tipo_evento}} ... {{data_reuniao}} ... {{hora_reuniao}} ... {{link_remarcar}}',
+  reminder_enabled boolean not null default true,
+  reminder_offset_minutes int not null default 120,
+  reminder_template text not null default '... {{primeiro_nome}} ... {{tipo_evento}} ... {{hora_reuniao}} ... {{link_reuniao}}',
+  updated_at timestamptz not null default now()
+);
+alter table public.calendly_message_settings enable row level security;
+create policy calendly_msg_settings_all on public.calendly_message_settings
+  for all using (is_member_of(org_id)) with check (is_member_of(org_id));
+-- scheduled_messages (tabela EXISTENTE, reusada): +appointment_id (FK appointments), +kind ('confirmation'|'reminder')
+alter table public.scheduled_messages
+  add column appointment_id uuid references public.appointments(id) on delete cascade,
+  add column kind text;
+create index on public.scheduled_messages (appointment_id);
+
+
+-- ---------------------------------------------------------------------
 --  FASE B — RELATÓRIOS/DASHBOARDS + Nº DE CHAMADO #NNNN
 --  Migrações: reports_conversation_timestamps + conversation_ticket_number +
 --  report_functions (APLICADAS em produção, 2026-06-24). Só objetos novos /

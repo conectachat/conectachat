@@ -50,7 +50,15 @@ import {
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
-type QuickReply = { id: string; shortcut: string; title: string | null; content: string };
+type QuickReply = {
+  id: string;
+  shortcut: string;
+  title: string | null;
+  content: string;
+  media_path: string | null;
+  media_name: string | null;
+  media_type: string | null;
+};
 
 // H.3b-3 — mensagem "otimista": aparece na hora (antes do servidor confirmar).
 // _optimistic marca a bolha temporária; _convId guarda em qual conversa ela vive.
@@ -999,7 +1007,7 @@ export function InboxScreen() {
     let active = true;
     supabase
       .from("quick_replies")
-      .select("id, shortcut, title, content")
+      .select("id, shortcut, title, content, media_path, media_name, media_type")
       .eq("active", true)
       .order("shortcut")
       .then(({ data }) => {
@@ -1025,9 +1033,61 @@ export function InboxScreen() {
     setQrIndex(0);
   }, [qrQuery]);
 
-  function applyQuickReply(q: QuickReply) {
-    const nome = contact?.name?.trim() || displayName(contact);
-    const text = q.content.replace(/\{\{\s*nome\s*\}\}/gi, nome);
+  // Resolve as {{variáveis}} para o valor real no momento do envio.
+  function resolveVariables(text: string): string {
+    const nomeCompleto = contact?.name?.trim() || displayName(contact);
+    const primeiroNome = nomeCompleto.trim().split(/\s+/)[0] || nomeCompleto;
+    const atendente = (user?.id ? memberNames[user.id] : "") || user?.email || "Atendente";
+    const setor = selected?.department?.name || "";
+    const conexao = selected?.channel?.name || "";
+    const now = new Date();
+    const data = now.toLocaleDateString("pt-BR");
+    const hora = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const h = now.getHours();
+    const saudacao = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+    const map: Record<string, string> = {
+      primeiro_nome: primeiroNome,
+      nome: nomeCompleto,
+      atendente,
+      saudacao,
+      data,
+      hora,
+      setor,
+      conexao,
+    };
+    return text.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (full, token) => {
+      const key = String(token).toLowerCase();
+      return key in map ? map[key] : full;
+    });
+  }
+
+  // Aplica a resposta rápida: troca as variáveis e, se houver mídia, abre a
+  // pré-visualização de envio (a mesma janela de "Enviar arquivo"), com o texto
+  // como legenda. Sem mídia, só coloca o texto resolvido no campo.
+  async function applyQuickReply(q: QuickReply) {
+    const text = resolveVariables(q.content || "");
+    if (q.media_path) {
+      try {
+        const { data: blob, error } = await supabase.storage.from("media").download(q.media_path);
+        if (error || !blob) {
+          toast.error("Não foi possível carregar a mídia da resposta.");
+          setDraft(text);
+          setPendingCursor(text.length);
+          return;
+        }
+        const file = new File([blob], q.media_name || "arquivo", {
+          type: blob.type || "application/octet-stream",
+        });
+        const url = (blob.type || "").startsWith("image/") ? URL.createObjectURL(file) : null;
+        setPendingMedia({ file, url, caption: text });
+        setDraft("");
+      } catch {
+        toast.error("Não foi possível carregar a mídia da resposta.");
+        setDraft(text);
+        setPendingCursor(text.length);
+      }
+      return;
+    }
     setDraft(text);
     setPendingCursor(text.length);
   }
@@ -2062,6 +2122,7 @@ export function InboxScreen() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-900">{q.title?.trim() || q.shortcut}</span>
                         <span className="text-xs text-gray-500">/{q.shortcut}</span>
+                        {q.media_path && <Paperclip size={12} className="text-gray-400" />}
                       </div>
                       <p className="truncate text-xs text-gray-500">{q.content}</p>
                     </button>

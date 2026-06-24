@@ -233,15 +233,6 @@ export function SettingsScreen() {
   const [fieldBusy, setFieldBusy] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
-  // Quick replies state
-  const [qrSearch, setQrSearch] = useState("");
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [editingQr, setEditingQr] = useState<QuickReply | null>(null);
-  const [qrShortcut, setQrShortcut] = useState("");
-  const [qrTitle, setQrTitle] = useState("");
-  const [qrContent, setQrContent] = useState("");
-  const [qrBusy, setQrBusy] = useState(false);
-  const [qrError, setQrError] = useState<string | null>(null);
 
   // Departamentos state (Fase 2 / Passo 1)
   const [deptModalOpen, setDeptModalOpen] = useState(false);

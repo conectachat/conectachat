@@ -7,6 +7,19 @@
 
 ---
 
+## 0. Progresso da implementação (atualizado 2026-06-24)
+
+- **C0 — Validação:** ✅ fechado (embed inline OK no grátis; leitura GET OK no grátis; detecção de plano por 403/200 confirmada por doc e na prática).
+- **C1 — Conexão:** ✅ ENTREGUE e testado na Duli (Pro na conta paga, Light na grátis).
+  - Banco: `calendly_connections` (1/org) + tokens no **Vault** (funções `calendly_save_connection` / `calendly_read_tokens` / `calendly_update_tokens` / `calendly_set_status` / `calendly_disconnect`, todas só `service_role`).
+  - Edge Functions: `calendly-oauth-start` (jwt on), `calendly-oauth-callback` (jwt off; valida state HMAC; detecção de plano create+delete), `calendly-disconnect` (jwt on).
+  - Frontend: card no Marketplace (slug `calendly` ativo) — conectar / plano (Light/Pro) / desconectar.
+  - Secrets no Supabase: `CALENDLY_CLIENT_ID` / `CALENDLY_CLIENT_SECRET` / `CALENDLY_WEBHOOK_SIGNING_KEY`.
+- **C2 — Leitura:** ✅ ENTREGUE e testado. Edge Function `calendly-api` (jwt on): `event_types` + `available_times` (paginação de 7 dias) + **renovação de token com rotação de refresh**. Card lista os tipos de evento. Sem cache (leitura ao vivo).
+- **Próximo:** C3 — agendamento + card do agendamento.
+
+---
+
 ## 1. Objetivo
 
 Permitir que cada empresa cliente do ConectaChat conecte sua própria conta Calendly e, dentro do inbox, agende reuniões com o cliente final — sem o cliente final sair do WhatsApp. Sobre o agendamento, disparar **mensagens de confirmação e lembrete pelo próprio WhatsApp** (texto padrão editável, tempo configurável antes da reunião) e, mais à frente, permitir que um **fluxo/IA** faça confirmação e remarcação automaticamente.

@@ -11,6 +11,7 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Logo } from "@/components/shared/logo";
 import { ContactTagsSection } from "@/components/contacts/contact-tags";
 import { ConversationCrmCard } from "@/components/crm/conversation-crm";
+import { CalendlyAppointmentPanel } from "@/components/inbox/calendly-appointment-panel";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Paperclip,
@@ -2523,6 +2524,16 @@ export function InboxScreen() {
 
             <div className="mt-6 border-t border-gray-200 pt-4">
               <ConversationCrmCard conversationId={selected.id} contactId={contact.id} orgId={orgId} />
+            </div>
+
+            <div className="mt-6 border-t border-gray-200 pt-4">
+              <CalendlyAppointmentPanel
+                orgId={orgId}
+                conversationId={selected.id}
+                contactId={contact.id}
+                contactName={displayName(contact)}
+                contactEmail={contact.email}
+              />
             </div>
 
             <div className="mt-6 border-t border-gray-200 pt-4">

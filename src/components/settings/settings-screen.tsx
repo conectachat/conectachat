@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TAG_PALETTE, ColorPicker, type Tag as TagType } from "@/components/contacts/contact-tags";
 import { CompanyDetailsCard } from "@/components/settings/company-details-card";
 import { NotificationsCard } from "@/components/settings/notifications-card";
+import { QuickRepliesSettings } from "@/components/settings/quick-replies-settings";
 
 type FieldType = "text" | "number" | "date";
 type CustomField = {
@@ -41,14 +42,6 @@ const FIELD_TYPE_LABEL: Record<FieldType, string> = {
   text: "Texto",
   number: "Número",
   date: "Data",
-};
-
-type QuickReply = {
-  id: string;
-  shortcut: string;
-  title: string | null;
-  content: string;
-  active: boolean;
 };
 
 // --- Fase 2 / Passo 1: Departamentos --------------------------------------

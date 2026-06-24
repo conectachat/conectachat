@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type ConversationListItem = {
   id: string;
+  ticket_number: number | null;
   status: "open" | "pending" | "closed";
   assigned_user_id: string | null;
   department_id: string | null;
@@ -33,7 +34,7 @@ export function useConversations() {
         .from("conversations")
         .select(
           `
-          id, status, last_message_at, created_at, unread_count, assigned_user_id, department_id,
+          id, ticket_number, status, last_message_at, created_at, unread_count, assigned_user_id, department_id,
           contact:contacts ( id, name, name_locked, is_group, avatar_url, channel_type, external_id, email, birth_date, notes ),
           channel:channels ( id, name, type ),
           department:departments ( id, name )

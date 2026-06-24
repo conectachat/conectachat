@@ -1,4 +1,112 @@
 -- ---------------------------------------------------------------------
+--  FASE B — RELATÓRIOS/DASHBOARDS + Nº DE CHAMADO #NNNN
+--  Migrações: reports_conversation_timestamps + conversation_ticket_number +
+--  report_functions (APLICADAS em produção, 2026-06-24). Só objetos novos /
+--  colunas aditivas — não altera dados existentes (além do backfill).
+--
+--  (B1) conversations += closed_at, first_response_at (timestamptz, nulas).
+--    Gatilhos: set_conversation_first_response (1º outbound carimba first_response_at)
+--    e set_conversation_closed_at (status→closed grava closed_at; reabrir zera).
+--    Backfill: first_response_at = min(outbound) por conversa; closed_at =
+--    coalesce(last_message_at, created_at) p/ as já fechadas.
+--  (B2) conversations += ticket_number bigint. Tabela org_ticket_counters
+--    (org_id PK, last_number). Gatilho assign_ticket_number (BEFORE INSERT,
+--    quando ticket_number is null) faz UPSERT atômico no contador. Backfill
+--    numera as existentes por created_at por org; contador semeado no max.
+--    Índice único (org_id, ticket_number). RLS no contador: select is_member_of.
+--  (B3) 5 funções de relatório SECURITY DEFINER (validam is_member_of(p_org_id),
+--    agregam em SQL; filtros período/canal/depto/atendente):
+--    report_overview (jsonb com KPIs: novas, encerradas, abertas, aguardando,
+--      recebidas, enviadas, transferencias, tma_primeira_resposta_seg,
+--      tma_atendimento_seg, aguardando_mais_1h),
+--    report_timeseries (por dia: conversas/recebidas/enviadas),
+--    report_by_agent, report_by_channel, report_by_department.
+--    NOTA: quebra por dia usa created_at::date (UTC) — refinar p/ fuso depois.
+-- ---------------------------------------------------------------------
+
+-- (B1)
+alter table public.conversations
+  add column closed_at timestamptz,
+  add column first_response_at timestamptz;
+
+create or replace function public.set_conversation_first_response()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if NEW.direction = 'outbound' then
+    update public.conversations set first_response_at = NEW.created_at
+     where id = NEW.conversation_id and first_response_at is null;
+  end if;
+  return NEW;
+end; $$;
+create trigger trg_set_first_response after insert on public.messages
+  for each row execute function public.set_conversation_first_response();
+
+create or replace function public.set_conversation_closed_at()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if NEW.status = 'closed' and OLD.status is distinct from 'closed' then
+    NEW.closed_at = now();
+  elsif NEW.status is distinct from 'closed' and OLD.status = 'closed' then
+    NEW.closed_at = null;
+  end if;
+  return NEW;
+end; $$;
+create trigger trg_set_closed_at before update on public.conversations
+  for each row execute function public.set_conversation_closed_at();
+
+-- backfill B1
+update public.conversations c set first_response_at = s.min_out
+  from (select conversation_id, min(created_at) min_out from public.messages
+        where direction='outbound' group by conversation_id) s
+ where s.conversation_id = c.id and c.first_response_at is null;
+update public.conversations c set closed_at = coalesce(c.last_message_at, c.created_at)
+ where c.status='closed' and c.closed_at is null;
+
+-- (B2)
+create table public.org_ticket_counters (
+  org_id uuid primary key references public.organizations(id) on delete cascade,
+  last_number bigint not null default 0
+);
+alter table public.org_ticket_counters enable row level security;
+create policy counters_select on public.org_ticket_counters
+  for select using (is_member_of(org_id));
+
+alter table public.conversations add column ticket_number bigint;
+
+with ranked as (
+  select id, row_number() over (partition by org_id order by created_at, id) as rn
+  from public.conversations
+)
+update public.conversations c set ticket_number = r.rn
+from ranked r where r.id = c.id and c.ticket_number is null;
+
+insert into public.org_ticket_counters (org_id, last_number)
+select org_id, max(ticket_number) from public.conversations group by org_id
+on conflict (org_id) do update set last_number = excluded.last_number;
+
+create or replace function public.assign_ticket_number()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_num bigint;
+begin
+  insert into public.org_ticket_counters (org_id, last_number) values (NEW.org_id, 1)
+  on conflict (org_id) do update set last_number = org_ticket_counters.last_number + 1
+  returning last_number into v_num;
+  NEW.ticket_number := v_num;
+  return NEW;
+end; $$;
+create trigger trg_assign_ticket_number before insert on public.conversations
+  for each row when (NEW.ticket_number is null)
+  execute function public.assign_ticket_number();
+
+create unique index on public.conversations (org_id, ticket_number);
+
+-- (B3) funções report_* — corpo completo no histórico de migrações do Supabase
+--   (report_overview / report_timeseries / report_by_agent /
+--    report_by_channel / report_by_department). Padrão: 1ª linha
+--   "if not is_member_of(p_org_id) then raise exception 'forbidden'; end if;".
+
+
+-- ---------------------------------------------------------------------
 --  AJUSTES PÓS-FASE A — CHAT INTERNO (mensagens entre colaboradores)
 --  Migrações: create_internal_chat + internal_chat_triggers_and_realtime
 --  (APLICADAS em produção, 2026-06-24).

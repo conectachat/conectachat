@@ -111,8 +111,11 @@ AJUSTES PÓS-FASE A (round de pequenas melhorias, antes da Fase B)
     anexos privados por conversa, gerenciar grupo, reações.
 
 DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem soft-launch):
-  Fase B — Relatórios/Dashboards (ref. conceitual: ReportService/Statistics do AtendeChat).
-           Inclui o número de chamado sequencial (#NNNN) adiado do F6.
+  Fase B — Relatórios/Dashboards ✅ ENTREGUE v1 (ver estado-atual.md / migrations.sql topo "FASE B").
+           Métricas no banco (funções report_*), tela /reports (KPIs + gráfico recharts +
+           tabelas por atendente/canal/depto + filtros + CSV) e número de chamado #NNNN por
+           empresa (no inbox). Em aberto p/ evoluir: restringir relatórios a dono/admin;
+           fuso horário na quebra por dia (hoje UTC).
   Fase C — Marketplace de integrações reais (Calendly, Google Agenda, HubSpot).
   Fase D — Atendente de IA.
   Fase E — Stripe + enforcement de planos + LANÇAMENTO.

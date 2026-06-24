@@ -1,4 +1,52 @@
 /* ============================================================
+ * FASE B — RELATÓRIOS/DASHBOARDS + Nº DE CHAMADO #NNNN — ✅ ENTREGUE (v1)
+ * ============================================================
+ * Telas de métricas de atendimento + número de chamado sequencial por empresa
+ * (#NNNN, herdado da Fase A). Métricas calculadas NO BANCO (funções report_*),
+ * não no navegador — mais rápido, correto e isolado por empresa. Publicado via
+ * Lovable. Inspirado no dashboard/relatorios do AtendeZap (KPIs + série por dia +
+ * tabelas + CSV), adaptado ao nosso foco em atendimento (não funil de vendas).
+ *
+ * BANCO (produção, 3 migrações — ver migrations.sql topo "FASE B"):
+ *   B1: conversations += closed_at, first_response_at (nulas) + 2 gatilhos que as
+ *     preenchem (1º outbound = first_response_at; status→closed = closed_at; reabrir
+ *     zera) + backfill do histórico (aproximado).
+ *   B2: conversations += ticket_number bigint; tabela org_ticket_counters + gatilho
+ *     assign_ticket_number (UPSERT atômico, BEFORE INSERT) + backfill por created_at
+ *     por org + índice único (org_id, ticket_number). Numeração por EMPRESA (Duli
+ *     ficou 1..27; próxima = 28).
+ *   B3: 5 funções SECURITY DEFINER (validam is_member_of, agregam em SQL, filtros
+ *     período/canal/depto/atendente): report_overview (KPIs em jsonb),
+ *     report_timeseries (por dia), report_by_agent, report_by_channel,
+ *     report_by_department. Validado na Duli (90 dias): novas 27, recebidas 162 +
+ *     enviadas 168 = 330 (total exato).
+ *
+ * FRONTEND (types.ts via (supabase as any), padrão do projeto):
+ *   - src/components/reports/use-reports.ts: hooks das 5 RPCs (useReportOverview/
+ *     Timeseries/ByAgent/ByChannel/ByDepartment) + useReportFilterOptions (listas de
+ *     canal/depto/atendente) + formatDuration (segundos → "Xh Ym").
+ *   - src/components/reports/reports-screen.tsx: filtros (período hoje/7d/30d/custom +
+ *     canal + depto + atendente), 9 cards de KPI, gráfico de área (recharts, verde/
+ *     azul da marca), tabela por atendente, tabelas por canal e por departamento,
+ *     export CSV (BOM + ';' p/ Excel pt-BR).
+ *   - src/routes/_authenticated/reports.tsx: rota /reports.
+ *   - src/components/shared/app-sidebar.tsx: item "Relatórios" (ícone BarChart3).
+ *   - #NNNN no inbox: use-conversations.ts passou a trazer ticket_number; o cabeçalho
+ *     da conversa (inbox-screen.tsx) mostra "#0001" (padStart 4) ao lado do canal.
+ *
+ * DECISÕES EM ABERTO (não bloqueiam; anotadas p/ evoluir):
+ *   - Visibilidade: /reports hoje é visível a TODOS os membros (dados isolados por
+ *     RLS). AtendeZap restringe a dono/admin — dá p/ restringir menu/rota depois.
+ *   - Fuso: report_timeseries agrupa por created_at::date (UTC). Brasília (UTC-3)
+ *     pode jogar madrugada p/ o dia anterior — refinar com timezone se incomodar.
+ *   - Tempos médios históricos saíram do backfill (aproximados); dados novos são
+ *     precisos (gatilhos em tempo real).
+ *
+ * VALIDAÇÃO: backend conferido direto no banco (números batem); frontend NÃO roda
+ *   local (máquina sem Node/Bun) — validação real no build do Lovable + Duli.
+ */
+
+/* ============================================================
  * AJUSTE PÓS-FASE A — CHAT INTERNO (colaborador ↔ colaborador) — ✅ CONCLUÍDO
  * ============================================================
  * Objetivo: colaboradores da MESMA empresa conversam entre si dentro do

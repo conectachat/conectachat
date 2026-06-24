@@ -1698,6 +1698,11 @@ export function InboxScreen() {
                     {displayName(selected.contact)}
                   </button>
                   <p className="truncate text-xs text-gray-500">
+                    {selected.ticket_number != null && (
+                      <span className="mr-1.5 font-mono text-[10px] font-medium text-gray-400">
+                        #{String(selected.ticket_number).padStart(4, "0")}
+                      </span>
+                    )}
                     {selected.contact?.is_group && (
                       <span className="mr-1.5 rounded bg-brand-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-blue">
                         Grupo

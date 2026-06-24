@@ -16,6 +16,7 @@ import {
   Workflow,
   Blocks,
   MessagesSquare,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
@@ -46,6 +47,7 @@ const items: NavItemData[] = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
   { title: "Chat interno", url: "/team-chat", icon: MessagesSquare },
   { title: "CRM", url: "/crm", icon: SquareKanban },
+  { title: "Relatórios", url: "/reports", icon: BarChart3 },
   { title: "Fluxos", url: "/flows", icon: Workflow },
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },

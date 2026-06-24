@@ -1033,9 +1033,61 @@ export function InboxScreen() {
     setQrIndex(0);
   }, [qrQuery]);
 
-  function applyQuickReply(q: QuickReply) {
-    const nome = contact?.name?.trim() || displayName(contact);
-    const text = q.content.replace(/\{\{\s*nome\s*\}\}/gi, nome);
+  // Resolve as {{variáveis}} para o valor real no momento do envio.
+  function resolveVariables(text: string): string {
+    const nomeCompleto = contact?.name?.trim() || displayName(contact);
+    const primeiroNome = nomeCompleto.trim().split(/\s+/)[0] || nomeCompleto;
+    const atendente = (user?.id ? memberNames[user.id] : "") || user?.email || "Atendente";
+    const setor = selected?.department?.name || "";
+    const conexao = selected?.channel?.name || "";
+    const now = new Date();
+    const data = now.toLocaleDateString("pt-BR");
+    const hora = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const h = now.getHours();
+    const saudacao = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+    const map: Record<string, string> = {
+      primeiro_nome: primeiroNome,
+      nome: nomeCompleto,
+      atendente,
+      saudacao,
+      data,
+      hora,
+      setor,
+      conexao,
+    };
+    return text.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (full, token) => {
+      const key = String(token).toLowerCase();
+      return key in map ? map[key] : full;
+    });
+  }
+
+  // Aplica a resposta rápida: troca as variáveis e, se houver mídia, abre a
+  // pré-visualização de envio (a mesma janela de "Enviar arquivo"), com o texto
+  // como legenda. Sem mídia, só coloca o texto resolvido no campo.
+  async function applyQuickReply(q: QuickReply) {
+    const text = resolveVariables(q.content || "");
+    if (q.media_path) {
+      try {
+        const { data: blob, error } = await supabase.storage.from("media").download(q.media_path);
+        if (error || !blob) {
+          toast.error("Não foi possível carregar a mídia da resposta.");
+          setDraft(text);
+          setPendingCursor(text.length);
+          return;
+        }
+        const file = new File([blob], q.media_name || "arquivo", {
+          type: blob.type || "application/octet-stream",
+        });
+        const url = (blob.type || "").startsWith("image/") ? URL.createObjectURL(file) : null;
+        setPendingMedia({ file, url, caption: text });
+        setDraft("");
+      } catch {
+        toast.error("Não foi possível carregar a mídia da resposta.");
+        setDraft(text);
+        setPendingCursor(text.length);
+      }
+      return;
+    }
     setDraft(text);
     setPendingCursor(text.length);
   }

@@ -180,11 +180,12 @@ export function CalendlyAppointmentPanel({
   useEffect(() => {
     if (!open || !chosen || !embedRef.current) return;
     let cancelled = false;
-    const params = new URLSearchParams();
-    if (contactName) params.set("name", contactName);
-    if (contactEmail) params.set("email", contactEmail);
+    // encodeURIComponent → espaço vira %20 (URLSearchParams usaria "+", que o Calendly exibe literal).
+    const parts: string[] = [];
+    if (contactName) parts.push(`name=${encodeURIComponent(contactName)}`);
+    if (contactEmail) parts.push(`email=${encodeURIComponent(contactEmail)}`);
     const sep = chosen.scheduling_url.includes("?") ? "&" : "?";
-    const url = params.toString() ? `${chosen.scheduling_url}${sep}${params.toString()}` : chosen.scheduling_url;
+    const url = parts.length ? `${chosen.scheduling_url}${sep}${parts.join("&")}` : chosen.scheduling_url;
     loadCalendlyScript().then(() => {
       if (cancelled || !embedRef.current) return;
       embedRef.current.innerHTML = "";

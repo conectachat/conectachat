@@ -16,7 +16,17 @@
   - Frontend: card no Marketplace (slug `calendly` ativo) — conectar / plano (Light/Pro) / desconectar.
   - Secrets no Supabase: `CALENDLY_CLIENT_ID` / `CALENDLY_CLIENT_SECRET` / `CALENDLY_WEBHOOK_SIGNING_KEY`.
 - **C2 — Leitura:** ✅ ENTREGUE e testado. Edge Function `calendly-api` (jwt on): `event_types` + `available_times` (paginação de 7 dias) + **renovação de token com rotação de refresh**. Card lista os tipos de evento. Sem cache (leitura ao vivo).
-- **Próximo:** C3 — agendamento + card do agendamento.
+- **C3 — Agendamento + card:** ✅ ENTREGUE e testado na Duli.
+  - Banco: tabela `appointments` (RLS select + realtime; índice único NÃO-parcial em `calendly_invitee_uri`).
+  - `calendly-api` ganhou `capture_booking` (puxa evento/invitee e grava) e `cancel` (POST `/scheduled_events/{uuid}/cancellation`).
+  - Frontend: `src/components/inbox/calendly-appointment-panel.tsx` no painel de dados do contato — botão **Agendar** abre o **embed** do Calendly (script assets.calendly.com), captura `calendly.event_scheduled`, mostra card (data/hora no fuso, Entrar, Remarcar, Cancelar). **Remarcar** abre o `reschedule_url` no MESMO embed (não há API de remarcação) e marca o antigo como `rescheduled`. Prefill de nome usa `%20` (não `+`).
+- **C4 — Mensagens automáticas (WhatsApp):** ✅ ENTREGUE e testado.
+  - REUSA `scheduled_messages` + a Edge `run-scheduled` (cron 1 min, já resolve `{{nome}}`/`{{primeiro_nome}}`). NÃO criar fila nova.
+  - `calendly-api` (v4) gera confirmação/lembrete ao capturar (variáveis Calendly resolvidas na geração: `{{tipo_evento}}`/`{{data_reuniao}}`/`{{hora_reuniao}}`/`{{link_reuniao}}`/`{{link_remarcar}}`/`{{link_cancelar}}`; `scheduled_at = início − offset`, só se habilitado e no futuro) e cancela pendentes em cancelar/remarcar.
+  - Banco: `calendly_message_settings` (por org) + colunas `appointment_id`/`kind` em `scheduled_messages`.
+  - Config na PÁGINA da integração Calendly (`calendly-messages-settings.tsx`): toggles, tempos, textos com chips de variáveis, aviso sobre lembretes nativos.
+- **Próximo:** C5 — Pro nativo (agendar pela Scheduling API, sem iframe; tratar `location`). Depois C6 (sync: webhook Pro + polling Light), C7 (nó no fluxo — depende de F4) e C8 (relatórios).
+- **Edge Functions Calendly no ar:** `calendly-oauth-start` (jwt on), `calendly-oauth-callback` (jwt off), `calendly-disconnect` (jwt on), `calendly-api` v4 (jwt on). Secrets: `CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY`.
 
 ---
 

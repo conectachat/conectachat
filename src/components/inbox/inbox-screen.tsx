@@ -1007,7 +1007,7 @@ export function InboxScreen() {
     let active = true;
     supabase
       .from("quick_replies")
-      .select("id, shortcut, title, content")
+      .select("id, shortcut, title, content, media_path, media_name, media_type")
       .eq("active", true)
       .order("shortcut")
       .then(({ data }) => {

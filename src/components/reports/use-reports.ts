@@ -9,8 +9,9 @@ import { supabase } from "@/integrations/supabase/client";
 const sb = supabase as any;
 
 export type ReportFilters = {
-  from: string; // ISO
-  to: string; // ISO
+  period: string; // 'hoje' | '7d' | '30d' | 'custom'
+  fromDate: string | null; // 'YYYY-MM-DD' (só no 'custom')
+  toDate: string | null; // 'YYYY-MM-DD' (só no 'custom')
   channelId: string | null;
   departmentId: string | null;
   userId: string | null;
@@ -49,15 +50,16 @@ export type DepartmentRow = {
 
 const baseArgs = (orgId: string, f: ReportFilters) => ({
   p_org_id: orgId,
-  p_from: f.from,
-  p_to: f.to,
+  p_period: f.period,
+  p_from_date: f.fromDate,
+  p_to_date: f.toDate,
   p_channel_id: f.channelId,
   p_department_id: f.departmentId,
   p_user_id: f.userId,
 });
 
 const keyOf = (orgId: string | null, f: ReportFilters) =>
-  [orgId, f.from, f.to, f.channelId, f.departmentId, f.userId] as const;
+  [orgId, f.period, f.fromDate, f.toDate, f.channelId, f.departmentId, f.userId] as const;
 
 export function useReportOverview(orgId: string | null, f: ReportFilters) {
   return useQuery({
@@ -85,13 +87,14 @@ export function useReportTimeseries(orgId: string | null, f: ReportFilters) {
 
 export function useReportByAgent(orgId: string | null, f: ReportFilters) {
   return useQuery({
-    queryKey: ["report-agent", orgId, f.from, f.to, f.channelId, f.departmentId],
+    queryKey: ["report-agent", orgId, f.period, f.fromDate, f.toDate, f.channelId, f.departmentId],
     enabled: !!orgId,
     queryFn: async (): Promise<AgentRow[]> => {
       const { data, error } = await sb.rpc("report_by_agent", {
         p_org_id: orgId,
-        p_from: f.from,
-        p_to: f.to,
+        p_period: f.period,
+        p_from_date: f.fromDate,
+        p_to_date: f.toDate,
         p_channel_id: f.channelId,
         p_department_id: f.departmentId,
       });
@@ -103,13 +106,14 @@ export function useReportByAgent(orgId: string | null, f: ReportFilters) {
 
 export function useReportByChannel(orgId: string | null, f: ReportFilters) {
   return useQuery({
-    queryKey: ["report-channel", orgId, f.from, f.to],
+    queryKey: ["report-channel", orgId, f.period, f.fromDate, f.toDate],
     enabled: !!orgId,
     queryFn: async (): Promise<ChannelRow[]> => {
       const { data, error } = await sb.rpc("report_by_channel", {
         p_org_id: orgId,
-        p_from: f.from,
-        p_to: f.to,
+        p_period: f.period,
+        p_from_date: f.fromDate,
+        p_to_date: f.toDate,
       });
       if (error) throw error;
       return (data ?? []) as ChannelRow[];
@@ -119,13 +123,14 @@ export function useReportByChannel(orgId: string | null, f: ReportFilters) {
 
 export function useReportByDepartment(orgId: string | null, f: ReportFilters) {
   return useQuery({
-    queryKey: ["report-department", orgId, f.from, f.to],
+    queryKey: ["report-department", orgId, f.period, f.fromDate, f.toDate],
     enabled: !!orgId,
     queryFn: async (): Promise<DepartmentRow[]> => {
       const { data, error } = await sb.rpc("report_by_department", {
         p_org_id: orgId,
-        p_from: f.from,
-        p_to: f.to,
+        p_period: f.period,
+        p_from_date: f.fromDate,
+        p_to_date: f.toDate,
       });
       if (error) throw error;
       return (data ?? []) as DepartmentRow[];

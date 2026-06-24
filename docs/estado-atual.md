@@ -29,16 +29,17 @@
  *     canal + depto + atendente), 9 cards de KPI, gráfico de área (recharts, verde/
  *     azul da marca), tabela por atendente, tabelas por canal e por departamento,
  *     export CSV (BOM + ';' p/ Excel pt-BR).
- *   - src/routes/_authenticated/reports.tsx: rota /reports.
- *   - src/components/shared/app-sidebar.tsx: item "Relatórios" (ícone BarChart3).
+ *   - src/routes/_authenticated/dashboard.tsx: rota /dashboard.
+ *   - src/components/shared/app-sidebar.tsx: item "Dashboard" (ícone BarChart3), 1º do menu.
  *   - #NNNN no inbox: use-conversations.ts passou a trazer ticket_number; o cabeçalho
  *     da conversa (inbox-screen.tsx) mostra "#0001" (padStart 4) ao lado do canal.
  *
  * DECISÕES EM ABERTO (não bloqueiam; anotadas p/ evoluir):
  *   - Visibilidade: /reports hoje é visível a TODOS os membros (dados isolados por
  *     RLS). AtendeZap restringe a dono/admin — dá p/ restringir menu/rota depois.
- *   - Fuso: report_timeseries agrupa por created_at::date (UTC). Brasília (UTC-3)
- *     pode jogar madrugada p/ o dia anterior — refinar com timezone se incomodar.
+ *   - Fuso: RESOLVIDO — períodos e quebra por dia são calculados no fuso da empresa
+ *     (organizations.timezone) via helper report_window; as funções recebem o período
+ *     ('hoje'/'7d'/'30d'/'custom') e calculam as datas no fuso, não em UTC.
  *   - Tempos médios históricos saíram do backfill (aproximados); dados novos são
  *     precisos (gatilhos em tempo real).
  *

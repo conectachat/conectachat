@@ -45,26 +45,6 @@ const BRAND_BLUE = "#0055A6";
 
 type Period = "hoje" | "7d" | "30d" | "custom";
 
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function computeRange(period: Period, customFrom: string, customTo: string): { from: string; to: string } {
-  const now = new Date();
-  const end = new Date(now.getTime() + 1000); // inclui o instante atual
-  if (period === "hoje") return { from: startOfDay(now).toISOString(), to: end.toISOString() };
-  if (period === "7d")
-    return { from: startOfDay(new Date(now.getTime() - 6 * 86400000)).toISOString(), to: end.toISOString() };
-  if (period === "30d")
-    return { from: startOfDay(new Date(now.getTime() - 29 * 86400000)).toISOString(), to: end.toISOString() };
-  // custom
-  const f = customFrom ? new Date(customFrom + "T00:00:00") : startOfDay(now);
-  const t = customTo ? new Date(customTo + "T23:59:59") : end;
-  return { from: f.toISOString(), to: t.toISOString() };
-}
-
 function fmtDay(iso: string) {
   // iso = 'YYYY-MM-DD'
   const [, m, d] = iso.split("-");
@@ -92,10 +72,16 @@ export function ReportsScreen() {
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
-  const range = useMemo(() => computeRange(period, customFrom, customTo), [period, customFrom, customTo]);
   const filters: ReportFilters = useMemo(
-    () => ({ from: range.from, to: range.to, channelId, departmentId, userId }),
-    [range, channelId, departmentId, userId],
+    () => ({
+      period,
+      fromDate: period === "custom" ? customFrom || null : null,
+      toDate: period === "custom" ? customTo || null : null,
+      channelId,
+      departmentId,
+      userId,
+    }),
+    [period, customFrom, customTo, channelId, departmentId, userId],
   );
 
   const options = useReportFilterOptions(orgId);
@@ -131,7 +117,8 @@ export function ReportsScreen() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `relatorio_${range.from.slice(0, 10)}_${range.to.slice(0, 10)}.csv`;
+    const tag = period === "custom" && customFrom ? `${customFrom}_${customTo || customFrom}` : period;
+    link.download = `dashboard_${tag}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -144,7 +131,7 @@ export function ReportsScreen() {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-auto flex items-center gap-2 text-lg font-semibold">
           <BarChart3 className="h-5 w-5 text-brand-green" />
-          Relatórios
+          Dashboard
         </h1>
 
         <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>

@@ -97,13 +97,15 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
     bucket 'media' em {org_id}/internal-chat/. Frontend em src/components/team-chat/*; types.ts via
     (supabase as any). ATENÇÃO: esta máquina NÃO tem Node/Bun/node_modules — build/validação rodam no
     Lovable, não localmente (não tente bun/tsc/lint local sem instalar o toolchain).
-- FASE B — Relatórios/Dashboards — ENTREGUE (v1). Métricas calculadas NO BANCO (5 funções report_*:
-  overview, timeseries, by_agent, by_channel, by_department; todas validam is_member_of e aceitam
-  filtros período/canal/depto/atendente). Base de métricas: conversations ganhou closed_at e
-  first_response_at (gatilhos + backfill). Número de chamado #NNNN por empresa: conversations.ticket_number
-  + tabela org_ticket_counters + gatilho atômico; mostrado no cabeçalho da conversa no inbox. Frontend:
-  src/components/reports/* (tela /reports com KPIs, gráfico recharts e tabelas + export CSV) e item
-  "Relatórios" no menu. Em aberto p/ evoluir: restringir /reports a dono/admin; quebra por dia usa UTC.
+- FASE B — Dashboard (Relatórios) — ENTREGUE (v1). Módulo "Dashboard" é o PRIMEIRO item do menu (acima
+  da Caixa de entrada), rota /dashboard. Métricas calculadas NO BANCO (5 funções report_*: overview,
+  timeseries, by_agent, by_channel, by_department; todas validam is_member_of). As funções recebem o
+  PERÍODO ('hoje'/'7d'/'30d'/'custom') + filtros canal/depto/atendente e calculam a janela e a quebra
+  por dia no FUSO DA EMPRESA (organizations.timezone, via helper report_window) — não mais UTC. Base de
+  métricas: conversations ganhou closed_at e first_response_at (gatilhos + backfill). Número de chamado
+  #NNNN por empresa: conversations.ticket_number + tabela org_ticket_counters + gatilho atômico; exibido
+  no cabeçalho da conversa no inbox. Frontend: src/components/reports/* (tela com KPIs, gráfico recharts,
+  tabelas + export CSV). Em aberto p/ evoluir: restringir /dashboard a dono/admin.
 - Próximo grande marco: FASE C (Integrações reais).
 
 ## 10. Roadmap até o lançamento (sequência fixa, lançamento único)

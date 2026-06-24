@@ -21,7 +21,11 @@
 --      tma_atendimento_seg, aguardando_mais_1h),
 --    report_timeseries (por dia: conversas/recebidas/enviadas),
 --    report_by_agent, report_by_channel, report_by_department.
---    NOTA: quebra por dia usa created_at::date (UTC) — refinar p/ fuso depois.
+--  (B4) report_functions_org_timezone: helper report_window(org,period,from,to) lê
+--    organizations.timezone e calcula a janela [from,to) e a quebra por dia NO FUSO
+--    DA EMPRESA. As 5 funções foram RECRIADAS recebendo o PERÍODO
+--    ('hoje'/'7d'/'30d'/'custom') + datas (no custom) em vez de timestamps absolutos.
+--    (Assinaturas antigas com timestamptz foram dropadas.)
 -- ---------------------------------------------------------------------
 
 -- (B1)

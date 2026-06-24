@@ -44,10 +44,10 @@ import { useTheme } from "@/hooks/use-theme";
 type NavItemData = { title: string; url: string; icon: LucideIcon };
 
 const items: NavItemData[] = [
+  { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
   { title: "Chat interno", url: "/team-chat", icon: MessagesSquare },
   { title: "CRM", url: "/crm", icon: SquareKanban },
-  { title: "Relatórios", url: "/reports", icon: BarChart3 },
   { title: "Fluxos", url: "/flows", icon: Workflow },
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },

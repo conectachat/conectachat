@@ -15,6 +15,7 @@ import {
   Moon,
   Workflow,
   Blocks,
+  MessagesSquare,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
@@ -43,6 +44,7 @@ type NavItemData = { title: string; url: string; icon: LucideIcon };
 
 const items: NavItemData[] = [
   { title: "Caixa de entrada", url: "/inbox", icon: Inbox },
+  { title: "Chat interno", url: "/team-chat", icon: MessagesSquare },
   { title: "CRM", url: "/crm", icon: SquareKanban },
   { title: "Fluxos", url: "/flows", icon: Workflow },
   { title: "Contatos", url: "/contacts", icon: Contact },

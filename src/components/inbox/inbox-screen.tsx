@@ -2122,6 +2122,7 @@ export function InboxScreen() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-900">{q.title?.trim() || q.shortcut}</span>
                         <span className="text-xs text-gray-500">/{q.shortcut}</span>
+                        {q.media_path && <Paperclip size={12} className="text-gray-400" />}
                       </div>
                       <p className="truncate text-xs text-gray-500">{q.content}</p>
                     </button>

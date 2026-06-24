@@ -1262,6 +1262,9 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          media_name: string | null
+          media_path: string | null
+          media_type: string | null
           org_id: string
           shortcut: string
           title: string | null
@@ -1271,6 +1274,9 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          media_name?: string | null
+          media_path?: string | null
+          media_type?: string | null
           org_id: string
           shortcut: string
           title?: string | null
@@ -1280,6 +1286,9 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          media_name?: string | null
+          media_path?: string | null
+          media_type?: string | null
           org_id?: string
           shortcut?: string
           title?: string | null

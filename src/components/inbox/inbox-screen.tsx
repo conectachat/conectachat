@@ -50,7 +50,15 @@ import {
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
-type QuickReply = { id: string; shortcut: string; title: string | null; content: string };
+type QuickReply = {
+  id: string;
+  shortcut: string;
+  title: string | null;
+  content: string;
+  media_path: string | null;
+  media_name: string | null;
+  media_type: string | null;
+};
 
 // H.3b-3 — mensagem "otimista": aparece na hora (antes do servidor confirmar).
 // _optimistic marca a bolha temporária; _convId guarda em qual conversa ela vive.

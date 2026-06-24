@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TAG_PALETTE, ColorPicker, type Tag as TagType } from "@/components/contacts/contact-tags";
 import { CompanyDetailsCard } from "@/components/settings/company-details-card";
 import { NotificationsCard } from "@/components/settings/notifications-card";
+import { QuickRepliesSettings } from "@/components/settings/quick-replies-settings";
 
 type FieldType = "text" | "number" | "date";
 type CustomField = {
@@ -41,14 +42,6 @@ const FIELD_TYPE_LABEL: Record<FieldType, string> = {
   text: "Texto",
   number: "Número",
   date: "Data",
-};
-
-type QuickReply = {
-  id: string;
-  shortcut: string;
-  title: string | null;
-  content: string;
-  active: boolean;
 };
 
 // --- Fase 2 / Passo 1: Departamentos --------------------------------------
@@ -240,15 +233,6 @@ export function SettingsScreen() {
   const [fieldBusy, setFieldBusy] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
-  // Quick replies state
-  const [qrSearch, setQrSearch] = useState("");
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [editingQr, setEditingQr] = useState<QuickReply | null>(null);
-  const [qrShortcut, setQrShortcut] = useState("");
-  const [qrTitle, setQrTitle] = useState("");
-  const [qrContent, setQrContent] = useState("");
-  const [qrBusy, setQrBusy] = useState(false);
-  const [qrError, setQrError] = useState<string | null>(null);
 
   // Departamentos state (Fase 2 / Passo 1)
   const [deptModalOpen, setDeptModalOpen] = useState(false);
@@ -657,135 +641,6 @@ export function SettingsScreen() {
     invalidateFields();
   }
 
-  // Quick replies (respostas rápidas)
-  const quickRepliesQuery = useQuery({
-    queryKey: ["settings-quick-replies", orgId],
-    enabled: !!orgId,
-    queryFn: async (): Promise<QuickReply[]> => {
-      const { data, error } = await supabase
-        .from("quick_replies")
-        .select("id, shortcut, title, content, active")
-        .order("shortcut");
-      if (error) throw error;
-      return (data ?? []) as QuickReply[];
-    },
-  });
-  const quickRepliesList = quickRepliesQuery.data ?? [];
-  const activeQuickReplies = quickRepliesList.filter((q) => q.active).length;
-  const filteredQuickReplies = useMemo(() => {
-    const s = qrSearch.trim().toLowerCase();
-    if (!s) return quickRepliesList;
-    return quickRepliesList.filter(
-      (q) =>
-        q.shortcut.toLowerCase().includes(s) ||
-        (q.title ?? "").toLowerCase().includes(s) ||
-        q.content.toLowerCase().includes(s),
-    );
-  }, [quickRepliesList, qrSearch]);
-
-  function invalidateQuickReplies() {
-    qc.invalidateQueries({ queryKey: ["settings-quick-replies"] });
-    qc.invalidateQueries({ queryKey: ["quick-replies"] });
-    qc.invalidateQueries({ queryKey: ["org-quick-replies"] });
-  }
-
-  function openNewQuickReply() {
-    setEditingQr(null);
-    setQrShortcut("");
-    setQrTitle("");
-    setQrContent("");
-    setQrError(null);
-    setQrModalOpen(true);
-  }
-  function openEditQuickReply(q: QuickReply) {
-    setEditingQr(q);
-    setQrShortcut(q.shortcut);
-    setQrTitle(q.title ?? "");
-    setQrContent(q.content);
-    setQrError(null);
-    setQrModalOpen(true);
-  }
-  async function saveQuickReply() {
-    setQrError(null);
-    const atalho = qrShortcut
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "");
-    const conteudo = qrContent.trim();
-    if (!atalho) {
-      setQrError("Informe um atalho (ex.: saudacao).");
-      return;
-    }
-    if (!conteudo) {
-      setQrError("Informe a mensagem da resposta.");
-      return;
-    }
-    if (!orgId) {
-      setQrError("Sem empresa vinculada.");
-      return;
-    }
-    setQrBusy(true);
-    if (editingQr) {
-      const { error } = await supabase
-        .from("quick_replies")
-        .update({ shortcut: atalho, title: qrTitle.trim() || null, content: conteudo })
-        .eq("id", editingQr.id);
-      setQrBusy(false);
-      if (error) {
-        if ((error as { code?: string }).code === "23505") {
-          setQrError("Já existe uma resposta com esse atalho.");
-        } else {
-          setQrError("Não foi possível salvar a resposta.");
-          console.error("Erro ao editar resposta rápida:", error);
-        }
-        return;
-      }
-    } else {
-      const { error } = await supabase.from("quick_replies").insert({
-        org_id: orgId,
-        shortcut: atalho,
-        title: qrTitle.trim() || null,
-        content: conteudo,
-      });
-      setQrBusy(false);
-      if (error) {
-        if ((error as { code?: string }).code === "23505") {
-          setQrError("Já existe uma resposta com esse atalho.");
-        } else {
-          setQrError("Não foi possível criar a resposta.");
-          console.error("Erro ao criar resposta rápida:", error);
-        }
-        return;
-      }
-    }
-    setQrModalOpen(false);
-    setEditingQr(null);
-    invalidateQuickReplies();
-  }
-  async function deleteQuickReply(q: QuickReply) {
-    const ok = await confirm({
-      title: "Excluir resposta rápida?",
-      description: `A resposta "/${q.shortcut}" será excluída.`,
-      confirmText: "Excluir",
-      danger: true,
-    });
-    if (!ok) return;
-    const { error } = await supabase.from("quick_replies").delete().eq("id", q.id);
-    if (error) {
-      console.error("Erro ao excluir resposta rápida:", error);
-      toast.error("Não foi possível excluir a resposta.");
-      return;
-    }
-    invalidateQuickReplies();
-  }
-  async function toggleQuickReply(q: QuickReply) {
-    const { error } = await supabase.from("quick_replies").update({ active: !q.active }).eq("id", q.id);
-    if (error) {
-      console.error("Erro ao alterar status da resposta:", error);
-      return;
-    }
-    invalidateQuickReplies();
-  }
 
   // --- Departamentos (Fase 2 / Passo 1) -----------------------------------
   // Lista de departamentos da empresa, já com a contagem de atendentes.
@@ -1951,137 +1806,8 @@ export function SettingsScreen() {
               </Dialog>
             </TabsContent>
 
-            <TabsContent value="respostas" className="mt-4 space-y-4">
-              {/* Cards */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <p className="text-2xl font-semibold text-foreground">{quickRepliesList.length}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Respostas rápidas</p>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <p className="text-2xl font-semibold text-foreground">{activeQuickReplies}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Ativas</p>
-                </div>
-              </div>
-
-              {/* Search + New */}
-              <div className="flex items-center gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={qrSearch}
-                    onChange={(e) => setQrSearch(e.target.value)}
-                    placeholder="Buscar respostas rápidas…"
-                    className="pl-9"
-                  />
-                </div>
-                <Button onClick={openNewQuickReply} size="sm">
-                  <Plus className="mr-1 h-4 w-4" /> Nova Resposta
-                </Button>
-              </div>
-
-              {/* List */}
-              <div className="rounded-lg border border-border bg-card">
-                {filteredQuickReplies.length === 0 ? (
-                  <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-                    {qrSearch.trim() ? "Nenhuma resposta encontrada." : "Nenhuma resposta rápida criada ainda."}
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {filteredQuickReplies.map((q) => (
-                      <li key={q.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-foreground">{q.title?.trim() || q.shortcut}</span>
-                            <span className="text-xs text-muted-foreground">/{q.shortcut}</span>
-                          </div>
-                          <p className="mt-0.5 truncate text-sm text-muted-foreground">{q.content}</p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => toggleQuickReply(q)}
-                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                              q.active ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {q.active ? "Ativa" : "Inativa"}
-                          </button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditQuickReply(q)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => deleteQuickReply(q)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Quick reply Modal (create / edit) */}
-              <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>{editingQr ? "Editar resposta rápida" : "Nova resposta rápida"}</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="qr-shortcut">Atalho</Label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">/</span>
-                        <Input
-                          id="qr-shortcut"
-                          value={qrShortcut}
-                          onChange={(e) => setQrShortcut(e.target.value)}
-                          placeholder="saudacao"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Sem espaços. No campo de mensagem você usa digitando /
-                        {qrShortcut
-                          .trim()
-                          .toLowerCase()
-                          .replace(/[^a-z0-9_-]/g, "") || "atalho"}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="qr-title">Título (opcional)</Label>
-                      <Input
-                        id="qr-title"
-                        value={qrTitle}
-                        onChange={(e) => setQrTitle(e.target.value)}
-                        placeholder="Ex.: Saudação inicial"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="qr-content">Mensagem</Label>
-                      <textarea
-                        id="qr-content"
-                        value={qrContent}
-                        onChange={(e) => setQrContent(e.target.value)}
-                        placeholder="Texto que será inserido na conversa…"
-                        className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      />
-                    </div>
-                    {qrError && <p className="text-sm text-destructive">{qrError}</p>}
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setQrModalOpen(false)}>
-                        Cancelar
-                      </Button>
-                      <Button size="sm" onClick={saveQuickReply} disabled={qrBusy}>
-                        {qrBusy ? "Salvando…" : editingQr ? "Salvar" : "Criar"}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+            <TabsContent value="respostas" className="mt-4">
+              <QuickRepliesSettings orgId={orgId} />
             </TabsContent>
 
             <TabsContent value="horarios" className="mt-4">

@@ -1,16 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // =====================================================================
-//  Painel "Agendamento (Calendly)" no painel de dados do contato (C3).
+//  Painel "Agendamento (Calendly)" no painel de dados do contato (C3 + C5).
 //  - Mostra os agendamentos da conversa (card com data/hora, link,
 //    Cancelar via API e Remarcar abrindo o link do Calendly).
-//  - Botão "Agendar" abre um diálogo com o embed do Calendly (modo Light,
-//    vale para todos). Ao concluir, captura o evento (capture_booking) e
-//    grava em appointments. Atualiza sozinho via Realtime.
+//  - Botão "Agendar":
+//      • Light (grátis): abre o EMBED do Calendly (iframe). Ao concluir,
+//        captura o evento (capture_booking) e grava em appointments.
+//      • Pro (pago, C5): agendamento NATIVO — escolhe o tipo, um horário
+//        livre e preenche e-mail + perguntas obrigatórias; chama a ação
+//        "book" (Scheduling API, sem iframe).
+//  - "Remarcar" sempre usa o embed do reschedule_url (não há API de
+//    remarcação no Calendly), nos dois planos.
+//  Atualiza sozinho via Realtime.
 //  Tabelas calendly_connections/appointments via (supabase as any) (CLAUDE.md §8).
 // =====================================================================
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { CalendarClock, CalendarPlus, ExternalLink, Loader2, X, CalendarX } from "lucide-react";
+import { CalendarClock, CalendarPlus, ExternalLink, Loader2, X, CalendarX, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -28,9 +34,32 @@ type Appointment = {
   invitee_timezone: string | null;
 };
 
-type EventType = { uri: string; name: string; duration: number | null; scheduling_url: string };
+type CustomQ = {
+  name: string;
+  type: string; // "text" | "phone_number" | "single_select" | "multi_select" | ...
+  position: number;
+  enabled: boolean;
+  required: boolean;
+  answer_choices: string[];
+};
+
+type EventType = {
+  uri: string;
+  name: string;
+  duration: number | null;
+  scheduling_url: string;
+  pooling_type?: string | null;
+  locations?: any[];
+  custom_questions?: CustomQ[];
+};
+
+type Slot = { start_time: string; status: string; scheduling_url: string; invitees_remaining?: number };
 
 const sb = supabase as any;
+// Fuso padrão para exibir os horários e mandar ao Calendly (cliente BR).
+const TZ = "America/Sao_Paulo";
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WINDOW_DAYS = 14; // quanto carregamos por vez no seletor de horários
 
 function loadCalendlyScript(): Promise<void> {
   return new Promise((resolve) => {
@@ -62,6 +91,17 @@ function fmtDateTime(iso: string, tz: string | null): string {
   }
 }
 
+function dayLabel(iso: string): string {
+  const s = new Intl.DateTimeFormat("pt-BR", {
+    weekday: "short", day: "2-digit", month: "2-digit", timeZone: TZ,
+  }).format(new Date(iso));
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function timeLabel(iso: string): string {
+  return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(iso));
+}
+
 export function CalendlyAppointmentPanel({
   orgId,
   conversationId,
@@ -76,6 +116,7 @@ export function CalendlyAppointmentPanel({
   contactEmail?: string | null;
 }) {
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [planTier, setPlanTier] = useState<"light" | "pro" | null>(null);
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [open, setOpen] = useState(false);
   const [types, setTypes] = useState<EventType[] | null>(null);
@@ -86,10 +127,30 @@ export function CalendlyAppointmentPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const embedRef = useRef<HTMLDivElement | null>(null);
 
+  // ---- Estado do agendamento nativo (Pro) ----
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotRangeEnd, setSlotRangeEnd] = useState<number>(0);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [fName, setFName] = useState("");
+  const [fEmail, setFEmail] = useState("");
+  const [fLocation, setFLocation] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [booking, setBooking] = useState(false);
+
+  const isPro = planTier === "pro";
+  const firstLoc = chosen?.locations?.[0];
+  const needsLocationInput =
+    !!firstLoc && (firstLoc.kind === "ask_invitee" || firstLoc.kind === "outbound_call");
+
   function resetDialog() {
     setChosen(null);
     setRescheduleUrl(null);
     reschedulingRef.current = null;
+    setSlots([]);
+    setSelectedSlot(null);
+    setFLocation("");
+    setAnswers({});
   }
 
   async function loadAppointments() {
@@ -105,10 +166,11 @@ export function CalendlyAppointmentPanel({
     if (!orgId) return;
     const { data } = await sb
       .from("calendly_connections")
-      .select("status")
+      .select("status, plan_tier")
       .eq("org_id", orgId)
       .maybeSingle();
     setConnected(!!data && data.status === "active");
+    setPlanTier((data?.plan_tier as "light" | "pro") ?? null);
   }
 
   useEffect(() => {
@@ -128,7 +190,7 @@ export function CalendlyAppointmentPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, orgId]);
 
-  // Captura o agendamento concluído no embed do Calendly.
+  // Captura o agendamento concluído no embed do Calendly (Light + Remarcar).
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       if (typeof e.origin === "string" && !e.origin.includes("calendly.com")) return;
@@ -192,14 +254,61 @@ export function CalendlyAppointmentPanel({
     }
   }
 
-  // Monta o embed: remarcação usa o reschedule_url; agendamento usa o tipo escolhido.
+  // Quando um tipo é escolhido (nome/e-mail prefill) ao entrar no fluxo nativo.
+  useEffect(() => {
+    if (chosen) {
+      setFName(contactName ?? "");
+      setFEmail(contactEmail ?? "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chosen]);
+
+  // ----- Horários livres (Pro nativo) -----
+  async function loadSlots(fromMs: number, toMs: number, append: boolean) {
+    if (!chosen || !orgId) return;
+    setLoadingSlots(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("calendly-api", {
+        body: {
+          action: "available_times",
+          orgId,
+          eventType: chosen.uri,
+          start: new Date(fromMs).toISOString(),
+          end: new Date(toMs).toISOString(),
+        },
+      });
+      if (error || !data?.ok) {
+        toast.error("Não foi possível carregar os horários", { description: data?.error ?? error?.message });
+        if (!append) setSlots([]);
+        return;
+      }
+      const list = ((data.available_times ?? []) as Slot[]).filter((s) => s.status === "available");
+      setSlots((prev) => (append ? [...prev, ...list] : list));
+      setSlotRangeEnd(toMs);
+    } finally {
+      setLoadingSlots(false);
+    }
+  }
+
+  // Carrega os horários ao escolher o tipo no modo Pro.
+  useEffect(() => {
+    if (!open || !isPro || !chosen || rescheduleUrl) return;
+    const from = Date.now() + 60000;
+    const to = from + WINDOW_DAYS * DAY_MS;
+    setSlots([]);
+    setSelectedSlot(null);
+    void loadSlots(from, to, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isPro, chosen, rescheduleUrl]);
+
+  // Monta o embed (Light) ou a remarcação (ambos os planos).
   useEffect(() => {
     if (!open || !embedRef.current) return;
     let url: string | null = null;
     if (rescheduleUrl) {
       url = rescheduleUrl;
-    } else if (chosen) {
-      // encodeURIComponent → espaço vira %20 (URLSearchParams usaria "+", que o Calendly exibe literal).
+    } else if (chosen && !isPro) {
+      // Light: embed da página. encodeURIComponent → espaço vira %20.
       const parts: string[] = [];
       if (contactName) parts.push(`name=${encodeURIComponent(contactName)}`);
       if (contactEmail) parts.push(`email=${encodeURIComponent(contactEmail)}`);
@@ -217,7 +326,74 @@ export function CalendlyAppointmentPanel({
     return () => {
       cancelled = true;
     };
-  }, [open, chosen, rescheduleUrl, contactName, contactEmail]);
+  }, [open, chosen, rescheduleUrl, isPro, contactName, contactEmail]);
+
+  async function confirmBooking() {
+    if (!chosen || !selectedSlot) return;
+    if (!fEmail.trim()) {
+      toast.error("Informe o e-mail do convidado para agendar.");
+      return;
+    }
+    const enabledQs = (chosen.custom_questions ?? []).filter((q) => q.enabled);
+    const missingReq = enabledQs.filter((q) => q.required && !(answers[q.name] ?? "").trim());
+    if (missingReq.length) {
+      toast.error("Responda as perguntas obrigatórias.", { description: missingReq.map((q) => q.name).join(", ") });
+      return;
+    }
+    if (needsLocationInput && !fLocation.trim()) {
+      toast.error("Informe o local/telefone da reunião.");
+      return;
+    }
+    setBooking(true);
+    try {
+      const answersPayload = enabledQs
+        .filter((q) => (answers[q.name] ?? "").trim())
+        .map((q) => ({ question: q.name, answer: answers[q.name].trim(), position: q.position }));
+      const { data, error } = await supabase.functions.invoke("calendly-api", {
+        body: {
+          action: "book",
+          orgId,
+          eventType: chosen.uri,
+          startTime: selectedSlot,
+          conversationId,
+          contactId,
+          invitee: { name: fName.trim() || contactName || "Convidado", email: fEmail.trim(), timezone: TZ },
+          answers: answersPayload,
+          rescheduledFromId: reschedulingRef.current ?? null,
+          locationInput: needsLocationInput ? fLocation.trim() : undefined,
+        },
+      });
+      if (error) {
+        toast.error("Falha ao agendar", { description: error.message });
+        return;
+      }
+      if (data?.error === "slot_taken") {
+        toast.error("Esse horário acabou de ser ocupado. Escolha outro.");
+        setSelectedSlot(null);
+        const from = Date.now() + 60000;
+        void loadSlots(from, from + WINDOW_DAYS * DAY_MS, false);
+        return;
+      }
+      if (data?.error === "missing_fields") {
+        toast.error("Faltam dados obrigatórios.", { description: (data.fields ?? []).join(", ") });
+        return;
+      }
+      if (data?.error === "forbidden") {
+        toast.error("A conta Calendly não permite agendamento nativo (plano).");
+        return;
+      }
+      if (!data?.ok) {
+        toast.error("Não foi possível agendar", { description: data?.detail ?? data?.error });
+        return;
+      }
+      toast.success(reschedulingRef.current ? "Reunião remarcada!" : "Agendamento criado!");
+      setOpen(false);
+      resetDialog();
+      await loadAppointments();
+    } finally {
+      setBooking(false);
+    }
+  }
 
   async function cancelar(appointmentId: string) {
     setBusyId(appointmentId);
@@ -237,6 +413,18 @@ export function CalendlyAppointmentPanel({
   }
 
   const active = appts.filter((a) => a.status === "active");
+
+  // Agrupa os horários por dia, preservando a ordem.
+  const slotGroups: { day: string; items: Slot[] }[] = [];
+  for (const s of slots) {
+    const day = dayLabel(s.start_time);
+    let g = slotGroups.find((x) => x.day === day);
+    if (!g) {
+      g = { day, items: [] };
+      slotGroups.push(g);
+    }
+    g.items.push(s);
+  }
 
   return (
     <div>
@@ -318,6 +506,7 @@ export function CalendlyAppointmentPanel({
           </DialogHeader>
 
           {rescheduleUrl ? (
+            // Remarcação: embed do reschedule_url (não há API de remarcação).
             <div ref={embedRef} style={{ minWidth: "320px", height: "640px" }} />
           ) : loadingTypes ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Carregando tipos de evento…</p>
@@ -339,7 +528,155 @@ export function CalendlyAppointmentPanel({
                 ))
               )}
             </div>
+          ) : isPro ? (
+            // ---------- Pro: agendamento NATIVO ----------
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setChosen(null);
+                  setSelectedSlot(null);
+                }}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" /> trocar tipo de evento
+              </button>
+
+              <div className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <span className="font-medium text-gray-900">{chosen.name}</span>
+                {chosen.duration != null && <span className="ml-2 text-xs text-gray-500">{chosen.duration} min</span>}
+              </div>
+
+              {!selectedSlot ? (
+                // Seletor de horário
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Escolha um horário disponível:</p>
+                  {loadingSlots && slots.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">Carregando horários…</p>
+                  ) : slots.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                      Nenhum horário disponível nas próximas semanas.
+                    </p>
+                  ) : (
+                    <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                      {slotGroups.map((g) => (
+                        <div key={g.day}>
+                          <p className="mb-1 text-xs font-semibold text-gray-500">{g.day}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {g.items.map((s) => (
+                              <button
+                                key={s.start_time}
+                                onClick={() => setSelectedSlot(s.start_time)}
+                                className="rounded border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:border-brand-green hover:bg-brand-green/10"
+                              >
+                                {timeLabel(s.start_time)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={loadingSlots}
+                        onClick={() => loadSlots(slotRangeEnd, slotRangeEnd + WINDOW_DAYS * DAY_MS, true)}
+                      >
+                        {loadingSlots ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ver mais horários"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Formulário do convidado
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setSelectedSlot(null)}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <ChevronLeft className="h-3 w-3" /> trocar horário
+                  </button>
+                  <div className="rounded-lg bg-brand-green/10 px-3 py-2 text-sm font-medium text-gray-800">
+                    {dayLabel(selectedSlot)} às {timeLabel(selectedSlot)}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-700">Nome do convidado</label>
+                    <input
+                      value={fName}
+                      onChange={(e) => setFName(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-green focus:outline-none"
+                      placeholder="Nome"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-700">E-mail do convidado *</label>
+                    <input
+                      type="email"
+                      value={fEmail}
+                      onChange={(e) => setFEmail(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-green focus:outline-none"
+                      placeholder="email@exemplo.com"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      O Calendly exige um e-mail para criar o agendamento.
+                    </p>
+                  </div>
+
+                  {needsLocationInput && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-700">
+                        {firstLoc?.kind === "outbound_call" ? "Telefone para a ligação *" : "Local da reunião *"}
+                      </label>
+                      <input
+                        value={fLocation}
+                        onChange={(e) => setFLocation(e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-green focus:outline-none"
+                        placeholder={firstLoc?.kind === "outbound_call" ? "+55 11 99999-9999" : "Endereço ou detalhe"}
+                      />
+                    </div>
+                  )}
+
+                  {(chosen.custom_questions ?? [])
+                    .filter((q) => q.enabled)
+                    .sort((a, b) => a.position - b.position)
+                    .map((q) => (
+                      <div key={q.name} className="space-y-1">
+                        <label className="text-xs font-medium text-gray-700">
+                          {q.name} {q.required && "*"}
+                        </label>
+                        {q.type === "single_select" && q.answer_choices.length > 0 ? (
+                          <select
+                            value={answers[q.name] ?? ""}
+                            onChange={(e) => setAnswers((p) => ({ ...p, [q.name]: e.target.value }))}
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-green focus:outline-none"
+                          >
+                            <option value="">Selecione…</option>
+                            {q.answer_choices.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            value={answers[q.name] ?? ""}
+                            onChange={(e) => setAnswers((p) => ({ ...p, [q.name]: e.target.value }))}
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-green focus:outline-none"
+                            placeholder={q.type === "phone_number" ? "Telefone" : "Resposta"}
+                          />
+                        )}
+                      </div>
+                    ))}
+
+                  <Button className="w-full gap-1" onClick={confirmBooking} disabled={booking}>
+                    {booking ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}
+                    Confirmar agendamento
+                  </Button>
+                </div>
+              )}
+            </div>
           ) : (
+            // ---------- Light: embed da página do Calendly ----------
             <div>
               <button
                 onClick={() => setChosen(null)}

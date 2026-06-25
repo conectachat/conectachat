@@ -25,6 +25,15 @@ import {
 const sb = supabase as any;
 
 const DEFAULTS = {
+  created_enabled: true,
+  created_template:
+    "Olá {{primeiro_nome}}! Seu agendamento de {{tipo_evento}} foi confirmado para {{data_reuniao}} às {{hora_reuniao}}. Link de acesso: {{link_reuniao}}",
+  rescheduled_enabled: true,
+  rescheduled_template:
+    "Olá {{primeiro_nome}}, sua {{tipo_evento}} foi remarcada para {{data_reuniao}} às {{hora_reuniao}}. Link de acesso: {{link_reuniao}}",
+  canceled_enabled: true,
+  canceled_template:
+    "Olá {{primeiro_nome}}, sua {{tipo_evento}} marcada para {{data_reuniao}} às {{hora_reuniao}} foi cancelada.",
   confirmation_enabled: true,
   confirmation_offset_minutes: 1440,
   confirmation_template:
@@ -66,6 +75,12 @@ function offsetOptions(current: number) {
 export function CalendlyMessagesSettings({ orgId }: { orgId: string | null }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [createdEnabled, setCreatedEnabled] = useState(DEFAULTS.created_enabled);
+  const [createdTpl, setCreatedTpl] = useState(DEFAULTS.created_template);
+  const [reschEnabled, setReschEnabled] = useState(DEFAULTS.rescheduled_enabled);
+  const [reschTpl, setReschTpl] = useState(DEFAULTS.rescheduled_template);
+  const [cancEnabled, setCancEnabled] = useState(DEFAULTS.canceled_enabled);
+  const [cancTpl, setCancTpl] = useState(DEFAULTS.canceled_template);
   const [confEnabled, setConfEnabled] = useState(DEFAULTS.confirmation_enabled);
   const [confOffset, setConfOffset] = useState(DEFAULTS.confirmation_offset_minutes);
   const [confTpl, setConfTpl] = useState(DEFAULTS.confirmation_template);
@@ -73,6 +88,9 @@ export function CalendlyMessagesSettings({ orgId }: { orgId: string | null }) {
   const [remOffset, setRemOffset] = useState(DEFAULTS.reminder_offset_minutes);
   const [remTpl, setRemTpl] = useState(DEFAULTS.reminder_template);
 
+  const createdRef = useRef<HTMLTextAreaElement | null>(null);
+  const reschRef = useRef<HTMLTextAreaElement | null>(null);
+  const cancRef = useRef<HTMLTextAreaElement | null>(null);
   const confRef = useRef<HTMLTextAreaElement | null>(null);
   const remRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -85,6 +103,12 @@ export function CalendlyMessagesSettings({ orgId }: { orgId: string | null }) {
       .maybeSingle()
       .then(({ data }: any) => {
         if (data) {
+          if (data.created_enabled != null) setCreatedEnabled(data.created_enabled);
+          if (data.created_template != null) setCreatedTpl(data.created_template);
+          if (data.rescheduled_enabled != null) setReschEnabled(data.rescheduled_enabled);
+          if (data.rescheduled_template != null) setReschTpl(data.rescheduled_template);
+          if (data.canceled_enabled != null) setCancEnabled(data.canceled_enabled);
+          if (data.canceled_template != null) setCancTpl(data.canceled_template);
           setConfEnabled(data.confirmation_enabled);
           setConfOffset(data.confirmation_offset_minutes);
           setConfTpl(data.confirmation_template);
@@ -126,6 +150,12 @@ export function CalendlyMessagesSettings({ orgId }: { orgId: string | null }) {
       const { error } = await sb.from("calendly_message_settings").upsert(
         {
           org_id: orgId,
+          created_enabled: createdEnabled,
+          created_template: createdTpl,
+          rescheduled_enabled: reschEnabled,
+          rescheduled_template: reschTpl,
+          canceled_enabled: cancEnabled,
+          canceled_template: cancTpl,
           confirmation_enabled: confEnabled,
           confirmation_offset_minutes: confOffset,
           confirmation_template: confTpl,
@@ -165,6 +195,39 @@ export function CalendlyMessagesSettings({ orgId }: { orgId: string | null }) {
     </div>
   );
 
+  // Bloco de mensagem IMEDIATA (sem "tempo antes"): toggle + texto + chips.
+  const immediateBlock = (
+    title: string,
+    hint: string,
+    enabled: boolean,
+    setEnabled: (v: boolean) => void,
+    tpl: string,
+    setTpl: (v: string) => void,
+    ref: React.RefObject<HTMLTextAreaElement | null>,
+  ) => (
+    <div className="mt-4 rounded-lg border border-border p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <Label className="text-sm font-medium">{title}</Label>
+          <p className="text-[11px] text-muted-foreground">{hint}</p>
+        </div>
+        <Switch checked={enabled} onCheckedChange={setEnabled} />
+      </div>
+      {enabled && (
+        <div className="mt-3 space-y-2">
+          <textarea
+            ref={ref}
+            value={tpl}
+            onChange={(e) => setTpl(e.target.value)}
+            rows={3}
+            className="w-full resize-none rounded border border-border bg-background px-2 py-1.5 text-sm focus:border-brand-green focus:outline-none"
+          />
+          {chips(ref, tpl, setTpl)}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="mt-4 rounded-lg border border-border bg-card p-5">
       <div className="flex items-start gap-3">
@@ -174,9 +237,27 @@ export function CalendlyMessagesSettings({ orgId }: { orgId: string | null }) {
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-foreground">Mensagens automáticas pelo WhatsApp</h3>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Dispare confirmação e lembrete automaticamente quando um agendamento é marcado. As variáveis são
-            trocadas pelos dados reais no envio.
+            Avise o cliente pelo WhatsApp quando ele <strong>agenda</strong>, <strong>remarca</strong> ou{" "}
+            <strong>cancela</strong> (na hora), além da <strong>confirmação</strong> e do <strong>lembrete</strong>{" "}
+            antes da reunião. As variáveis são trocadas pelos dados reais no envio.
           </p>
+
+          {/* Notificações imediatas (na hora do evento) */}
+          {immediateBlock(
+            "Agendado",
+            "Enviada na hora em que a reunião é marcada.",
+            createdEnabled, setCreatedEnabled, createdTpl, setCreatedTpl, createdRef,
+          )}
+          {immediateBlock(
+            "Remarcado",
+            "Enviada quando a reunião é remarcada.",
+            reschEnabled, setReschEnabled, reschTpl, setReschTpl, reschRef,
+          )}
+          {immediateBlock(
+            "Cancelado",
+            "Enviada quando a reunião é cancelada (por você ou pelo cliente no Calendly).",
+            cancEnabled, setCancEnabled, cancTpl, setCancTpl, cancRef,
+          )}
 
           {/* Confirmação */}
           <div className="mt-4 rounded-lg border border-border p-4">

@@ -1,6 +1,6 @@
 /* ============================================================
- * FASE C — INTEGRAÇÃO CALENDLY (C1–C5) — ✅ ENTREGUE e testado na Duli
- * (próximo: C6 sincronização). Plano e progresso completos:
+ * FASE C — INTEGRAÇÃO CALENDLY (C1–C6) — ✅ ENTREGUE e testado na Duli
+ * (próximo: C7 nó no fluxo, depende do F4). Plano e progresso completos:
  * docs/conectachat-calendly-plano.md (seção 0). Resumo:
  * ============================================================
  * Card único adaptativo no Marketplace (/integracoes/calendly): conecta a conta
@@ -49,9 +49,24 @@
  *   retorna alreadyConnected e NÃO reinicia. Restart na Evolution v2 é PUT (não POST). Frontend não mudou
  *   (QR ao vivo já vem pelo whatsapp-webhook via QRCODE_UPDATED + realtime).
  *
- * EM ABERTO (anotado): trava de renovação simultânea de token (cenário raro); C6 sync (webhook Pro +
- *   polling Light 5min); C7 nó no fluxo (depende do F4); C8 relatórios. Decisões fixadas: tokens=Vault;
- *   polling Light=5min; tempos padrão conf 24h/lembrete 2h; lembretes nativos = empresa decide na config.
+ * C6 — Sincronização (cancelar/remarcar refletem sozinho): ENTREGUE. C6a (Pro) testado na Duli.
+ *   Inscrição do webhook criada com a NOSSA signing_key (CALENDLY_WEBHOOK_SIGNING_KEY); Calendly assina
+ *   HMAC-SHA256 de t.body (header Calendly-Webhook-Signature t=...,v1=...). calendly-webhook (jwt off)
+ *   valida a assinatura e, em invitee.canceled, cancela o appointment + scheduled_messages pendentes. A
+ *   inscrição é garantida pela ação ensure_webhook (calendly-api v8), chamada DENTRO do book (gatilho
+ *   confiável, server-side) e pelo card. calendly-disconnect v2 apaga a inscrição. Coluna
+ *   calendly_connections.webhook_subscription_uri. C6b (Light): calendly-poll (jwt off, CRON_SECRET) +
+ *   cron 'conectachat-calendly-poll' 5min reconcilia cancelamentos via GET do invitee; teste do Light
+ *   pendente (Duli está Pro). APRENDIZADO: criar a inscrição só no card (abrir página) falhou no 1º teste
+ *   (frontend ainda não publicado) → o gatilho no book resolveu.
+ *
+ * BACKLOG (Renato, 2026-06-25): ao cliente cancelar/remarcar, NOTIFICAR no WhatsApp (confirmar cancelamento
+ *   / novos dados da remarcação). Fazer junto dos envios automáticos. Hoje o C6 só atualiza o card + cancela
+ *   pendentes, não notifica o cliente do cancelamento.
+ *
+ * EM ABERTO (anotado): trava de renovação simultânea de token (cenário raro); ajuste de UI do agendamento
+ *   nativo (não mexer por ora); C7 nó no fluxo (depende do F4); C8 relatórios. Decisões fixadas:
+ *   tokens=Vault; polling Light=5min; tempos padrão conf 24h/lembrete 2h; lembretes nativos = empresa decide.
  */
 
 /* ============================================================

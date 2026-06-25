@@ -106,35 +106,42 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   #NNNN por empresa: conversations.ticket_number + tabela org_ticket_counters + gatilho atômico; exibido
   no cabeçalho da conversa no inbox. Frontend: src/components/reports/* (tela com KPIs, gráfico recharts,
   tabelas + export CSV). Em aberto p/ evoluir: restringir /dashboard a dono/admin.
-- FASE C (Integrações reais) — EM ANDAMENTO. Calendly: C0–C5 ENTREGUES e testados na Duli (ver
+- FASE C (Integrações reais) — EM ANDAMENTO. Calendly: C0–C6 ENTREGUES e testados na Duli (ver
   docs/conectachat-calendly-plano.md, seção 0). Card único adaptativo em /integracoes/calendly que detecta
   plano Light (grátis) ou Pro (pago). Banco: calendly_connections (tokens OAuth no Supabase VAULT; funções
-  calendly_* só service_role), appointments (RLS+realtime; índice único NÃO-parcial em calendly_invitee_uri),
-  calendly_message_settings, +colunas appointment_id/kind em scheduled_messages. Edge Functions:
-  calendly-oauth-start (jwt on), calendly-oauth-callback (jwt off; valida state HMAC + detecção de plano
-  create+delete), calendly-disconnect (jwt on), calendly-api v6 (jwt on: event_types[+locations/
-  custom_questions]/available_times/capture_booking/book/cancel + renovação de token c/ rotação + geração de
-  confirmação/lembrete). Secrets: CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY. Frontend: card +
-  config de mensagens em /integracoes/calendly; painel "Agendar" no inbox (Light=embed; Pro=agendamento
-  NATIVO via Scheduling API — seletor de horário + formulário com e-mail e perguntas obrigatórias, sem iframe;
-  card + cancelar + remarcar). C5: ação `book` (POST https://api.calendly.com/invitees; escopo
-  scheduled_events:write JÁ presente na app OAuth; trata `location` e custom_questions; reusa o helper de
-  captura → appointments source='manual' + mensagens) + cancel robusto (evento de outra conta Calendly →
-  remove só localmente, localOnly). Remarcar = embed do reschedule_url (não há API) com fallback "abrir em
-  nova aba"; embed monta por callback ref (sem corrida/tela em branco). C4 REUSA scheduled_messages +
-  run-scheduled (NÃO criar fila nova). PRÓXIMO: C6 (sync: webhook Pro + polling Light 5min); depois C7 (nó no
-  fluxo — depende do F4), C8 (relatórios). EM ABERTO: ajuste de UI do agendamento (Renato anotou; não mexer
-  por ora).
+  calendly_* só service_role; coluna webhook_subscription_uri), appointments (RLS+realtime; índice único
+  NÃO-parcial em calendly_invitee_uri), calendly_message_settings, +colunas appointment_id/kind em
+  scheduled_messages. Edge Functions: calendly-oauth-start (jwt on), calendly-oauth-callback (jwt off; valida
+  state HMAC + detecção de plano create+delete), calendly-disconnect v2 (jwt on; apaga a inscrição de webhook),
+  calendly-api v8 (jwt on: event_types[+locations/custom_questions]/available_times/capture_booking/book/
+  cancel/ensure_webhook + renovação de token c/ rotação + geração de confirmação/lembrete), calendly-webhook
+  (jwt off; valida assinatura HMAC), calendly-poll (jwt off; cron 5min, protegida por CRON_SECRET). Secrets:
+  CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY. Frontend: card + config de mensagens em
+  /integracoes/calendly; painel "Agendar" no inbox (Light=embed; Pro=agendamento NATIVO via Scheduling API —
+  seletor de horário + formulário com e-mail e perguntas obrigatórias, sem iframe; card + cancelar + remarcar).
+  C5: ação `book` (POST https://api.calendly.com/invitees; escopo scheduled_events:write JÁ presente na app
+  OAuth; trata `location` e custom_questions; reusa o helper de captura → appointments source='manual' +
+  mensagens) + cancel robusto (evento de outra conta Calendly → remove só localmente, localOnly). Remarcar =
+  embed do reschedule_url (não há API) com fallback "abrir em nova aba"; embed monta por callback ref (sem
+  corrida/tela em branco). C6 (sincronização de cancelar/remarcar): Pro via webhook (calendly-webhook valida
+  assinatura HMAC com CALENDLY_WEBHOOK_SIGNING_KEY; a inscrição é criada com a NOSSA signing_key pela ação
+  ensure_webhook, chamada no `book` E pelo card — confiável, não depende de abrir a página); Light via polling
+  pg_cron 5min (calendly-poll, job 'conectachat-calendly-poll'). C4 REUSA scheduled_messages + run-scheduled
+  (NÃO criar fila nova). PRÓXIMO: C7 (nó no fluxo — depende do F4), C8 (relatórios). BACKLOG: ao cliente
+  cancelar/remarcar, disparar notificação automática no WhatsApp (confirmando cancelamento / novos dados da
+  remarcação) — fazer JUNTO do bloco de envios automáticos. EM ABERTO: ajuste de UI do agendamento (Renato
+  anotou; não mexer por ora).
 - Fix WhatsApp (entregue junto do C5): manage-channels v7 — ação `qr` força sessão nova (PUT
   /instance/restart) + reaplica webhook quando a instância trava em "connecting" (antes só GET
   /instance/connect); se já está "open", não reinicia (não derruba número conectado). Resolve a falha de
   reconexão pelo app. Restart na Evolution v2 é PUT (não POST). [[whatsapp-qr-reconnect-fix]]
-- Próximo grande marco: FASE C — bloco C5 (Pro nativo).
+- Próximo grande marco: FASE C — bloco C7 (nó Calendly no fluxo; depende do F4) e C8 (relatórios).
 
 ## 10. Roadmap até o lançamento (sequência fixa, lançamento único)
 - Fase B — Relatórios/Dashboards (inclui o número de chamado sequencial #NNNN, adiado da Fase A).
-- Fase C — Integrações reais (EM ANDAMENTO). Calendly: C0–C4 entregues (conexão, leitura, agendamento,
-  mensagens automáticas); próximo C5 (Pro nativo). Depois Google Agenda, HubSpot, etc.
+- Fase C — Integrações reais (EM ANDAMENTO). Calendly: C0–C6 entregues (conexão, leitura, agendamento,
+  mensagens automáticas, Pro nativo, sincronização webhook/polling); falta C7 (nó no fluxo, depende do F4) e
+  C8 (relatórios). Depois Google Agenda, HubSpot, etc.
 - Fase D — Atendente de IA.
 - Fase E — Stripe + enforcement de planos + LANÇAMENTO.
   Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597 (anual ~17% off;

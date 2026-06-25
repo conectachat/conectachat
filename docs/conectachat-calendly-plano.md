@@ -48,9 +48,29 @@
 - **Fix WhatsApp (junto do C5):** `manage-channels` v7 — ação `qr` força sessão nova (PUT
   `/instance/restart`) + reaplica webhook quando a instância trava em "connecting"; se já está "open", não
   reinicia. Resolve a reconexão pelo app. (Restart na Evolution v2 é **PUT**.)
-- **Próximo:** C6 — sincronização (webhook Pro + polling Light 5 min). Depois C7 (nó no fluxo — depende de F4)
-  e C8 (relatórios).
-- **Edge Functions Calendly no ar:** `calendly-oauth-start` (jwt on), `calendly-oauth-callback` (jwt off), `calendly-disconnect` (jwt on), `calendly-api` v6 (jwt on). Secrets: `CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY`.
+- **C6 — Sincronização (cancelar/remarcar refletem sozinho):** ✅ ENTREGUE. C6a (Pro, instantâneo) testado na
+  Duli (cliente cancelou no Calendly → card sumiu sozinho).
+  - **Confirmado:** ao criar a inscrição (`POST /webhook_subscriptions`) passamos a **NOSSA `signing_key`**
+    (o secret `CALENDLY_WEBHOOK_SIGNING_KEY`); o Calendly assina cada chamada com HMAC-SHA256 de `t.body` no
+    header `Calendly-Webhook-Signature` (formato `t=...,v1=...`). Resolve a dúvida da seção 5.8.
+  - **C6a (Pro):** `calendly-webhook` (jwt off) valida a assinatura e, em `invitee.canceled`, marca o
+    `appointments` como cancelado + cancela as `scheduled_messages` pendentes. A inscrição é criada com a
+    nossa signing_key pela ação **`ensure_webhook`** (`calendly-api`), chamada **dentro do `book`** (toda vez
+    que um Pro agenda — confiável, não depende de abrir a página) e também pelo card de Integrações.
+    `calendly-disconnect` v2 apaga a inscrição ao desconectar. Coluna `calendly_connections.webhook_subscription_uri`.
+  - **APRENDIZADO:** depender SÓ do card (abrir a página) falhou no 1º teste — o frontend ainda não tinha
+    publicado. A criação no `book` (server-side) é o gatilho confiável.
+  - **C6b (Light):** `calendly-poll` (jwt off, protegida por `CRON_SECRET`) + job `pg_cron`
+    `conectachat-calendly-poll` a cada **5 min**: para conexões Light ativas, confere os agendamentos ativos
+    (GET do invitee) e marca cancelado o que foi cancelado no Calendly. Construído; teste do Light pendente
+    (precisa de uma conta grátis conectada — a Duli está Pro).
+- **BACKLOG (pedido do Renato, 2026-06-25):** quando o cliente **cancelar ou remarcar**, disparar uma
+  **notificação automática no WhatsApp** (confirmando o cancelamento, ou com os novos dados da remarcação).
+  Fazer **junto** do bloco de envios automáticos (confirmação do agendamento, confirmação da reunião,
+  lembrete). Hoje o C6 só atualiza o card e cancela as pendentes — não NOTIFICA o cliente do cancelamento.
+- **EM ABERTO:** ajuste de UI do agendamento nativo (Renato anotou; não mexer por ora).
+- **Próximo:** C7 (nó no fluxo — depende de F4) e C8 (relatórios).
+- **Edge Functions Calendly no ar:** `calendly-oauth-start` (jwt on), `calendly-oauth-callback` (jwt off), `calendly-disconnect` v2 (jwt on), `calendly-api` v8 (jwt on), `calendly-webhook` (jwt off), `calendly-poll` (jwt off; cron). Secrets: `CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY`, `CRON_SECRET`.
 
 ---
 

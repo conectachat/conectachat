@@ -60,9 +60,15 @@
  *   pendente (Duli está Pro). APRENDIZADO: criar a inscrição só no card (abrir página) falhou no 1º teste
  *   (frontend ainda não publicado) → o gatilho no book resolveu.
  *
- * BACKLOG (Renato, 2026-06-25): ao cliente cancelar/remarcar, NOTIFICAR no WhatsApp (confirmar cancelamento
- *   / novos dados da remarcação). Fazer junto dos envios automáticos. Hoje o C6 só atualiza o card + cancela
- *   pendentes, não notifica o cliente do cancelamento.
+ * NOTIFICAÇÕES AUTOMÁTICAS (entregue 2026-06-25): 5 tipos por org em calendly_message_settings (+6 colunas:
+ *   created/rescheduled/canceled × enabled/template; as de tempo confirmation/reminder já existiam do C4).
+ *   Imediatas pela mesma fila scheduled_messages + run-scheduled: 'created'(agendado)/'rescheduled'
+ *   enfileirados em captureAppointment (book Pro + embed Light); 'canceled' na ação cancel (calendly-api v9,
+ *   só se não localOnly) E quando o cliente cancela no Calendly (calendly-webhook v2 / calendly-poll v2,
+ *   pulando remarcação pelo flag invitee.rescheduled). Idempotente (1 por kind/agendamento). Config no card:
+ *   calendly-messages-settings.tsx (5 blocos: Agendado/Remarcado/Cancelado + Confirmação/Lembrete).
+ *   LIMITAÇÃO: remarcação feita pelo cliente DIRETO no Calendly não dispara 'remarcado' (novo invitee externo
+ *   sem conversa ligada); só evita o 'cancelado' indevido. Pelo app (embed) dispara 'remarcado' normal.
  *
  * EM ABERTO (anotado): trava de renovação simultânea de token (cenário raro); ajuste de UI do agendamento
  *   nativo (não mexer por ora); C7 nó no fluxo (depende do F4); C8 relatórios. Decisões fixadas:

@@ -64,10 +64,20 @@
     `conectachat-calendly-poll` a cada **5 min**: para conexões Light ativas, confere os agendamentos ativos
     (GET do invitee) e marca cancelado o que foi cancelado no Calendly. Construído; teste do Light pendente
     (precisa de uma conta grátis conectada — a Duli está Pro).
-- **BACKLOG (pedido do Renato, 2026-06-25):** quando o cliente **cancelar ou remarcar**, disparar uma
-  **notificação automática no WhatsApp** (confirmando o cancelamento, ou com os novos dados da remarcação).
-  Fazer **junto** do bloco de envios automáticos (confirmação do agendamento, confirmação da reunião,
-  lembrete). Hoje o C6 só atualiza o card e cancela as pendentes — não NOTIFICA o cliente do cancelamento.
+- **Notificações automáticas (agendado/remarcado/cancelado + confirmação/lembrete):** ✅ ENTREGUE (2026-06-25).
+  - **Banco:** +6 colunas em `calendly_message_settings` (`created_/rescheduled_/canceled_` × `_enabled/_template`).
+    As de tempo (`confirmation_/reminder_` com `_offset_minutes`) já existiam do C4.
+  - **Imediatas (na hora do evento), pela mesma fila `scheduled_messages` + `run-scheduled`:**
+    `created` (= "agendado") e `rescheduled` enfileirados em `captureAppointment` (vale p/ `book` Pro e embed
+    Light; 'remarcado' quando há `rescheduledFromId`). `canceled` enfileirado na ação `cancel` (`calendly-api`
+    v9, só se NÃO for `localOnly`) e quando o **cliente** cancela no Calendly: `calendly-webhook` v2 (Pro) e
+    `calendly-poll` v2 (Light) — ambos **pulam o caso de remarcação** (invitee `rescheduled=true` → marca o
+    appointment como `rescheduled` e NÃO manda 'cancelado'). Idempotente: 1 de cada `kind` por agendamento.
+  - **Config (card do Calendly):** `calendly-messages-settings.tsx` ganhou 3 blocos (Agendado/Remarcado/
+    Cancelado, liga-desliga + texto + chips de variáveis), além de Confirmação/Lembrete. Tudo ON por padrão.
+  - **LIMITAÇÃO conhecida:** remarcação feita pelo cliente DIRETO no Calendly não dispara 'remarcado' (o novo
+    invitee externo não está ligado a uma conversa) — só evita o 'cancelado' indevido. Remarcação feita DENTRO
+    do app (embed) dispara 'remarcado' normal. Melhorar depois (ligar o novo invitee à conversa via webhook).
 - **EM ABERTO:** ajuste de UI do agendamento nativo (Renato anotou; não mexer por ora).
 - **Próximo:** C7 (nó no fluxo — depende de F4) e C8 (relatórios).
 - **Edge Functions Calendly no ar:** `calendly-oauth-start` (jwt on), `calendly-oauth-callback` (jwt off), `calendly-disconnect` v2 (jwt on), `calendly-api` v8 (jwt on), `calendly-webhook` (jwt off), `calendly-poll` (jwt off; cron). Secrets: `CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY`, `CRON_SECRET`.

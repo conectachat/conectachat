@@ -113,9 +113,9 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   NÃO-parcial em calendly_invitee_uri), calendly_message_settings, +colunas appointment_id/kind em
   scheduled_messages. Edge Functions: calendly-oauth-start (jwt on), calendly-oauth-callback (jwt off; valida
   state HMAC + detecção de plano create+delete), calendly-disconnect v2 (jwt on; apaga a inscrição de webhook),
-  calendly-api v8 (jwt on: event_types[+locations/custom_questions]/available_times/capture_booking/book/
-  cancel/ensure_webhook + renovação de token c/ rotação + geração de confirmação/lembrete), calendly-webhook
-  (jwt off; valida assinatura HMAC), calendly-poll (jwt off; cron 5min, protegida por CRON_SECRET). Secrets:
+  calendly-api v9 (jwt on: event_types[+locations/custom_questions]/available_times/capture_booking/book/
+  cancel/ensure_webhook + renovação de token c/ rotação + geração de notificações), calendly-webhook v2
+  (jwt off; valida assinatura HMAC), calendly-poll v2 (jwt off; cron 5min, protegida por CRON_SECRET). Secrets:
   CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY. Frontend: card + config de mensagens em
   /integracoes/calendly; painel "Agendar" no inbox (Light=embed; Pro=agendamento NATIVO via Scheduling API —
   seletor de horário + formulário com e-mail e perguntas obrigatórias, sem iframe; card + cancelar + remarcar).
@@ -127,9 +127,13 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   assinatura HMAC com CALENDLY_WEBHOOK_SIGNING_KEY; a inscrição é criada com a NOSSA signing_key pela ação
   ensure_webhook, chamada no `book` E pelo card — confiável, não depende de abrir a página); Light via polling
   pg_cron 5min (calendly-poll, job 'conectachat-calendly-poll'). C4 REUSA scheduled_messages + run-scheduled
-  (NÃO criar fila nova). PRÓXIMO: C7 (nó no fluxo — depende do F4), C8 (relatórios). BACKLOG: ao cliente
-  cancelar/remarcar, disparar notificação automática no WhatsApp (confirmando cancelamento / novos dados da
-  remarcação) — fazer JUNTO do bloco de envios automáticos. EM ABERTO: ajuste de UI do agendamento (Renato
+  (NÃO criar fila nova). NOTIFICAÇÕES AUTOMÁTICAS (entregue 2026-06-25): 5 tipos por org em
+  calendly_message_settings — imediatas 'agendado'/'remarcado'/'cancelado' (enfileiradas em captureAppointment
+  e na ação cancel; e quando o cliente cancela no Calendly via calendly-webhook/calendly-poll, pulando
+  remarcação pelo flag invitee.rescheduled) + por tempo 'confirmação'/'lembrete' (C4). Config no card do
+  Calendly (calendly-messages-settings.tsx, 5 blocos). LIMITAÇÃO: remarcação feita pelo cliente DIRETO no
+  Calendly não dispara 'remarcado' (novo invitee externo não ligado à conversa); pelo app (embed) dispara.
+  PRÓXIMO: C7 (nó no fluxo — depende do F4), C8 (relatórios). EM ABERTO: ajuste de UI do agendamento (Renato
   anotou; não mexer por ora).
 - Fix WhatsApp (entregue junto do C5): manage-channels v7 — ação `qr` força sessão nova (PUT
   /instance/restart) + reaplica webhook quando a instância trava em "connecting" (antes só GET

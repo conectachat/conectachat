@@ -401,11 +401,25 @@ export function CalendlyAppointmentPanel({
       const { data, error } = await supabase.functions.invoke("calendly-api", {
         body: { action: "cancel", orgId, appointmentId },
       });
-      if (error || !data?.ok) {
-        toast.error("Não foi possível cancelar", { description: data?.error ?? error?.message });
+      if (error) {
+        toast.error("Não foi possível cancelar", { description: error.message });
         return;
       }
-      toast.success("Agendamento cancelado.");
+      if (data?.ok === false) {
+        // Falha real no Calendly — mostra o motivo (status + trecho do detalhe).
+        const desc = data?.detail
+          ? `Calendly ${data.status}: ${String(data.detail).slice(0, 160)}`
+          : data?.error ?? "erro desconhecido";
+        toast.error("Não foi possível cancelar no Calendly", { description: desc });
+        return;
+      }
+      if (data?.localOnly) {
+        toast.success("Removido daqui.", {
+          description: "Esta reunião pertence a outra conta Calendly (provavelmente de antes de trocar de conta). Se ainda valer, cancele direto no Calendly.",
+        });
+      } else {
+        toast.success("Agendamento cancelado.");
+      }
       await loadAppointments();
     } finally {
       setBusyId(null);

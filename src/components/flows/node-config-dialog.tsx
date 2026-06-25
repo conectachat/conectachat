@@ -23,6 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { AiModelSelect } from "@/components/shared/ai-model-select";
+import { defaultModelFor, isKnownModel } from "@/lib/ai-models";
 import { findCatalogItem } from "./node-catalog";
 import {
   useOrgTags,
@@ -792,7 +794,10 @@ export function NodeConfigDialog({
                 <Label>Provedor de IA</Label>
                 <Select
                   value={config.provider ?? ""}
-                  onValueChange={(v) => set("provider", v)}
+                  onValueChange={(v) => {
+                    set("provider", v);
+                    if (!config.model || !isKnownModel(v, config.model)) set("model", defaultModelFor(v));
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione..." />
@@ -804,16 +809,16 @@ export function NodeConfigDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  A chave de API é configurada em Credenciais de IA (em breve) e usada com segurança no servidor.
+                  A chave de API é configurada em Integrações → Inteligência Artificial e usada com segurança no
+                  servidor.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cfg-ai-model">Modelo</Label>
-                <Input
-                  id="cfg-ai-model"
+                <Label>Modelo</Label>
+                <AiModelSelect
+                  provider={config.provider ?? ""}
                   value={config.model ?? ""}
-                  onChange={(e) => set("model", e.target.value)}
-                  placeholder="ex.: gpt-4o-mini"
+                  onChange={(m) => set("model", m)}
                 />
               </div>
               <div className="space-y-2">

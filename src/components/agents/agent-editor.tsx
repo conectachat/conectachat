@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AiModelSelect } from "@/components/shared/ai-model-select";
+import { defaultModelFor } from "@/lib/ai-models";
 import { useOrgDepartments } from "@/hooks/use-flow-resources";
 import {
   useAiAgent,
@@ -30,13 +32,6 @@ import {
   type AiProvider,
   type BusinessHours,
 } from "@/hooks/use-ai-agents";
-
-// Modelos comuns por provedor — só dica de preenchimento (campo é livre).
-const MODEL_HINTS: Record<AiProvider, { default: string; examples: string }> = {
-  openai: { default: "gpt-4o-mini", examples: "gpt-4o-mini, gpt-4o" },
-  gemini: { default: "gemini-1.5-flash", examples: "gemini-1.5-flash, gemini-1.5-pro" },
-  claude: { default: "claude-3-5-haiku-latest", examples: "claude-3-5-haiku-latest, claude-3-5-sonnet-latest" },
-};
 
 const PROVIDER_LABEL: Record<AiProvider, string> = {
   openai: "OpenAI (GPT)",
@@ -264,7 +259,7 @@ export function AgentEditor({ agentId }: { agentId: string }) {
                   value={form.provider}
                   onValueChange={(v) => {
                     const provider = v as AiProvider;
-                    patch({ provider, model: form.model.trim() ? form.model : MODEL_HINTS[provider].default });
+                    patch({ provider, model: form.model.trim() ? form.model : defaultModelFor(provider) });
                   }}
                 >
                   <SelectTrigger>
@@ -278,14 +273,12 @@ export function AgentEditor({ agentId }: { agentId: string }) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="model">Modelo</Label>
-                <Input
-                  id="model"
+                <Label>Modelo</Label>
+                <AiModelSelect
+                  provider={form.provider}
                   value={form.model}
-                  onChange={(e) => patch({ model: e.target.value })}
-                  placeholder={MODEL_HINTS[form.provider].default}
+                  onChange={(m) => patch({ model: m })}
                 />
-                <p className="text-xs text-muted-foreground">Ex.: {MODEL_HINTS[form.provider].examples}</p>
               </div>
             </div>
 

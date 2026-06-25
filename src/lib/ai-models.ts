@@ -14,14 +14,14 @@ export const AI_MODELS: Record<AiProviderId, AiModelOption[]> = {
     { id: "gpt-4.1", label: "GPT-4.1", note: "Mais capaz, geração 4.1" },
   ],
   gemini: [
-    { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash", note: "Rápido e econômico (recomendado)" },
-    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", note: "Geração 2.0, rápido" },
-    { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro", note: "Mais capaz" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", note: "Rápido e econômico (recomendado)" },
+    { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", note: "O mais econômico" },
+    { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", note: "Mais capaz" },
   ],
   claude: [
-    { id: "claude-3-5-haiku-latest", label: "Claude 3.5 Haiku", note: "Rápido e econômico (recomendado)" },
-    { id: "claude-3-5-sonnet-latest", label: "Claude 3.5 Sonnet", note: "Mais capaz" },
-    { id: "claude-3-7-sonnet-latest", label: "Claude 3.7 Sonnet", note: "Geração 3.7, mais capaz" },
+    { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", note: "Rápido e econômico (recomendado)" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", note: "Equilíbrio (mais capaz)" },
+    { id: "claude-opus-4-8", label: "Claude Opus 4.8", note: "O mais capaz" },
   ],
 };
 

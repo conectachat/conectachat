@@ -14,7 +14,7 @@
 //  Atualiza sozinho via Realtime.
 //  Tabelas calendly_connections/appointments via (supabase as any) (CLAUDE.md §8).
 // =====================================================================
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { CalendarClock, CalendarPlus, ExternalLink, Loader2, X, CalendarX, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -125,7 +125,7 @@ export function CalendlyAppointmentPanel({
   const [rescheduleUrl, setRescheduleUrl] = useState<string | null>(null);
   const reschedulingRef = useRef<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const embedRef = useRef<HTMLDivElement | null>(null);
+  const [embedNode, setEmbedNode] = useState<HTMLDivElement | null>(null);
 
   // ---- Estado do agendamento nativo (Pro) ----
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -301,32 +301,35 @@ export function CalendlyAppointmentPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isPro, chosen, rescheduleUrl]);
 
-  // Monta o embed (Light) ou a remarcação (ambos os planos).
-  useEffect(() => {
-    if (!open || !embedRef.current) return;
-    let url: string | null = null;
-    if (rescheduleUrl) {
-      url = rescheduleUrl;
-    } else if (chosen && !isPro) {
+  // URL do embed: remarcação (ambos os planos) ou agendamento Light.
+  const embedUrl = useMemo<string | null>(() => {
+    if (!open) return null;
+    if (rescheduleUrl) return rescheduleUrl;
+    if (chosen && !isPro) {
       // Light: embed da página. encodeURIComponent → espaço vira %20.
       const parts: string[] = [];
       if (contactName) parts.push(`name=${encodeURIComponent(contactName)}`);
       if (contactEmail) parts.push(`email=${encodeURIComponent(contactEmail)}`);
       const sep = chosen.scheduling_url.includes("?") ? "&" : "?";
-      url = parts.length ? `${chosen.scheduling_url}${sep}${parts.join("&")}` : chosen.scheduling_url;
+      return parts.length ? `${chosen.scheduling_url}${sep}${parts.join("&")}` : chosen.scheduling_url;
     }
-    if (!url) return;
-    const target = url;
+    return null;
+  }, [open, rescheduleUrl, chosen, isPro, contactName, contactEmail]);
+
+  // Inicializa o widget assim que o <div> do embed monta (callback ref).
+  // Evita a corrida em que o efeito rodava antes do nó existir → tela em branco.
+  useEffect(() => {
+    if (!embedNode || !embedUrl) return;
     let cancelled = false;
     loadCalendlyScript().then(() => {
-      if (cancelled || !embedRef.current) return;
-      embedRef.current.innerHTML = "";
-      (window as any).Calendly?.initInlineWidget({ url: target, parentElement: embedRef.current });
+      if (cancelled || !embedNode) return;
+      embedNode.innerHTML = "";
+      (window as any).Calendly?.initInlineWidget({ url: embedUrl, parentElement: embedNode });
     });
     return () => {
       cancelled = true;
     };
-  }, [open, chosen, rescheduleUrl, isPro, contactName, contactEmail]);
+  }, [embedNode, embedUrl]);
 
   async function confirmBooking() {
     if (!chosen || !selectedSlot) return;
@@ -521,7 +524,17 @@ export function CalendlyAppointmentPanel({
 
           {rescheduleUrl ? (
             // Remarcação: embed do reschedule_url (não há API de remarcação).
-            <div ref={embedRef} style={{ minWidth: "320px", height: "640px" }} />
+            <div className="space-y-2">
+              <div ref={setEmbedNode} style={{ minWidth: "320px", height: "640px" }} />
+              <a
+                href={rescheduleUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block text-center text-xs text-brand-blue hover:underline"
+              >
+                Não carregou? Abrir a remarcação em nova aba
+              </a>
+            </div>
           ) : loadingTypes ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Carregando tipos de evento…</p>
           ) : !chosen ? (
@@ -698,7 +711,7 @@ export function CalendlyAppointmentPanel({
               >
                 <X className="h-3 w-3" /> trocar tipo de evento
               </button>
-              <div ref={embedRef} style={{ minWidth: "320px", height: "640px" }} />
+              <div ref={setEmbedNode} style={{ minWidth: "320px", height: "640px" }} />
             </div>
           )}
         </DialogContent>

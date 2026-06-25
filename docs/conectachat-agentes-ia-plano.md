@@ -1,0 +1,66 @@
+# Fase D — Atendente de IA (módulo "Agentes")
+
+Estado: EM ANDAMENTO, entregue e testado na Duli. Doc vivo — atualizar a cada bloco.
+
+## Visão
+A empresa cria **agentes de IA reutilizáveis**. Cada agente tem persona (system prompt),
+base de conhecimento (texto), comportamento configurável e handoff para humano. O agente
+responde no WhatsApp quando **nenhum fluxo** trata a mensagem. Reaproveita a infraestrutura
+de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b).
+
+## Banco
+- **ai_agents** (RLS "ALL" via is_member_of): name, is_active, persona, knowledge_base,
+  provider (enum ai_provider: openai/gemini/claude), model, activation_mode
+  (`sempre`/`quando_ninguem_atende`/`fora_do_horario`), business_hours (jsonb, dias×horas),
+  handoff_enabled, handoff_department_id (FK departments), handoff_message, handoff_keywords,
+  greeting, **humanize_replies** (bool, default true), **reply_delay_seconds** (int, default 3).
+- **channels.ai_agent_id** (FK ai_agents) — 1 agente por canal; um agente cobre vários canais.
+- **conversations.ai_agent_id** + **conversations.ai_status** (`active`/`handed_off`/null) —
+  estado da IA por conversa (zerado ao reabrir conversa).
+- **contacts.ai_enabled** (bool, default **false**) — interruptor do chatbot POR CONTATO. Segurança:
+  por padrão NENHUM contato recebe IA; o atendente liga no inbox (botão "Chatbot").
+
+## Edge Function whatsapp-webhook (v38 ACTIVE, verify_jwt false)
+- `runAutomation` = motor de fluxo primeiro; se NENHUM fluxo tratou → `runAgentAttendant`.
+- `runAgentAttendant`: gates (trava humana, status, ai_status handed_off, agente alocado,
+  contact.ai_enabled, agente ativo, ativação/horário) → handoff por palavra-gatilho →
+  **anti-ban** (`agentRateLimited`: silêncio se ≥6 outbound auto/10min na conversa ou ≥20/min na
+  org) → chama a IA (`buildAgentSystemPrompt` + callAiProvider) → envia (`sendAgentReply`).
+- **Humanização** (`sendAgentReply`, se humanize_replies): buffer `reply_delay_seconds` →
+  `splitReplyParts` (1–3 bolhas por `|||`) → por bolha: `sendPresence('composing', typingMs)` +
+  espera `min(3000,1200+len*35)`ms + `sendText` + jitter 700–1500ms. Sem humanize: envia de uma vez.
+- `sendPresence` = `POST {evolutionUrl}/chat/sendPresence/{instance}` `{number,presence,delay}` (apikey).
+- Handoff: `[HANDOFF]` no texto da IA OU palavra-gatilho → `doHandoff` (avisa cliente, joga p/ depto,
+  marca ai_status='handed_off'; a IA não volta até reabrir).
+- Defaults de fallback dos provedores corrigidos: Claude `claude-sonnet-4-6`, Gemini `gemini-2.5-flash`.
+
+## Frontend
+- Rota `/agentes` (+ `/agentes/$agentId`), item "Agentes" no menu (src/routes/_authenticated/agentes*).
+- `src/components/agents/agents-screen.tsx` (lista) + `agent-editor.tsx` (editor com cards:
+  Identidade/modelo, Personalidade, Base de conhecimento, Quando atende, Handoff, **Humanização e
+  segurança**, Onde atua). `src/hooks/use-ai-agents.ts` (CRUD + canais + chaves).
+- Modelo: `src/components/shared/ai-model-select.tsx` + `src/lib/ai-models.ts` (lista por provedor +
+  "Outro"). Mesmo seletor no nó de IA do fluxo. **Atenção:** IDs de modelo aposentam — manter a lista
+  atual (catálogo oficial via skill claude-api).
+- Inbox: botão "Chatbot" no cabeçalho da conversa (liga/desliga `contacts.ai_enabled`) — desktop e
+  menu mobile (src/components/inbox/inbox-screen.tsx + src/hooks/use-conversations.ts).
+
+## Decisões fixadas
+- Base de conhecimento = texto colado (Fase 1). RAG por upload = Fase 2 (diferencial de plano).
+- Humanização LIGADA por padrão, configurável por agente.
+- Anti-ban: ao bater o limite, o agente fica em SILÊNCIO (não passa para humano).
+- Provedor/modelo por agente; chaves reaproveitam ai_credentials (card /integracoes/ai).
+
+## Roadmap IA (fora do MVP)
+- RAG por upload de documentos (pgvector).
+- Function calling (agendar no Calendly, transferir) — "responder + executar ações".
+- Nó de IA do fluxo escolher um agente (ai_agent_id).
+- Métricas do agente; limites anti-ban configuráveis por agente/plano; humanização no nó de fluxo.
+
+## Histórico de blocos
+- B1: migration ai_agents + channels.ai_agent_id + conversations.ai_agent_id/ai_status.
+- B2: módulo Agentes (frontend) + seletor de modelo por dropdown.
+- B3: execução no whatsapp-webhook (runAgentAttendant) + roteamento + handoff (v36/v37).
+- Segurança: contacts.ai_enabled (padrão false) + botão "Chatbot" no inbox (v37).
+- Fix: IDs de modelo aposentados → atualizados (Claude/Gemini/OpenAI).
+- S1/S2/S3: humanização (digitando…+partes+buffer) + anti-banimento (v38) + UI no editor.

@@ -80,6 +80,8 @@ type FormState = {
   handoff_department_id: string | null;
   handoff_message: string;
   handoff_keywords: string;
+  humanize_replies: boolean;
+  reply_delay_seconds: number;
 };
 
 function toForm(a: AiAgent): FormState {
@@ -97,6 +99,8 @@ function toForm(a: AiAgent): FormState {
     handoff_department_id: a.handoff_department_id,
     handoff_message: a.handoff_message ?? "",
     handoff_keywords: a.handoff_keywords ?? "",
+    humanize_replies: a.humanize_replies !== false,
+    reply_delay_seconds: a.reply_delay_seconds ?? 3,
   };
 }
 
@@ -177,6 +181,8 @@ export function AgentEditor({ agentId }: { agentId: string }) {
           handoff_department_id: form.handoff_department_id,
           handoff_message: form.handoff_message,
           handoff_keywords: form.handoff_keywords,
+          humanize_replies: form.humanize_replies,
+          reply_delay_seconds: form.reply_delay_seconds,
         },
       });
       await setAgentChannels.mutateAsync({ agentId, channelIds: selectedChannels });
@@ -508,6 +514,54 @@ export function AgentEditor({ agentId }: { agentId: string }) {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Humanização e segurança */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Humanização e segurança</CardTitle>
+            <CardDescription>
+              Faz o agente parecer menos robô e protege seu número (WhatsApp não-oficial).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.humanize_replies}
+                onCheckedChange={(c) => patch({ humanize_replies: c })}
+              />
+              <span className="text-sm text-foreground">
+                Responder como humano (mostra &quot;digitando…&quot; e envia em 1–3 partes)
+              </span>
+            </div>
+
+            {form.humanize_replies && (
+              <div className="space-y-2">
+                <Label htmlFor="reply-delay">Tempo antes de começar a responder (segundos)</Label>
+                <Input
+                  id="reply-delay"
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={form.reply_delay_seconds}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    patch({ reply_delay_seconds: isNaN(n) ? 0 : Math.max(0, Math.min(20, n)) });
+                  }}
+                  className="w-32"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Uma pausa antes da primeira mensagem, como se a pessoa estivesse lendo. 0 a 20s.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+              <strong className="text-foreground">Proteção anti-banimento sempre ativa:</strong> o agente
+              limita o ritmo de envio automático (até 6 mensagens por 10 min por contato e 20 por minuto na
+              empresa). Num pico, ele fica em silêncio por alguns minutos para proteger seu número.
+            </div>
           </CardContent>
         </Card>
 

@@ -139,6 +139,24 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   /instance/restart) + reaplica webhook quando a instância trava em "connecting" (antes só GET
   /instance/connect); se já está "open", não reinicia (não derruba número conectado). Resolve a falha de
   reconexão pelo app. Restart na Evolution v2 é PUT (não POST). [[whatsapp-qr-reconnect-fix]]
+- FASE D — ATENDENTE DE IA (módulo "Agentes") — EM ANDAMENTO (entregue e testado na Duli).
+  Empresa cria agentes reutilizáveis: persona + base de conhecimento (TEXTO colado, Fase 1) +
+  provedor/modelo (dropdown, src/lib/ai-models.ts — IDs atuais: Claude haiku-4-5/sonnet-4-6/opus-4-8;
+  Gemini 2.5; OpenAI 4o/4.1) + ativação (sempre/quando_ninguem_atende/fora_do_horario com horário
+  comercial) + handoff (departamento + palavras-gatilho + marcador [HANDOFF]) + alocação por canal.
+  Banco: tabela ai_agents (RLS is_member_of), channels.ai_agent_id (1 agente/canal), conversations.
+  ai_agent_id/ai_status, contacts.ai_enabled (interruptor por contato, PADRÃO false — botão "Chatbot"
+  no cabeçalho do inbox; segurança: nada de IA até ligar contato a contato). Execução no
+  whatsapp-webhook (runAgentAttendant): roda quando NENHUM fluxo trata a mensagem; reusa
+  callAiProvider/getAiKey/loadHistory. Frontend: rota /agentes + menu "Agentes" + lista + editor
+  (src/components/agents/*, src/hooks/use-ai-agents.ts). HUMANIZAÇÃO + ANTI-BAN (webhook v38,
+  por agente via ai_agents.humanize_replies/reply_delay_seconds): mostra "digitando…"
+  (POST /chat/sendPresence), buffer inicial, resposta em 1–3 bolhas (separadas por |||, typing
+  min(3000,1200+len*35)ms, jitter 700–1500ms); anti-banimento SEMPRE ativo (6 msgs/10min por
+  contato, 20/min por empresa → agente fica em SILÊNCIO no pico). LIÇÃO: IDs de modelo dos provedores
+  mudam/aposentam — conferir no catálogo oficial (skill claude-api). ROADMAP IA: RAG por upload
+  (Fase 2), function calling (agendar/transferir), nó de fluxo escolher agente, métricas, limites
+  anti-ban por plano. Plano detalhado: docs/conectachat-agentes-ia-plano.md.
 - Próximo grande marco: FASE C — bloco C7 (nó Calendly no fluxo; depende do F4) e C8 (relatórios).
 
 ## 10. Roadmap até o lançamento (sequência fixa, lançamento único)

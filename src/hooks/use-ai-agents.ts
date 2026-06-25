@@ -37,6 +37,8 @@ export type AiAgent = AiAgentListItem & {
   handoff_message: string;
   handoff_keywords: string;
   greeting: string;
+  humanize_replies: boolean;
+  reply_delay_seconds: number;
   created_at: string;
 };
 

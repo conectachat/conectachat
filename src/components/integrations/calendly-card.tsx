@@ -97,6 +97,13 @@ export function CalendlyCard({ orgId }: { orgId: string | null }) {
     };
   }, [conn, orgId]);
 
+  // Pro: garante a inscrição de webhook (sincronização instantânea de
+  // cancelar/remarcar). Idempotente e silencioso — roda ao abrir a página.
+  useEffect(() => {
+    if (!conn || !orgId || conn.plan_tier !== "pro") return;
+    supabase.functions.invoke("calendly-api", { body: { action: "ensure_webhook", orgId } });
+  }, [conn, orgId]);
+
   async function conectar() {
     if (!orgId) return;
     setBusy(true);

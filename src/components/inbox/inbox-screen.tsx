@@ -47,6 +47,7 @@ import {
   Send,
   MoreVertical,
   CircleCheckBig,
+  Bot,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -538,6 +539,25 @@ export function InboxScreen() {
       return;
     }
     toast.success(uid ? "Você assumiu o atendimento." : "Atendimento liberado.");
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+  // Fase D — liga/desliga o chatbot (agente de IA) para ESTE contato.
+  // Por padrão vem desligado; o atendente liga contato por contato. O gate é
+  // lido no whatsapp-webhook (contacts.ai_enabled).
+  async function toggleChatbot() {
+    const c = selected?.contact;
+    if (!c?.id) return;
+    const next = !(c.ai_enabled === true);
+    const { error } = await (supabase as any)
+      .from("contacts")
+      .update({ ai_enabled: next })
+      .eq("id", c.id);
+    if (error) {
+      toast.error("Não foi possível alterar o chatbot deste contato.");
+      return;
+    }
+    toast.success(next ? "Chatbot ligado para este contato." : "Chatbot desligado para este contato.");
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
@@ -1767,6 +1787,24 @@ export function InboxScreen() {
                   </button>
                 )}
                 <button
+                  onClick={toggleChatbot}
+                  title={
+                    selected.contact?.ai_enabled
+                      ? "Chatbot LIGADO para este contato — clique para desligar"
+                      : "Chatbot desligado — clique para ligar (o agente de IA passa a atender este contato)"
+                  }
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm ${
+                    selected.contact?.ai_enabled
+                      ? "border-brand-green/40 bg-brand-green/10 text-brand-green"
+                      : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Bot size={16} />{" "}
+                  <span className="hidden lg:inline">
+                    {selected.contact?.ai_enabled ? "Chatbot ligado" : "Chatbot"}
+                  </span>
+                </button>
+                <button
                   onClick={closeConversation}
                   title="Encerrar atendimento (fecha a conversa)"
                   className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
@@ -1820,6 +1858,17 @@ export function InboxScreen() {
                         className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         <ArrowRightLeft size={15} /> Transferir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          toggleChatbot();
+                          setHeaderMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Bot size={15} />{" "}
+                        {selected.contact?.ai_enabled ? "Desligar chatbot" : "Ligar chatbot"}
                       </button>
                       <div className="my-1 border-t border-gray-100" />
                       {selected.assigned_user_id && selected.assigned_user_id === user?.id ? (

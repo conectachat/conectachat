@@ -22,6 +22,7 @@ export type ConversationListItem = {
     email: string | null;
     birth_date: string | null;
     notes: string | null;
+    ai_enabled: boolean | null;
   } | null;
   channel: { id: string; name: string; type: string } | null;
 };
@@ -35,7 +36,7 @@ export function useConversations() {
         .select(
           `
           id, ticket_number, status, last_message_at, created_at, unread_count, assigned_user_id, department_id,
-          contact:contacts ( id, name, name_locked, is_group, avatar_url, channel_type, external_id, email, birth_date, notes ),
+          contact:contacts ( id, name, name_locked, is_group, avatar_url, channel_type, external_id, email, birth_date, notes, ai_enabled ),
           channel:channels ( id, name, type ),
           department:departments ( id, name )
         `,

@@ -1,6 +1,6 @@
 /* ============================================================
- * FASE C — INTEGRAÇÃO CALENDLY (C1–C4) — ✅ ENTREGUE e testado na Duli
- * (próximo: C5 Pro nativo). Plano e progresso completos:
+ * FASE C — INTEGRAÇÃO CALENDLY (C1–C5) — ✅ ENTREGUE e testado na Duli
+ * (próximo: C6 sincronização). Plano e progresso completos:
  * docs/conectachat-calendly-plano.md (seção 0). Resumo:
  * ============================================================
  * Card único adaptativo no Marketplace (/integracoes/calendly): conecta a conta
@@ -32,10 +32,26 @@
  *   appointment_id/kind em scheduled_messages. Config na página da integração Calendly
  *   (calendly-messages-settings.tsx): toggles, tempos, textos com chips, aviso sobre lembretes nativos.
  *
- * EM ABERTO (anotado): trava de renovação simultânea de token (cenário raro); C5 Pro nativo
- *   (Scheduling API, sem iframe, tratar location); C6 sync (webhook Pro + polling Light 5min);
- *   C7 nó no fluxo (depende do F4); C8 relatórios. Decisões fixadas: tokens=Vault; polling
- *   Light=5min; tempos padrão conf 24h/lembrete 2h; lembretes nativos = empresa decide na config.
+ * C5 — Pro nativo (Scheduling API, sem iframe): calendly-api v6 ganhou a ação `book`
+ *   (POST https://api.calendly.com/invitees; escopo scheduled_events:write JÁ na app OAuth da Duli —
+ *   verificado, não recriou app). `book` lê o detalhe do event type, valida e-mail do convidado +
+ *   perguntas obrigatórias, monta `location` (omite se sem local/round_robin; ask_invitee/outbound_call
+ *   pedem string da UI) e questions_and_answers, e REUSA o helper de captura (appointments source='manual'
+ *   + confirmação/lembrete). event_types passou a devolver locations/custom_questions. `cancel` ficou
+ *   robusto: evento de OUTRA conta Calendly (403/404/410) → remove só localmente (localOnly), não trava.
+ *   Frontend (calendly-appointment-panel.tsx): lê plan_tier; Pro = nativo (tipo → seletor de horário por
+ *   dia, 14d + "ver mais" → formulário com e-mail obrigatório + perguntas dinâmicas); Light = embed.
+ *   Remarcar (ambos) = embed do reschedule_url + link "abrir em nova aba"; embed monta por CALLBACK REF
+ *   (corrigida a "tela em branco" por corrida de montagem). UI do agendamento: ajuste anotado p/ depois.
+ *
+ * FIX WhatsApp (junto do C5): manage-channels v7 — ação `qr` força sessão nova (PUT /instance/restart) +
+ *   reaplica webhook (helper applyWebhook) quando a instância trava em "connecting"; se já está "open",
+ *   retorna alreadyConnected e NÃO reinicia. Restart na Evolution v2 é PUT (não POST). Frontend não mudou
+ *   (QR ao vivo já vem pelo whatsapp-webhook via QRCODE_UPDATED + realtime).
+ *
+ * EM ABERTO (anotado): trava de renovação simultânea de token (cenário raro); C6 sync (webhook Pro +
+ *   polling Light 5min); C7 nó no fluxo (depende do F4); C8 relatórios. Decisões fixadas: tokens=Vault;
+ *   polling Light=5min; tempos padrão conf 24h/lembrete 2h; lembretes nativos = empresa decide na config.
  */
 
 /* ============================================================

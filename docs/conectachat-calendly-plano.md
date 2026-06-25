@@ -7,7 +7,7 @@
 
 ---
 
-## 0. Progresso da implementação (atualizado 2026-06-24)
+## 0. Progresso da implementação (atualizado 2026-06-25)
 
 - **C0 — Validação:** ✅ fechado (embed inline OK no grátis; leitura GET OK no grátis; detecção de plano por 403/200 confirmada por doc e na prática).
 - **C1 — Conexão:** ✅ ENTREGUE e testado na Duli (Pro na conta paga, Light na grátis).
@@ -25,8 +25,32 @@
   - `calendly-api` (v4) gera confirmação/lembrete ao capturar (variáveis Calendly resolvidas na geração: `{{tipo_evento}}`/`{{data_reuniao}}`/`{{hora_reuniao}}`/`{{link_reuniao}}`/`{{link_remarcar}}`/`{{link_cancelar}}`; `scheduled_at = início − offset`, só se habilitado e no futuro) e cancela pendentes em cancelar/remarcar.
   - Banco: `calendly_message_settings` (por org) + colunas `appointment_id`/`kind` em `scheduled_messages`.
   - Config na PÁGINA da integração Calendly (`calendly-messages-settings.tsx`): toggles, tempos, textos com chips de variáveis, aviso sobre lembretes nativos.
-- **Próximo:** C5 — Pro nativo (agendar pela Scheduling API, sem iframe; tratar `location`). Depois C6 (sync: webhook Pro + polling Light), C7 (nó no fluxo — depende de F4) e C8 (relatórios).
-- **Edge Functions Calendly no ar:** `calendly-oauth-start` (jwt on), `calendly-oauth-callback` (jwt off), `calendly-disconnect` (jwt on), `calendly-api` v4 (jwt on). Secrets: `CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY`.
+- **C5 — Pro nativo (agendamento via Scheduling API, sem iframe):** ✅ ENTREGUE e testado na Duli.
+  - Pré-flight resolvido: a conexão da Duli já tem o escopo **`scheduled_events:write`** (verificado em
+    `calendly_connections.scope`) → **NÃO foi preciso recriar a app OAuth**.
+  - Fatos confirmados: endpoint **`POST https://api.calendly.com/invitees`** (resposta 201 com
+    `resource.uri`=invitee e `resource.event`=evento). **E-mail do convidado é obrigatório.** O event type
+    expõe `locations[]` e `custom_questions[]` na própria listagem; o principal da Duli ("Análise de
+    Viabilidade") tem perguntas **obrigatórias** → o nativo coleta. `location` obrigatório se o tipo tem
+    local; omitir se não tem ou se `round_robin`; `ask_invitee`/`outbound_call` exigem string da UI.
+  - `calendly-api` (v6): ação **`book`** (lê o detalhe do event type → valida e-mail + obrigatórias → monta
+    `location` + `questions_and_answers` → POST /invitees → **reusa o helper de captura** compartilhado com
+    `capture_booking` → grava `appointments` com `source='manual'` e gera confirmação/lembrete). `event_types`
+    passou a devolver `locations`/`custom_questions`. **`cancel` robusto:** se o Calendly recusa por o evento
+    pertencer a OUTRA conta (403/404/410 — ex.: a empresa trocou de conta Calendly), remove o agendamento só
+    daqui (`localOnly`) em vez de travar; erros reais retornam status+detalhe.
+  - Frontend (`calendly-appointment-panel.tsx`): lê `plan_tier`; **Pro** = fluxo nativo (escolher tipo →
+    seletor de horário agrupado por dia, janela de 14 dias + "ver mais" → formulário com nome, **e-mail
+    obrigatório**, perguntas obrigatórias dinâmicas e campo de local quando o tipo pede). **Light** segue no
+    embed. **Remarcar** (ambos) = embed do `reschedule_url` + link "abrir em nova aba"; o embed monta por
+    **callback ref** (corrigida a "tela em branco" por corrida de montagem dentro do diálogo).
+  - **Pendência anotada (não mexer por ora):** ajuste de UI do agendamento (a pedido do Renato).
+- **Fix WhatsApp (junto do C5):** `manage-channels` v7 — ação `qr` força sessão nova (PUT
+  `/instance/restart`) + reaplica webhook quando a instância trava em "connecting"; se já está "open", não
+  reinicia. Resolve a reconexão pelo app. (Restart na Evolution v2 é **PUT**.)
+- **Próximo:** C6 — sincronização (webhook Pro + polling Light 5 min). Depois C7 (nó no fluxo — depende de F4)
+  e C8 (relatórios).
+- **Edge Functions Calendly no ar:** `calendly-oauth-start` (jwt on), `calendly-oauth-callback` (jwt off), `calendly-disconnect` (jwt on), `calendly-api` v6 (jwt on). Secrets: `CALENDLY_CLIENT_ID/CLIENT_SECRET/WEBHOOK_SIGNING_KEY`.
 
 ---
 

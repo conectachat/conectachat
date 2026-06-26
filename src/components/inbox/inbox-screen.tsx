@@ -471,9 +471,10 @@ export function InboxScreen() {
   const { data: conversations, isLoading } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState("");
-  // Bloco M — aba ativa da lista. "aguardando" = sem atendente; "minhas" = atribuída a mim.
-  // Abre em "Minhas" por padrão; ordem das abas: Minhas → Aguardando → Todas.
-  const [tab, setTab] = useState<"todas" | "aguardando" | "minhas">("minhas");
+  // Bloco M — aba ativa da lista. "aguardando" = sem atendente e sem IA atuando;
+  // "agentes" = sem atendente e IA atuando (ai_status='active'); "minhas" = atribuída a mim.
+  // Abre em "Minhas" por padrão; ordem das abas: Minhas → Aguardando → Agentes → Todas.
+  const [tab, setTab] = useState<"todas" | "aguardando" | "minhas" | "agentes">("minhas");
 
   // H.3a — lista de conversas filtrada pela busca (nome, telefone ou e-mail).
   const filteredConvs = useMemo(() => {
@@ -697,19 +698,29 @@ export function InboxScreen() {
   }
 
   // Bloco M — contadores por aba (sobre a lista já filtrada pela busca).
+  // Não-atribuídas se dividem: IA atuando (ai_status='active') → Agentes; o resto → Aguardando.
   const counts = useMemo(() => {
     let aguardando = 0;
     let minhas = 0;
+    let agentes = 0;
     for (const c of filteredConvs) {
-      if (!c.assigned_user_id) aguardando++;
-      else if (c.assigned_user_id === myId) minhas++;
+      if (c.assigned_user_id) {
+        if (c.assigned_user_id === myId) minhas++;
+      } else if (c.ai_status === "active") {
+        agentes++;
+      } else {
+        aguardando++;
+      }
     }
-    return { todas: filteredConvs.length, aguardando, minhas };
+    return { todas: filteredConvs.length, aguardando, minhas, agentes };
   }, [filteredConvs, myId]);
 
   // Bloco M — lista exibida = busca + aba ativa.
   const visibleConvs = useMemo(() => {
-    if (tab === "aguardando") return filteredConvs.filter((c) => !c.assigned_user_id);
+    if (tab === "aguardando")
+      return filteredConvs.filter((c) => !c.assigned_user_id && c.ai_status !== "active");
+    if (tab === "agentes")
+      return filteredConvs.filter((c) => !c.assigned_user_id && c.ai_status === "active");
     if (tab === "minhas") return filteredConvs.filter((c) => c.assigned_user_id === myId);
     return filteredConvs;
   }, [filteredConvs, tab, myId]);
@@ -1528,6 +1539,7 @@ export function InboxScreen() {
               [
                 ["minhas", "Minhas", counts.minhas],
                 ["aguardando", "Aguardando", counts.aguardando],
+                ["agentes", "Agentes", counts.agentes],
                 ["todas", "Todas", counts.todas],
               ] as const
             ).map(([key, label, n]) => {
@@ -1573,9 +1585,11 @@ export function InboxScreen() {
                 ? "Nenhuma conversa encontrada"
                 : tab === "aguardando"
                   ? "Nenhuma conversa aguardando"
-                  : tab === "minhas"
-                    ? "Você não está atendendo nenhuma conversa"
-                    : "Nenhuma conversa ainda"}
+                  : tab === "agentes"
+                    ? "Nenhuma conversa sendo atendida pela IA"
+                    : tab === "minhas"
+                      ? "Você não está atendendo nenhuma conversa"
+                      : "Nenhuma conversa ainda"}
             </p>
           )}
           {!isLoading &&

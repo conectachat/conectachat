@@ -145,8 +145,9 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   Gemini 2.5; OpenAI 4o/4.1) + ativação (sempre/quando_ninguem_atende/fora_do_horario com horário
   comercial) + handoff (departamento + palavras-gatilho + marcador [HANDOFF]) + alocação por canal.
   Banco: tabela ai_agents (RLS is_member_of), channels.ai_agent_id (1 agente/canal), conversations.
-  ai_agent_id/ai_status, contacts.ai_enabled (interruptor por contato, PADRÃO false — botão "Chatbot"
-  no cabeçalho do inbox; segurança: nada de IA até ligar contato a contato). Execução no
+  ai_agent_id/ai_status, contacts.ai_enabled (interruptor por contato, PADRÃO true desde o Passo 2 —
+  botão "Chatbot" no inbox agora é DESLIGAR pontual; a segurança vem da regra "só sem humano", abaixo).
+  Execução no
   whatsapp-webhook (runAgentAttendant): roda quando NENHUM fluxo trata a mensagem; reusa
   callAiProvider/getAiKey/loadHistory. Frontend: rota /agentes + menu "Agentes" + lista + editor
   (src/components/agents/*, src/hooks/use-ai-agents.ts). PASSO 1 ENTREGUE (webhook v39): o nó "ai" do
@@ -155,7 +156,15 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   (cfg.aiAgentId → ai_agents), monta o prompt via buildAgentSystemPrompt com humanize/handoff FORÇADOS
   OFF (bolha única, sem |||/[HANDOFF]; chave continua de ai_credentials; temperature/maxTokens/history/
   behavior seguem do nó). Roda mesmo com agente is_active=false (a presença no fluxo é a ativação).
-  Fluxos antigos sem aiAgentId: comportamento idêntico ao anterior. HUMANIZAÇÃO + ANTI-BAN (webhook v38,
+  Fluxos antigos sem aiAgentId: comportamento idêntico ao anterior. PASSO 2 ENTREGUE (sem mudar webhook):
+  (a) IA SEMPRE LIGADA — migration contacts_ai_enabled_default_true (ai_enabled DEFAULT true + ligou os
+  63 contatos existentes); a regra "só responde sem humano" já estava no runAgentAttendant (para se
+  conversa atribuída OU ai_status='handed_off'); botão "Chatbot" vira desligar pontual (false=off).
+  (b) INBOX — 4ª aba "Agentes" (inbox-screen.tsx + use-conversations.ts traz ai_status): roteamento por
+  ai_status — Agentes = sem atendente E ai_status='active' (IA atuando); Aguardando = sem atendente E
+  ai_status≠'active' (handoff/sem-IA, espera humano); Minhas = atribuída a mim; Todas. Falta Passo 3
+  (barra de filtros: Fechar todas/Abertos/Fechadas/Crescente/Filas) e Passo 4 (níveis hierárquicos:
+  dono/admin tudo, atendente só as dele + filas dele). HUMANIZAÇÃO + ANTI-BAN (webhook v38,
   por agente via ai_agents.humanize_replies/reply_delay_seconds): mostra "digitando…"
   (POST /chat/sendPresence), buffer inicial, resposta em 1–3 bolhas (separadas por |||, typing
   min(3000,1200+len*35)ms, jitter 700–1500ms); anti-banimento SEMPRE ativo (6 msgs/10min por

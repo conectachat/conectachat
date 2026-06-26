@@ -17,8 +17,9 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
 - **channels.ai_agent_id** (FK ai_agents) — 1 agente por canal; um agente cobre vários canais.
 - **conversations.ai_agent_id** + **conversations.ai_status** (`active`/`handed_off`/null) —
   estado da IA por conversa (zerado ao reabrir conversa).
-- **contacts.ai_enabled** (bool, default **false**) — interruptor do chatbot POR CONTATO. Segurança:
-  por padrão NENHUM contato recebe IA; o atendente liga no inbox (botão "Chatbot").
+- **contacts.ai_enabled** (bool, default **true** desde o Passo 2) — interruptor do chatbot POR CONTATO.
+  Agora a IA vem LIGADA por padrão; o botão "Chatbot" no inbox vira DESLIGAR pontual (false=off). A
+  segurança não é mais "opt-in por contato", e sim a regra "só responde sem humano" (ver Passo 2).
 
 ## Edge Function whatsapp-webhook (v39 ACTIVE, verify_jwt false)
 - `runAutomation` = motor de fluxo primeiro; se NENHUM fluxo tratou → `runAgentAttendant`.
@@ -89,3 +90,10 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
 - S1/S2/S3: humanização (digitando…+partes+buffer) + anti-banimento (v38) + UI no editor.
 - Passo 1 (v39): nó "ai" do fluxo pode usar um Agente (seletor `cfg.aiAgentId` + ramificação no
   `runAiNode` reusando `buildAgentSystemPrompt`, bolha única). Sem mudança de banco.
+- Passo 2: (a) IA SEMPRE LIGADA — migration `contacts_ai_enabled_default_true` (default true + ligou os
+  63 contatos existentes); a regra "só sem humano" já estava no `runAgentAttendant` (NÃO mexeu no
+  webhook). (b) INBOX — 4ª aba "Agentes" roteando por `ai_status`: Agentes = sem atendente E
+  `ai_status='active'`; Aguardando = sem atendente E `ai_status≠'active'`; Minhas = atribuída a mim;
+  Todas. Toca `src/components/inbox/inbox-screen.tsx` + `src/hooks/use-conversations.ts` (passou a
+  trazer `ai_status`). PRÓXIMOS: Passo 3 (barra de filtros: Fechar todas/Abertos/Fechadas/Crescente/
+  Filas) e Passo 4 (níveis hierárquicos: dono/admin tudo, atendente só as dele + filas dele).

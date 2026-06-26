@@ -156,7 +156,11 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   contato, 20/min por empresa → agente fica em SILÊNCIO no pico). LIÇÃO: IDs de modelo dos provedores
   mudam/aposentam — conferir no catálogo oficial (skill claude-api). ROADMAP IA: RAG por upload
   (Fase 2), function calling (agendar/transferir), nó de fluxo escolher agente, métricas, limites
-  anti-ban por plano. Plano detalhado: docs/conectachat-agentes-ia-plano.md.
+  anti-ban por plano. PASSOS RESTANTES (próxima conversa): (1) nó de IA do fluxo escolher um agente;
+  (2) botão "acionar fluxo manualmente" no inbox (Edge trigger-flow); (3) CALIBRAR o tempo do
+  "digitando…" — hoje NÃO é proporcional ao tamanho da mensagem (refinamento anotado pelo Renato);
+  (4) tornar falha de IA visível; (5) restringir /agentes a dono/admin. Plano + passos detalhados:
+  docs/conectachat-agentes-ia-plano.md.
 - Próximo grande marco: FASE C — bloco C7 (nó Calendly no fluxo; depende do F4) e C8 (relatórios).
 
 ## 10. Roadmap até o lançamento (sequência fixa, lançamento único)

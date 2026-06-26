@@ -122,7 +122,15 @@ DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem s
            e lembrete automáticos pelo WhatsApp reusando scheduled_messages + run-scheduled). Próximo:
            C5 (Pro nativo via Scheduling API), depois C6 (sync webhook/poll), C7 (nó no fluxo — depende
            do F4), C8 (relatórios). Detalhe: docs/conectachat-calendly-plano.md. Depois: Google Agenda, HubSpot.
-  Fase D — Atendente de IA.
+  Fase D — Atendente de IA (módulo "Agentes") — EM ANDAMENTO. Entregue: tabela ai_agents, módulo
+           /agentes (persona + base de conhecimento em texto + provedor/modelo + ativação + handoff +
+           alocação por canal), execução no whatsapp-webhook (runAgentAttendant), interruptor por
+           contato (contacts.ai_enabled, padrão off + botão "Chatbot" no inbox), humanização
+           (digitando…+1–3 bolhas+buffer) e anti-banimento (6/10min por contato, 20/min por empresa).
+           PASSOS RESTANTES: nó de IA do fluxo escolher agente; botão "acionar fluxo manual" no inbox;
+           calibrar tempo do "digitando…" (não-proporcional); falha de IA visível; restringir
+           /agentes a dono/admin. Detalhe: docs/conectachat-agentes-ia-plano.md. Roadmap IA: RAG por
+           upload (Fase 2), function calling (agendar/transferir), métricas.
   Fase E — Stripe + enforcement de planos + LANÇAMENTO.
     Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597
     (anual ~17% off; trial 14 dias sem cartão). Stripe na conta da Duli

@@ -51,11 +51,28 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
 - Anti-ban: ao bater o limite, o agente fica em SILÊNCIO (não passa para humano).
 - Provedor/modelo por agente; chaves reaproveitam ai_credentials (card /integracoes/ai).
 
+## Passos restantes (para uma conversa nova) — em ordem sugerida
+1. **Nó de IA do fluxo escolher um agente** (Bloco 4 original, ainda NÃO feito): o nó "ai" do
+   construtor de fluxos ganha um seletor "Usar um agente" (ai_agent_id). Se escolhido, o nó usa
+   persona/base/provedor/modelo do agente em vez da config digitada. Compatível com fluxos antigos.
+   Toca: src/components/flows/node-config-dialog.tsx (+ hook tipo useOrgAiAgents) e runAiNode no
+   whatsapp-webhook (carregar o agente quando cfg.ai_agent_id existir).
+2. **Botão "Acionar fluxo manualmente" no inbox** (Feature 2, planejada e NÃO feita): o atendente
+   escolhe um fluxo e dispara na conversa atual. Precisa de uma Edge Function `trigger-flow` (jwt on)
+   que valida o membro e inicia o fluxo reusando o motor do webhook (caminho interno protegido por
+   segredo). Referência: atendchat `src` (TriggerFlowService / TicketController.triggerFlow).
+3. **Calibração do tempo de "digitando…"** (refinamento anotado pelo Renato): hoje o tempo do
+   indicador não está proporcional ao tamanho da mensagem. Ajustar a fórmula em `sendAgentReply`
+   (`typingMs = min(3000, 1200 + len*35)`) e/ou o uso de `sendPresence` para casar melhor.
+4. **Tornar falhas de IA visíveis** (robustez): quando o provedor devolve vazio, gravar um aviso
+   interno na conversa (não enviado ao cliente) tipo "⚠️ IA não respondeu — verifique modelo/chave".
+5. **Restringir /agentes a dono/admin** (igual decisão em aberto do Dashboard).
+
 ## Roadmap IA (fora do MVP)
-- RAG por upload de documentos (pgvector).
+- RAG por upload de documentos (pgvector) — base de conhecimento via arquivos (Fase 2, diferencial de plano).
 - Function calling (agendar no Calendly, transferir) — "responder + executar ações".
-- Nó de IA do fluxo escolher um agente (ai_agent_id).
-- Métricas do agente; limites anti-ban configuráveis por agente/plano; humanização no nó de fluxo.
+- Métricas do agente (respostas, handoffs, tempo); limites anti-ban configuráveis por agente/plano.
+- Humanização também no nó de IA do fluxo (hoje só no agente do canal).
 
 ## Histórico de blocos
 - B1: migration ai_agents + channels.ai_agent_id + conversations.ai_agent_id/ai_status.

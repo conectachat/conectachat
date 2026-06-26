@@ -182,7 +182,8 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   conversa (dismissAiError limpa ai_last_error). use-conversations traz ai_last_error(+_at).
   PASSOS RESTANTES: (1) ✅ nó de fluxo escolher agente (v39); (2) botão "acionar fluxo manualmente" no
   inbox (Edge trigger-flow) ← PRÓXIMO; (3) CALIBRAR o tempo do "digitando…" (não proporcional ao
-  tamanho); (4) ✅ falha de IA visível (v40); (5) restringir /agentes a dono/admin; (6) níveis
+  tamanho); (4) ✅ falha de IA visível (v40); (5) ✅ /agentes restrito a dono/admin (guard no layout
+  agentes.tsx via useCurrentUser + item "Agentes" do sidebar com adminOnly); (6) níveis
   hierárquicos no inbox (Passo 4: dono/admin tudo, atendente só as dele + filas dele). Plano detalhado:
   docs/conectachat-agentes-ia-plano.md.
 - Próximo grande marco: FASE C — bloco C7 (nó Calendly no fluxo; depende do F4) e C8 (relatórios).

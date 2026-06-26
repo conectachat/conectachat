@@ -42,7 +42,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { usePlatformStaff } from "@/hooks/use-platform-staff";
 import { useTheme } from "@/hooks/use-theme";
 
-type NavItemData = { title: string; url: string; icon: LucideIcon };
+type NavItemData = { title: string; url: string; icon: LucideIcon; adminOnly?: boolean };
 
 const items: NavItemData[] = [
   { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
@@ -50,7 +50,7 @@ const items: NavItemData[] = [
   { title: "Chat interno", url: "/team-chat", icon: MessagesSquare },
   { title: "CRM", url: "/crm", icon: SquareKanban },
   { title: "Fluxos", url: "/flows", icon: Workflow },
-  { title: "Agentes", url: "/agentes", icon: Bot },
+  { title: "Agentes", url: "/agentes", icon: Bot, adminOnly: true },
   { title: "Contatos", url: "/contacts", icon: Contact },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },
   { title: "Conexões", url: "/connections", icon: Plug },
@@ -120,6 +120,9 @@ export function AppSidebar() {
 
   const displayName = profile?.full_name || user?.email || "";
   const role = activeMembership?.role;
+  const isAdmin = role === "owner" || role === "admin";
+  // Itens visíveis conforme o papel (ex.: "Agentes" só para dono/admin).
+  const visibleItems = items.filter((item) => !item.adminOnly || isAdmin);
   const isDark = theme === "dark";
 
   return (
@@ -157,7 +160,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Atendimento</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <NavItem key={item.url} item={item} active={pathname === item.url} collapsed={collapsed} />
               ))}
             </SidebarMenu>

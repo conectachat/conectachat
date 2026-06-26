@@ -78,7 +78,10 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
    Inbox (selo escolhido pelo Renato): badge "⚠️ IA" no card da lista + banner vermelho dispensável no
    topo da conversa (`dismissAiError`). `use-conversations` traz `ai_last_error`(+`_at`). Sem mexer nos
    gatilhos de métrica (não cria mensagem; só atualiza a conversa).
-5. **Restringir /agentes a dono/admin** (igual decisão em aberto do Dashboard).
+5. ✅ **ENTREGUE — /agentes restrito a dono/admin**: guard no layout `agentes.tsx` (useCurrentUser:
+   trata isLoading; se role ≠ owner/admin mostra "Acesso restrito", cobrindo /agentes e /agentes/$agentId)
+   + item "Agentes" do sidebar (`app-sidebar.tsx`) marcado `adminOnly` e filtrado. Padrão de papel:
+   `role === "owner" || role === "admin"` (mesmo de connections/settings). Frontend puro.
 
 ## Roadmap IA (fora do MVP)
 - RAG por upload de documentos (pgvector) — base de conhecimento via arquivos (Fase 2, diferencial de plano).

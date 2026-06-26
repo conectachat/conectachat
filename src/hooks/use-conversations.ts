@@ -28,11 +28,14 @@ export type ConversationListItem = {
   channel: { id: string; name: string; type: string } | null;
 };
 
-export function useConversations() {
+// status="open" (padrão) traz as conversas em andamento (status != closed);
+// status="closed" traz as encerradas (limitado às 200 mais recentes) — usado pelo
+// filtro "Fechadas" do inbox (Passo 3).
+export function useConversations(status: "open" | "closed" = "open") {
   return useQuery({
-    queryKey: ["conversations"],
+    queryKey: ["conversations", status],
     queryFn: async (): Promise<ConversationListItem[]> => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("conversations")
         .select(
           `
@@ -42,8 +45,9 @@ export function useConversations() {
           department:departments ( id, name )
         `,
         )
-        .neq("status", "closed")
         .order("last_message_at", { ascending: false, nullsFirst: false });
+      q = status === "closed" ? q.eq("status", "closed").limit(200) : q.neq("status", "closed");
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as ConversationListItem[];
     },

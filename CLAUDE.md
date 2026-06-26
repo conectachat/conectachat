@@ -162,8 +162,12 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   conversa atribuída OU ai_status='handed_off'); botão "Chatbot" vira desligar pontual (false=off).
   (b) INBOX — 4ª aba "Agentes" (inbox-screen.tsx + use-conversations.ts traz ai_status): roteamento por
   ai_status — Agentes = sem atendente E ai_status='active' (IA atuando); Aguardando = sem atendente E
-  ai_status≠'active' (handoff/sem-IA, espera humano); Minhas = atribuída a mim; Todas. Falta Passo 3
-  (barra de filtros: Fechar todas/Abertos/Fechadas/Crescente/Filas) e Passo 4 (níveis hierárquicos:
+  ai_status≠'active' (handoff/sem-IA, espera humano); Minhas = atribuída a mim; Todas. PASSO 3 ENTREGUE
+  (frontend puro, sem banco/webhook): barra de filtros entre a busca e as abas — Abertos/Fechadas
+  (status; "closed" parametriza useConversations(status) e cai na aba Todas, limite 200), Crescente
+  (toggle de ordenação asc/desc client-side por last_message_at), Filas (dropdown por department_id via
+  useOrgDepartments) e "Fechar todas" (encerra em massa SÓ as conversas abertas atribuídas ao próprio
+  usuário, com confirmação + contagem; não toca nas de outros). Falta Passo 4 (níveis hierárquicos:
   dono/admin tudo, atendente só as dele + filas dele). HUMANIZAÇÃO + ANTI-BAN (webhook v38,
   por agente via ai_agents.humanize_replies/reply_delay_seconds): mostra "digitando…"
   (POST /chat/sendPresence), buffer inicial, resposta em 1–3 bolhas (separadas por |||, typing

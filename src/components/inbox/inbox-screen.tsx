@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useConversations } from "@/hooks/use-conversations";
 import { useMessages, type Message } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useOrgDepartments } from "@/hooks/use-flow-resources";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Logo } from "@/components/shared/logo";
 import { ContactTagsSection } from "@/components/contacts/contact-tags";
@@ -47,6 +48,7 @@ import {
   Send,
   MoreVertical,
   CircleCheckBig,
+  ArrowDownUp,
   Bot,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -468,7 +470,14 @@ function MessageActions({
 }
 
 export function InboxScreen() {
-  const { data: conversations, isLoading } = useConversations();
+  // Passo 3 — barra de filtros. statusFilter: "open" (padrão) = conversas abertas;
+  // "closed" = encerradas. sortAsc: false = mais recentes primeiro (padrão). deptFilter:
+  // "" = todas as filas; senão filtra por department_id.
+  const [statusFilter, setStatusFilter] = useState<"open" | "closed">("open");
+  const [sortAsc, setSortAsc] = useState(false);
+  const [deptFilter, setDeptFilter] = useState<string>("");
+  const { data: conversations, isLoading } = useConversations(statusFilter);
+  const departments = useOrgDepartments();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState("");
   // Bloco M — aba ativa da lista. "aguardando" = sem atendente e sem IA atuando;
@@ -476,9 +485,10 @@ export function InboxScreen() {
   // Abre em "Minhas" por padrão; ordem das abas: Minhas → Aguardando → Agentes → Todas.
   const [tab, setTab] = useState<"todas" | "aguardando" | "minhas" | "agentes">("minhas");
 
-  // H.3a — lista de conversas filtrada pela busca (nome, telefone ou e-mail).
+  // H.3a — lista de conversas filtrada pela fila (Passo 3) + busca (nome, telefone, e-mail).
   const filteredConvs = useMemo(() => {
-    const list = conversations ?? [];
+    let list = conversations ?? [];
+    if (deptFilter) list = list.filter((c) => c.department_id === deptFilter);
     const term = convSearch.trim().toLowerCase();
     if (!term) return list;
     return list.filter((c) => {
@@ -487,7 +497,7 @@ export function InboxScreen() {
       const email = (c.contact?.email ?? "").toLowerCase();
       return name.includes(term) || phone.includes(term) || email.includes(term);
     });
-  }, [conversations, convSearch]);
+  }, [conversations, convSearch, deptFilter]);
   const previewRef = useRef(false);
   useEffect(() => {
     try {
@@ -598,6 +608,45 @@ export function InboxScreen() {
       return;
     }
     toast.success("Você assumiu o atendimento.");
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+  // Passo 3 — "Fechar todas": encerra TODAS as conversas abertas atribuídas a MIM
+  // (não toca nas de outros atendentes). Confirma antes, mostrando quantas serão fechadas.
+  async function closeAllMine() {
+    if (!myId) return;
+    const { count, error: countErr } = await supabase
+      .from("conversations")
+      .select("id", { count: "exact", head: true })
+      .eq("assigned_user_id", myId)
+      .neq("status", "closed");
+    if (countErr) {
+      toast.error("Não foi possível verificar suas conversas.");
+      return;
+    }
+    const n = count ?? 0;
+    if (n === 0) {
+      toast("Você não tem conversas abertas atribuídas a você.");
+      return;
+    }
+    const ok = await confirm({
+      title: "Fechar todas as suas conversas?",
+      description: `Isto vai encerrar ${n} conversa(s) atribuída(s) a você. As conversas de outros atendentes não são afetadas.`,
+      confirmText: "Fechar todas",
+      danger: true,
+    });
+    if (!ok) return;
+    const { error } = await supabase
+      .from("conversations")
+      .update({ status: "closed", assigned_user_id: null })
+      .eq("assigned_user_id", myId)
+      .neq("status", "closed");
+    if (error) {
+      toast.error("Não foi possível fechar as conversas.");
+      return;
+    }
+    toast.success("Conversas encerradas.");
+    setSelectedId(null);
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
@@ -715,15 +764,18 @@ export function InboxScreen() {
     return { todas: filteredConvs.length, aguardando, minhas, agentes };
   }, [filteredConvs, myId]);
 
-  // Bloco M — lista exibida = busca + aba ativa.
+  // Bloco M — lista exibida = busca/fila + aba ativa + ordenação (Passo 3).
   const visibleConvs = useMemo(() => {
+    let list = filteredConvs;
     if (tab === "aguardando")
-      return filteredConvs.filter((c) => !c.assigned_user_id && c.ai_status !== "active");
-    if (tab === "agentes")
-      return filteredConvs.filter((c) => !c.assigned_user_id && c.ai_status === "active");
-    if (tab === "minhas") return filteredConvs.filter((c) => c.assigned_user_id === myId);
-    return filteredConvs;
-  }, [filteredConvs, tab, myId]);
+      list = list.filter((c) => !c.assigned_user_id && c.ai_status !== "active");
+    else if (tab === "agentes")
+      list = list.filter((c) => !c.assigned_user_id && c.ai_status === "active");
+    else if (tab === "minhas") list = list.filter((c) => c.assigned_user_id === myId);
+    const ts = (c: (typeof list)[number]) =>
+      new Date(c.last_message_at ?? c.created_at).getTime();
+    return [...list].sort((a, b) => (sortAsc ? ts(a) - ts(b) : ts(b) - ts(a)));
+  }, [filteredConvs, tab, myId, sortAsc]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
@@ -1533,6 +1585,64 @@ export function InboxScreen() {
               )}
             </div>
           </div>
+          {/* Passo 3 — barra de filtros: status (Abertos/Fechadas) · ordenar · filas · fechar todas */}
+          <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2">
+            <div className="inline-flex rounded-lg bg-gray-100 p-0.5">
+              {(
+                [
+                  ["open", "Abertos"],
+                  ["closed", "Fechadas"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setStatusFilter(key);
+                    // Encerradas ficam sem atendente → cair em "Todas" evita aba vazia.
+                    if (key === "closed") setTab("todas");
+                  }}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    statusFilter === key ? "bg-brand-blue text-white" : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setSortAsc((v) => !v)}
+              title={
+                sortAsc
+                  ? "Ordem crescente (mais antigas primeiro) — clique para inverter"
+                  : "Mais recentes primeiro — clique para ordem crescente"
+              }
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            >
+              <ArrowDownUp size={13} />
+              {sortAsc ? "Crescente" : "Recentes"}
+            </button>
+            <select
+              value={deptFilter}
+              onChange={(e) => setDeptFilter(e.target.value)}
+              title="Filtrar por fila (departamento)"
+              className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 focus:border-brand-blue focus:outline-none"
+            >
+              <option value="">Todas as filas</option>
+              {(departments.data ?? []).map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={closeAllMine}
+              title="Encerrar todas as conversas atribuídas a você"
+              className="ml-auto inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              <CheckCheck size={13} />
+              Fechar todas
+            </button>
+          </div>
           {/* Bloco M — abas com contadores */}
           <div className="flex gap-1 px-3 pb-3">
             {(
@@ -1665,7 +1775,7 @@ export function InboxScreen() {
                         <span className="truncate text-[11px] text-gray-500">{c.channel?.name ?? ""}</span>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
-                        {!c.assigned_user_id && (
+                        {!c.assigned_user_id && c.status !== "closed" && (
                           <span
                             role="button"
                             tabIndex={0}

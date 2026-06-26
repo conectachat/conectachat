@@ -95,5 +95,10 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
   webhook). (b) INBOX — 4ª aba "Agentes" roteando por `ai_status`: Agentes = sem atendente E
   `ai_status='active'`; Aguardando = sem atendente E `ai_status≠'active'`; Minhas = atribuída a mim;
   Todas. Toca `src/components/inbox/inbox-screen.tsx` + `src/hooks/use-conversations.ts` (passou a
-  trazer `ai_status`). PRÓXIMOS: Passo 3 (barra de filtros: Fechar todas/Abertos/Fechadas/Crescente/
-  Filas) e Passo 4 (níveis hierárquicos: dono/admin tudo, atendente só as dele + filas dele).
+  trazer `ai_status`). PRÓXIMO: Passo 4 (níveis hierárquicos: dono/admin tudo, atendente só as dele +
+  filas dele).
+- Passo 3 (frontend puro): barra de filtros no inbox entre a busca e as abas — Abertos/Fechadas
+  (status; "closed" parametriza `useConversations(status)`, limite 200, cai na aba Todas), Crescente
+  (toggle asc/desc client-side por `last_message_at`), Filas (dropdown por `department_id` via
+  `useOrgDepartments`) e "Fechar todas" (`closeAllMine`: encerra em massa só as conversas abertas
+  atribuídas ao próprio usuário, com confirmação + contagem). Sem mudança de banco/webhook.

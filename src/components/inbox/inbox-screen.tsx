@@ -49,6 +49,8 @@ import {
   MoreVertical,
   CircleCheckBig,
   ArrowDownUp,
+  Inbox,
+  Archive,
   Bot,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -1585,15 +1587,16 @@ export function InboxScreen() {
               )}
             </div>
           </div>
-          {/* Passo 3 — barra de filtros: status (Abertos/Fechadas) · ordenar · filas · fechar todas */}
+          {/* Passo 3 — barra de filtros (somente ícones; o nome aparece no hover/title). */}
           <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2">
+            {/* Status: Abertos / Fechadas */}
             <div className="inline-flex rounded-lg bg-gray-100 p-0.5">
               {(
                 [
-                  ["open", "Abertos"],
-                  ["closed", "Fechadas"],
+                  ["open", "Abertos", Inbox],
+                  ["closed", "Fechadas", Archive],
                 ] as const
-              ).map(([key, label]) => (
+              ).map(([key, label, Icon]) => (
                 <button
                   key={key}
                   onClick={() => {
@@ -1601,46 +1604,54 @@ export function InboxScreen() {
                     // Encerradas ficam sem atendente → cair em "Todas" evita aba vazia.
                     if (key === "closed") setTab("todas");
                   }}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  title={label}
+                  aria-label={label}
+                  className={`grid h-7 w-7 place-items-center rounded-md transition-colors ${
                     statusFilter === key ? "bg-brand-blue text-white" : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
-                  {label}
+                  <Icon size={15} />
                 </button>
               ))}
             </div>
+            {/* Ordenar (crescente/decrescente) */}
             <button
               onClick={() => setSortAsc((v) => !v)}
-              title={
+              title={sortAsc ? "Ordem crescente (mais antigas primeiro)" : "Mais recentes primeiro"}
+              aria-label="Alternar ordenação"
+              className={`grid h-7 w-7 place-items-center rounded-lg border transition-colors ${
                 sortAsc
-                  ? "Ordem crescente (mais antigas primeiro) — clique para inverter"
-                  : "Mais recentes primeiro — clique para ordem crescente"
-              }
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  ? "border-brand-blue bg-brand-blue/10 text-brand-blue"
+                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
             >
-              <ArrowDownUp size={13} />
-              {sortAsc ? "Crescente" : "Recentes"}
+              <ArrowDownUp size={14} />
             </button>
+            {/* Filas (departamentos) */}
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
               title="Filtrar por fila (departamento)"
-              className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 focus:border-brand-blue focus:outline-none"
+              aria-label="Filtrar por fila"
+              className={`h-7 rounded-lg border bg-white pl-2 pr-6 text-xs font-medium focus:outline-none ${
+                deptFilter ? "border-brand-blue text-brand-blue" : "border-gray-300 text-gray-600"
+              }`}
             >
-              <option value="">Todas as filas</option>
+              <option value="">Filas</option>
               {(departments.data ?? []).map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
               ))}
             </select>
+            {/* Fechar todas (só as minhas) */}
             <button
               onClick={closeAllMine}
-              title="Encerrar todas as conversas atribuídas a você"
-              className="ml-auto inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+              title="Fechar todas (encerra as conversas atribuídas a você)"
+              aria-label="Fechar todas"
+              className="ml-auto grid h-7 w-7 place-items-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
             >
-              <CheckCheck size={13} />
-              Fechar todas
+              <CheckCheck size={15} />
             </button>
           </div>
           {/* Bloco M — abas com contadores */}

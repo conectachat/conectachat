@@ -149,15 +149,21 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   no cabeçalho do inbox; segurança: nada de IA até ligar contato a contato). Execução no
   whatsapp-webhook (runAgentAttendant): roda quando NENHUM fluxo trata a mensagem; reusa
   callAiProvider/getAiKey/loadHistory. Frontend: rota /agentes + menu "Agentes" + lista + editor
-  (src/components/agents/*, src/hooks/use-ai-agents.ts). HUMANIZAÇÃO + ANTI-BAN (webhook v38,
+  (src/components/agents/*, src/hooks/use-ai-agents.ts). PASSO 1 ENTREGUE (webhook v39): o nó "ai" do
+  construtor de fluxos pode USAR UM AGENTE — seletor "Usar um agente" em node-config-dialog.tsx (hook
+  useAiAgents); quando escolhido, esconde provedor/modelo/prompt e o runAiNode carrega o agente
+  (cfg.aiAgentId → ai_agents), monta o prompt via buildAgentSystemPrompt com humanize/handoff FORÇADOS
+  OFF (bolha única, sem |||/[HANDOFF]; chave continua de ai_credentials; temperature/maxTokens/history/
+  behavior seguem do nó). Roda mesmo com agente is_active=false (a presença no fluxo é a ativação).
+  Fluxos antigos sem aiAgentId: comportamento idêntico ao anterior. HUMANIZAÇÃO + ANTI-BAN (webhook v38,
   por agente via ai_agents.humanize_replies/reply_delay_seconds): mostra "digitando…"
   (POST /chat/sendPresence), buffer inicial, resposta em 1–3 bolhas (separadas por |||, typing
   min(3000,1200+len*35)ms, jitter 700–1500ms); anti-banimento SEMPRE ativo (6 msgs/10min por
   contato, 20/min por empresa → agente fica em SILÊNCIO no pico). LIÇÃO: IDs de modelo dos provedores
   mudam/aposentam — conferir no catálogo oficial (skill claude-api). ROADMAP IA: RAG por upload
   (Fase 2), function calling (agendar/transferir), nó de fluxo escolher agente, métricas, limites
-  anti-ban por plano. PASSOS RESTANTES (próxima conversa): (1) nó de IA do fluxo escolher um agente;
-  (2) botão "acionar fluxo manualmente" no inbox (Edge trigger-flow); (3) CALIBRAR o tempo do
+  anti-ban por plano. PASSOS RESTANTES (próxima conversa): (1) ✅ FEITO — nó de IA do fluxo escolher um
+  agente (webhook v39); (2) botão "acionar fluxo manualmente" no inbox (Edge trigger-flow); (3) CALIBRAR o tempo do
   "digitando…" — hoje NÃO é proporcional ao tamanho da mensagem (refinamento anotado pelo Renato);
   (4) tornar falha de IA visível; (5) restringir /agentes a dono/admin. Plano + passos detalhados:
   docs/conectachat-agentes-ia-plano.md.

@@ -32,6 +32,7 @@ import {
   useOrgAgents,
   useOtherFlows,
 } from "@/hooks/use-flow-resources";
+import { useAiAgents } from "@/hooks/use-ai-agents";
 
 export type FlowNodeData = {
   nodeType?: string;
@@ -69,6 +70,7 @@ export function NodeConfigDialog({
   const departments = useOrgDepartments();
   const agents = useOrgAgents();
   const otherFlows = useOtherFlows(currentFlowId ?? null);
+  const aiAgents = useAiAgents();
 
   useEffect(() => {
     if (open) {
@@ -791,46 +793,82 @@ export function NodeConfigDialog({
             </TabsList>
             <TabsContent value="config" className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label>Provedor de IA</Label>
+                <Label>Usar um agente de IA</Label>
                 <Select
-                  value={config.provider ?? ""}
-                  onValueChange={(v) => {
-                    set("provider", v);
-                    if (!config.model || !isKnownModel(v, config.model)) set("model", defaultModelFor(v));
-                  }}
+                  value={config.aiAgentId ? config.aiAgentId : "manual"}
+                  onValueChange={(v) => set("aiAgentId", v === "manual" ? "" : v)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="openai">OpenAI (ChatGPT)</SelectItem>
-                    <SelectItem value="gemini">Google Gemini</SelectItem>
-                    <SelectItem value="claude">Anthropic Claude</SelectItem>
+                    <SelectItem value="manual">Não — configurar manualmente</SelectItem>
+                    {(aiAgents.data ?? []).map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  A chave de API é configurada em Integrações → Inteligência Artificial e usada com segurança no
-                  servidor.
+                  Use a persona, a base de conhecimento, o provedor e o modelo de um agente já criado em
+                  "Agentes". Os campos manuais abaixo ficam desativados.
+                  {(aiAgents.data ?? []).length === 0
+                    ? " Nenhum agente criado ainda — crie um no menu Agentes."
+                    : ""}
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label>Modelo</Label>
-                <AiModelSelect
-                  provider={config.provider ?? ""}
-                  value={config.model ?? ""}
-                  onChange={(m) => set("model", m)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cfg-ai-prompt">Prompt do sistema</Label>
-                <Textarea
-                  id="cfg-ai-prompt"
-                  value={config.systemPrompt ?? ""}
-                  onChange={(e) => set("systemPrompt", e.target.value)}
-                  rows={6}
-                  placeholder="Descreva como a IA deve se comportar..."
-                />
-              </div>
+              {config.aiAgentId ? (
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  Este nó usará as configurações do agente «
+                  {(aiAgents.data ?? []).find((a) => a.id === config.aiAgentId)?.name ?? "selecionado"}
+                  ». Provedor, modelo e prompt do sistema vêm do agente.
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>Provedor de IA</Label>
+                    <Select
+                      value={config.provider ?? ""}
+                      onValueChange={(v) => {
+                        set("provider", v);
+                        if (!config.model || !isKnownModel(v, config.model)) set("model", defaultModelFor(v));
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="openai">OpenAI (ChatGPT)</SelectItem>
+                        <SelectItem value="gemini">Google Gemini</SelectItem>
+                        <SelectItem value="claude">Anthropic Claude</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      A chave de API é configurada em Integrações → Inteligência Artificial e usada com segurança no
+                      servidor.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Modelo</Label>
+                    <AiModelSelect
+                      provider={config.provider ?? ""}
+                      value={config.model ?? ""}
+                      onChange={(m) => set("model", m)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cfg-ai-prompt">Prompt do sistema</Label>
+                    <Textarea
+                      id="cfg-ai-prompt"
+                      value={config.systemPrompt ?? ""}
+                      onChange={(e) => set("systemPrompt", e.target.value)}
+                      rows={6}
+                      placeholder="Descreva como a IA deve se comportar..."
+                    />
+                  </div>
+                </>
+              )}
               <div className="space-y-2">
                 <Label>Comportamento</Label>
                 <Select

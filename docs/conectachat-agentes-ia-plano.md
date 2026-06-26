@@ -20,7 +20,7 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
 - **contacts.ai_enabled** (bool, default **false**) — interruptor do chatbot POR CONTATO. Segurança:
   por padrão NENHUM contato recebe IA; o atendente liga no inbox (botão "Chatbot").
 
-## Edge Function whatsapp-webhook (v38 ACTIVE, verify_jwt false)
+## Edge Function whatsapp-webhook (v39 ACTIVE, verify_jwt false)
 - `runAutomation` = motor de fluxo primeiro; se NENHUM fluxo tratou → `runAgentAttendant`.
 - `runAgentAttendant`: gates (trava humana, status, ai_status handed_off, agente alocado,
   contact.ai_enabled, agente ativo, ativação/horário) → handoff por palavra-gatilho →
@@ -52,11 +52,17 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
 - Provedor/modelo por agente; chaves reaproveitam ai_credentials (card /integracoes/ai).
 
 ## Passos restantes (para uma conversa nova) — em ordem sugerida
-1. **Nó de IA do fluxo escolher um agente** (Bloco 4 original, ainda NÃO feito): o nó "ai" do
-   construtor de fluxos ganha um seletor "Usar um agente" (ai_agent_id). Se escolhido, o nó usa
-   persona/base/provedor/modelo do agente em vez da config digitada. Compatível com fluxos antigos.
-   Toca: src/components/flows/node-config-dialog.tsx (+ hook tipo useOrgAiAgents) e runAiNode no
-   whatsapp-webhook (carregar o agente quando cfg.ai_agent_id existir).
+1. ✅ **ENTREGUE (webhook v39) — Nó de IA do fluxo escolher um agente** (Bloco 4 original): o nó "ai"
+   ganhou o seletor "Usar um agente" (guarda `cfg.aiAgentId` no JSON do nó — SEM mudança de banco).
+   Quando escolhido, o frontend esconde provedor/modelo/prompt do sistema e mostra a nota do agente;
+   o `runAiNode` ramifica: se `cfg.aiAgentId`, carrega o agente de `ai_agents` e monta o system prompt
+   via `buildAgentSystemPrompt({ ...agent, humanize_replies:false, handoff_enabled:false })` — bolha
+   ÚNICA, sem `|||`/[HANDOFF] (decisão do Renato); chave continua de `ai_credentials`;
+   temperature/maxTokens/history/behavior/responseVariable seguem do nó. Roda mesmo com agente
+   `is_active=false` (a presença no fluxo é a ativação; e o `runAiNode` só executa dentro do fluxo).
+   Defesa: limpa `|||` residual antes do `sendText`. Fluxos antigos sem `aiAgentId` → caem no `else`,
+   comportamento idêntico ao anterior. Toca: `src/components/flows/node-config-dialog.tsx` (import
+   `useAiAgents`) e `runAiNode` no `whatsapp-webhook` (v38→v39, verify_jwt FALSE).
 2. **Botão "Acionar fluxo manualmente" no inbox** (Feature 2, planejada e NÃO feita): o atendente
    escolhe um fluxo e dispara na conversa atual. Precisa de uma Edge Function `trigger-flow` (jwt on)
    que valida o membro e inicia o fluxo reusando o motor do webhook (caminho interno protegido por
@@ -81,3 +87,5 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
 - Segurança: contacts.ai_enabled (padrão false) + botão "Chatbot" no inbox (v37).
 - Fix: IDs de modelo aposentados → atualizados (Claude/Gemini/OpenAI).
 - S1/S2/S3: humanização (digitando…+partes+buffer) + anti-banimento (v38) + UI no editor.
+- Passo 1 (v39): nó "ai" do fluxo pode usar um Agente (seletor `cfg.aiAgentId` + ramificação no
+  `runAiNode` reusando `buildAgentSystemPrompt`, bolha única). Sem mudança de banco.

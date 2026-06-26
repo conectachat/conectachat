@@ -117,25 +117,57 @@ DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem s
            filtros + CSV, e número de chamado #NNNN por empresa (no inbox). Períodos e quebra por
            dia calculados no FUSO DA EMPRESA (organizations.timezone). Em aberto p/ evoluir:
            restringir /dashboard a dono/admin.
-  Fase C — Integrações reais. CALENDLY: C0–C4 ✅ ENTREGUES e testados (conexão OAuth + Vault com
-           detecção Light/Pro; leitura; agendamento via embed com card/cancelar/remarcar; confirmação
-           e lembrete automáticos pelo WhatsApp reusando scheduled_messages + run-scheduled). Próximo:
-           C5 (Pro nativo via Scheduling API), depois C6 (sync webhook/poll), C7 (nó no fluxo — depende
-           do F4), C8 (relatórios). Detalhe: docs/conectachat-calendly-plano.md. Depois: Google Agenda, HubSpot.
-  Fase D — Atendente de IA (módulo "Agentes") — EM ANDAMENTO. Entregue: tabela ai_agents, módulo
-           /agentes (persona + base de conhecimento em texto + provedor/modelo + ativação + handoff +
-           alocação por canal), execução no whatsapp-webhook (runAgentAttendant), interruptor por
-           contato (contacts.ai_enabled, padrão off + botão "Chatbot" no inbox), humanização
-           (digitando…+1–3 bolhas+buffer) e anti-banimento (6/10min por contato, 20/min por empresa).
-           PASSOS RESTANTES: nó de IA do fluxo escolher agente; botão "acionar fluxo manual" no inbox;
-           calibrar tempo do "digitando…" (não-proporcional); falha de IA visível; restringir
-           /agentes a dono/admin. Detalhe: docs/conectachat-agentes-ia-plano.md. Roadmap IA: RAG por
-           upload (Fase 2), function calling (agendar/transferir), métricas.
+  Fase C — Integrações reais. CALENDLY: C0–C6 ✅ ENTREGUES e testados (conexão OAuth + Vault com
+           detecção Light/Pro; leitura; agendamento — Light via embed, Pro NATIVO via Scheduling API —
+           com card/cancelar/remarcar; mensagens automáticas agendado/remarcado/cancelado/confirmação/
+           lembrete reusando scheduled_messages + run-scheduled; sincronização Pro via webhook HMAC e
+           Light via polling pg_cron). FALTA: C7 (nó Calendly no fluxo — depende do F4) e C8 (relatórios).
+           Detalhe: docs/conectachat-calendly-plano.md. Depois: Google Agenda, HubSpot.
+  Fase D — Atendente de IA (módulo "Agentes") — EM ANDAMENTO (quase fechada). Entregue: tabela
+           ai_agents, módulo /agentes (persona + base de conhecimento + provedor/modelo + ativação +
+           handoff + alocação por canal), execução no whatsapp-webhook (runAgentAttendant), humanização
+           (digitando…+1–3 bolhas+buffer) e anti-banimento. ENTREGUE TAMBÉM: nó de IA do fluxo escolher
+           um Agente (webhook v39); inbox aba "Agentes" + IA SEMPRE LIGADA por padrão (contacts.ai_enabled
+           default true; só responde sem humano); barra de filtros do inbox (Abertos/Fechadas/ordenar/
+           Filas/Fechar todas + Todas); falha de IA visível (selo de aviso, webhook v40); /agentes restrito
+           a dono/admin; botão "Acionar fluxo manualmente" no inbox (webhook v41 + Edge trigger-flow).
+           PASSOS RESTANTES: níveis hierárquicos no inbox (dono/admin tudo, atendente só as dele + filas
+           dele); calibrar o tempo do "digitando…" (hoje não-proporcional). Detalhe:
+           docs/conectachat-agentes-ia-plano.md. Roadmap IA: RAG por upload (Fase 2), function calling
+           (agendar/transferir), métricas.
+  MVP PRÉ-LANÇAMENTO — recursos de operação (decidido 2026-06-26 a partir do estudo das
+    referências AtendChat e Remix AtendeZap; entram ANTES do lançamento, ordem de execução a definir):
+    1. CAMPANHAS / DISPARO EM MASSA — enviar para listas de contatos/tags, com intervalo entre
+       envios, recorrência e relatório de entrega. É o recurso de MAIOR retorno comercial (muita
+       gente compra SaaS de WhatsApp por isso). ATENÇÃO: maior esforço + risco de banimento —
+       precisa de limites/cadência (reusar a lógica anti-ban). Inclui listas de contatos + status
+       de entrega por contato. (Ref. AtendChat: Campaign/CampaignShipping/ContactList.)
+    2. IMPORTAR CONTATOS (CSV/planilha) — o cliente sobe a base dele. Baixo-médio esforço; é
+       pré-requisito prático das Campanhas e ajuda a ATIVAÇÃO. (Ref. AtendChat: ContactList import.)
+    3. HORÁRIO DE ATENDIMENTO / FORA DE EXPEDIENTE — resposta automática e comportamento por
+       horário, por empresa/fila. Já existe um pedaço na IA (activation_mode fora_do_horario +
+       business_hours); generalizar para o atendimento humano também. (Ref. AtendChat: Queue.schedules
+       + outOfHoursMessage; VerifyCurrentSchedule.)
+
   Fase E — Stripe + enforcement de planos + LANÇAMENTO.
     Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597
     (anual ~17% off; trial 14 dias sem cartão). Stripe na conta da Duli
     temporariamente; migrar para a entidade ConectaChat com ~10 pagantes ou 3 meses
     (migração = trocar chaves de API + product IDs).
+    CONSIDERAR p/ o público BR: além do Stripe, as referências usam gateways nacionais
+    (Kiwify/Cakto/Perfectpay) via webhook de cobrança — avaliar na hora de fechar a Fase E.
+
+  BACKLOG PÓS-LANÇAMENTO (diferenciais identificados nas referências; priorizar depois do lançamento):
+    - Avaliação / NPS ao encerrar o atendimento (nota 0–10) + métrica no dashboard.
+    - Distribuição automática de conversas (round-robin por fila) + "carteira" (cliente fixo de um atendente).
+    - Campos personalizados de contato (ex.: CPF, plano).
+    - Transcrição de áudio recebido (vira texto; ótimo para a IA ler).
+    - Aniversários (mensagem automática no aniversário do contato; já temos contacts.birth_date).
+    - Notas internas na conversa (comentário entre atendentes, não vai ao cliente).
+    - API pública + Webhooks de eventos (terceiros enviam mensagens / recebem eventos).
+    - LGPD (mensagem de consentimento + apagar dados a pedido).
+    - Onboarding por IA (a IA lê um "briefing leigo" e já monta o agente).
+    - NÃO priorizar: integrações Typebot/Dialogflow/n8n (já temos fluxo próprio + IA).
 
 Lições Fase A: <Outlet/> em rota-pai; editor fixed inset-0 z-50; drag-drop nativo HTML5;
   config em data.config; nós de Ação guardam ID; saídas múltiplas = handle por saída

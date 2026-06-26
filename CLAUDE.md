@@ -199,11 +199,20 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
 - Fase C — Integrações reais (EM ANDAMENTO). Calendly: C0–C6 entregues (conexão, leitura, agendamento,
   mensagens automáticas, Pro nativo, sincronização webhook/polling); falta C7 (nó no fluxo, depende do F4) e
   C8 (relatórios). Depois Google Agenda, HubSpot, etc.
-- Fase D — Atendente de IA.
+- Fase D — Atendente de IA (quase fechada; falta níveis hierárquicos no inbox + calibrar "digitando…").
+- MVP PRÉ-LANÇAMENTO — recursos de operação decididos 2026-06-26 (estudo das referências AtendChat +
+  Remix AtendeZap). Entram ANTES do lançamento (ordem de execução a definir; NÃO iniciados):
+  (1) CAMPANHAS/disparo em massa (listas/tags + intervalo + recorrência + relatório; maior retorno,
+  maior risco de ban → reusar anti-ban); (2) IMPORTAR CONTATOS (CSV; pré-requisito das campanhas);
+  (3) HORÁRIO DE ATENDIMENTO / fora de expediente (resposta automática por horário, por empresa/fila;
+  generalizar o que a IA já faz). Backlog pós-lançamento (em docs/roadmap.md): NPS, distribuição
+  automática+carteira, campos personalizados, transcrição de áudio, aniversários, notas internas, API
+  pública+webhooks, LGPD, onboarding por IA. NÃO priorizar Typebot/Dialogflow/n8n (temos fluxo+IA).
 - Fase E — Stripe + enforcement de planos + LANÇAMENTO.
   Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597 (anual ~17% off;
   trial 14 dias sem cartão). Stripe começa na conta da Duli; migrar para a entidade ConectaChat com
-  ~10 pagantes ou 3 meses (migração = trocar só as chaves de API + product IDs).
+  ~10 pagantes ou 3 meses (migração = trocar só as chaves de API + product IDs). Considerar p/ o público
+  BR: gateways nacionais (Kiwify/Cakto/Perfectpay) via webhook, além do Stripe (visto nas referências).
 
 ## 11. Gotchas críticos (já nos morderam)
 - Nunca editar src/routeTree.gen.ts (gerado automaticamente).

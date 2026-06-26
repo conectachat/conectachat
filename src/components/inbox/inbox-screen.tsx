@@ -51,6 +51,7 @@ import {
   ArrowDownUp,
   Inbox,
   Archive,
+  List,
   Bot,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -1589,6 +1590,19 @@ export function InboxScreen() {
           </div>
           {/* Passo 3 — barra de filtros (somente ícones; o nome aparece no hover/title). */}
           <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2">
+            {/* Todas (ver todas as conversas, ignorando a aba Minhas/Aguardando/Agentes) */}
+            <button
+              onClick={() => setTab("todas")}
+              title="Todas as conversas"
+              aria-label="Todas"
+              className={`grid h-7 w-7 place-items-center rounded-lg border transition-colors ${
+                tab === "todas"
+                  ? "border-brand-blue bg-brand-blue/10 text-brand-blue"
+                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <List size={15} />
+            </button>
             {/* Status: Abertos / Fechadas */}
             <div className="inline-flex rounded-lg bg-gray-100 p-0.5">
               {(
@@ -1661,7 +1675,6 @@ export function InboxScreen() {
                 ["minhas", "Minhas", counts.minhas],
                 ["aguardando", "Aguardando", counts.aguardando],
                 ["agentes", "Agentes", counts.agentes],
-                ["todas", "Todas", counts.todas],
               ] as const
             ).map(([key, label, n]) => {
               const isActive = tab === key;

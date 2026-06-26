@@ -8,6 +8,7 @@ import { useConversations } from "@/hooks/use-conversations";
 import { useMessages, type Message } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useOrgDepartments } from "@/hooks/use-flow-resources";
+import { useFlows } from "@/hooks/use-flows";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Logo } from "@/components/shared/logo";
 import { ContactTagsSection } from "@/components/contacts/contact-tags";
@@ -52,6 +53,7 @@ import {
   Inbox,
   Archive,
   List,
+  Workflow,
   Bot,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -481,6 +483,11 @@ export function InboxScreen() {
   const [deptFilter, setDeptFilter] = useState<string>("");
   const { data: conversations, isLoading } = useConversations(statusFilter);
   const departments = useOrgDepartments();
+  const flows = useFlows();
+  // Passo "acionar fluxo": modal para o atendente disparar um fluxo na conversa atual.
+  const [triggerFlowOpen, setTriggerFlowOpen] = useState(false);
+  const [triggerFlowId, setTriggerFlowId] = useState("");
+  const [triggeringFlow, setTriggeringFlow] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState("");
   // Bloco M — aba ativa da lista. "aguardando" = sem atendente e sem IA atuando;
@@ -664,6 +671,30 @@ export function InboxScreen() {
       toast.error("Não foi possível dispensar o aviso.");
       return;
     }
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+  // Acionar fluxo manualmente: dispara o fluxo escolhido na conversa atual (Edge trigger-flow).
+  const activeFlows = useMemo(() => (flows.data ?? []).filter((f) => f.is_active), [flows.data]);
+  async function doTriggerFlow() {
+    if (!selectedId || !triggerFlowId) {
+      toast.error("Escolha um fluxo.");
+      return;
+    }
+    setTriggeringFlow(true);
+    const { data, error } = await supabase.functions.invoke("trigger-flow", {
+      body: { conversationId: selectedId, flowId: triggerFlowId },
+    });
+    setTriggeringFlow(false);
+    // A função responde { ok:false, error } com HTTP 200 em regra de negócio; 'error' = falha de rede.
+    if (error || !(data as any)?.ok) {
+      toast.error((data as any)?.error || "Não foi possível acionar o fluxo.");
+      return;
+    }
+    toast.success("Fluxo acionado.");
+    setTriggerFlowOpen(false);
+    setTriggerFlowId("");
+    queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
@@ -1931,6 +1962,13 @@ export function InboxScreen() {
                 >
                   <ArrowRightLeft size={16} /> <span className="hidden lg:inline">Transferir</span>
                 </button>
+                <button
+                  onClick={() => setTriggerFlowOpen(true)}
+                  title="Acionar um fluxo (chatbot) nesta conversa"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  <Workflow size={16} /> <span className="hidden lg:inline">Acionar fluxo</span>
+                </button>
                 {selected.assigned_user_id && selected.assigned_user_id === user?.id ? (
                   <button
                     onClick={() => assignConversation(null)}
@@ -2028,6 +2066,16 @@ export function InboxScreen() {
                         className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         <ArrowRightLeft size={15} /> Transferir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTriggerFlowOpen(true);
+                          setHeaderMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Workflow size={15} /> Acionar fluxo
                       </button>
                       <button
                         type="button"
@@ -2979,6 +3027,74 @@ export function InboxScreen() {
       )}
 
       {/* Bloco N — Modal de transferência */}
+      {triggerFlowOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !triggeringFlow && setTriggerFlowOpen(false)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">Acionar fluxo</h3>
+              <button
+                onClick={() => !triggeringFlow && setTriggerFlowOpen(false)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              <p className="text-xs text-gray-500">
+                Escolha um fluxo para iniciar nesta conversa. Ele começa do início e substitui qualquer
+                fluxo que já esteja rodando aqui.
+              </p>
+              <div>
+                <label className="text-xs font-medium text-gray-600">Fluxo</label>
+                {flows.isLoading ? (
+                  <p className="mt-1 text-sm text-gray-400">Carregando…</p>
+                ) : activeFlows.length === 0 ? (
+                  <p className="mt-1 text-sm text-gray-400">
+                    Nenhum fluxo ativo. Crie e ative um fluxo no menu “Fluxos”.
+                  </p>
+                ) : (
+                  <select
+                    value={triggerFlowId}
+                    onChange={(e) => setTriggerFlowId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                  >
+                    <option value="">Selecione…</option>
+                    {activeFlows.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-100 px-4 py-3">
+              <button
+                onClick={() => setTriggerFlowOpen(false)}
+                disabled={triggeringFlow}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={doTriggerFlow}
+                disabled={triggeringFlow || !triggerFlowId}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {triggeringFlow ? "Acionando…" : "Acionar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {transferOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"

@@ -21,7 +21,8 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
   Agora a IA vem LIGADA por padrão; o botão "Chatbot" no inbox vira DESLIGAR pontual (false=off). A
   segurança não é mais "opt-in por contato", e sim a regra "só responde sem humano" (ver Passo 2).
 
-## Edge Function whatsapp-webhook (v40 ACTIVE, verify_jwt false)
+## Edge Function whatsapp-webhook (v41 ACTIVE, verify_jwt false)
+> Companheira: Edge Function **trigger-flow** (verify_jwt TRUE) — disparo manual de fluxo pelo inbox.
 - `runAutomation` = motor de fluxo primeiro; se NENHUM fluxo tratou → `runAgentAttendant`.
 - `runAgentAttendant`: gates (trava humana, status, ai_status handed_off, agente alocado,
   contact.ai_enabled, agente ativo, ativação/horário) → handoff por palavra-gatilho →
@@ -64,10 +65,14 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
    Defesa: limpa `|||` residual antes do `sendText`. Fluxos antigos sem `aiAgentId` → caem no `else`,
    comportamento idêntico ao anterior. Toca: `src/components/flows/node-config-dialog.tsx` (import
    `useAiAgents`) e `runAiNode` no `whatsapp-webhook` (v38→v39, verify_jwt FALSE).
-2. **Botão "Acionar fluxo manualmente" no inbox** (Feature 2, planejada e NÃO feita): o atendente
-   escolhe um fluxo e dispara na conversa atual. Precisa de uma Edge Function `trigger-flow` (jwt on)
-   que valida o membro e inicia o fluxo reusando o motor do webhook (caminho interno protegido por
-   segredo). Referência: atendchat `src` (TriggerFlowService / TicketController.triggerFlow).
+2. ✅ **ENTREGUE (webhook v41 + Edge Function `trigger-flow`) — Botão "Acionar fluxo manualmente"**:
+   botão no cabeçalho da conversa (+ item no menu mobile) abre modal com os fluxos ATIVOS (`useFlows`,
+   filtra `is_active`) e dispara via `supabase.functions.invoke("trigger-flow")`. `trigger-flow`
+   (verify_jwt TRUE) valida o usuário pelo JWT + vínculo `org_members` + fluxo da mesma org, e chama o
+   `whatsapp-webhook` com `?secret=WEBHOOK_SECRET` e body `{action:'trigger_flow',conversation_id,
+   flow_id}`. O webhook monta o EngineInput da conversa (`buildEngineInputForConversation`), encerra a
+   sessão ativa e inicia o fluxo do nó inicial (`triggerFlowManually` reusa loadFlow/runFromNode/
+   persistSession). Segredo nunca vai ao navegador; motor num só lugar. Toca: `inbox-screen.tsx` + função nova.
 3. **Calibração do tempo de "digitando…"** (refinamento anotado pelo Renato): hoje o tempo do
    indicador não está proporcional ao tamanho da mensagem. Ajustar a fórmula em `sendAgentReply`
    (`typingMs = min(3000, 1200 + len*35)`) e/ou o uso de `sendPresence` para casar melhor.

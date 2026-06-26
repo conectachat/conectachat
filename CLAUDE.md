@@ -180,11 +180,17 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   resposta vazia, exceção) — em runAgentAttendant E runAiNode — e limpam no sucesso. NÃO marca em
   silêncio anti-ban/gates normais. Inbox: selo "⚠️ IA" no card + banner vermelho dispensável no topo da
   conversa (dismissAiError limpa ai_last_error). use-conversations traz ai_last_error(+_at).
-  PASSOS RESTANTES: (1) ✅ nó de fluxo escolher agente (v39); (2) botão "acionar fluxo manualmente" no
-  inbox (Edge trigger-flow) ← PRÓXIMO; (3) CALIBRAR o tempo do "digitando…" (não proporcional ao
-  tamanho); (4) ✅ falha de IA visível (v40); (5) ✅ /agentes restrito a dono/admin (guard no layout
-  agentes.tsx via useCurrentUser + item "Agentes" do sidebar com adminOnly); (6) níveis
-  hierárquicos no inbox (Passo 4: dono/admin tudo, atendente só as dele + filas dele). Plano detalhado:
+  ACIONAR FLUXO MANUALMENTE ENTREGUE (webhook v41 + nova Edge Function trigger-flow): botão "Acionar
+  fluxo" no cabeçalho da conversa (+ menu mobile) abre modal com os fluxos ATIVOS (useFlows) e dispara
+  na conversa atual. Arquitetura: trigger-flow (verify_jwt TRUE) valida o usuário pelo JWT + vínculo
+  (org_members) e que o fluxo é da mesma org, e chama o whatsapp-webhook com ?secret=WEBHOOK_SECRET +
+  body {action:'trigger_flow',conversation_id,flow_id}; o webhook monta EngineInput da conversa
+  (buildEngineInputForConversation), encerra sessão ativa e inicia o fluxo (triggerFlowManually reusa
+  loadFlow/runFromNode/persistSession). Segredo nunca vai ao navegador; motor num lugar só.
+  PASSOS RESTANTES: (1) ✅ nó de fluxo escolher agente (v39); (2) ✅ acionar fluxo manualmente (v41 +
+  trigger-flow); (3) CALIBRAR o tempo do "digitando…" (não proporcional ao tamanho); (4) ✅ falha de IA
+  visível (v40); (5) ✅ /agentes restrito a dono/admin; (6) níveis hierárquicos no inbox (Passo 4:
+  dono/admin tudo, atendente só as dele + filas dele). Plano detalhado:
   docs/conectachat-agentes-ia-plano.md.
 - Próximo grande marco: FASE C — bloco C7 (nó Calendly no fluxo; depende do F4) e C8 (relatórios).
 

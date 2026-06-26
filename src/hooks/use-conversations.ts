@@ -6,6 +6,8 @@ export type ConversationListItem = {
   ticket_number: number | null;
   status: "open" | "pending" | "closed";
   ai_status: "active" | "handed_off" | null;
+  ai_last_error: string | null;
+  ai_last_error_at: string | null;
   assigned_user_id: string | null;
   department_id: string | null;
   department: { id: string; name: string } | null;
@@ -39,7 +41,7 @@ export function useConversations(status: "open" | "closed" = "open") {
         .from("conversations")
         .select(
           `
-          id, ticket_number, status, ai_status, last_message_at, created_at, unread_count, assigned_user_id, department_id,
+          id, ticket_number, status, ai_status, ai_last_error, ai_last_error_at, last_message_at, created_at, unread_count, assigned_user_id, department_id,
           contact:contacts ( id, name, name_locked, is_group, avatar_url, channel_type, external_id, email, birth_date, notes, ai_enabled ),
           channel:channels ( id, name, type ),
           department:departments ( id, name )

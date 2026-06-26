@@ -175,10 +175,15 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   contato, 20/min por empresa → agente fica em SILÊNCIO no pico). LIÇÃO: IDs de modelo dos provedores
   mudam/aposentam — conferir no catálogo oficial (skill claude-api). ROADMAP IA: RAG por upload
   (Fase 2), function calling (agendar/transferir), nó de fluxo escolher agente, métricas, limites
-  anti-ban por plano. PASSOS RESTANTES (próxima conversa): (1) ✅ FEITO — nó de IA do fluxo escolher um
-  agente (webhook v39); (2) botão "acionar fluxo manualmente" no inbox (Edge trigger-flow); (3) CALIBRAR o tempo do
-  "digitando…" — hoje NÃO é proporcional ao tamanho da mensagem (refinamento anotado pelo Renato);
-  (4) tornar falha de IA visível; (5) restringir /agentes a dono/admin. Plano + passos detalhados:
+  anti-ban por plano. FALHA DE IA VISÍVEL ENTREGUE (webhook v40): colunas conversations.ai_last_error
+  (+_at); helpers setAiError/clearAiError no webhook gravam o motivo quando a IA falha (sem chave,
+  resposta vazia, exceção) — em runAgentAttendant E runAiNode — e limpam no sucesso. NÃO marca em
+  silêncio anti-ban/gates normais. Inbox: selo "⚠️ IA" no card + banner vermelho dispensável no topo da
+  conversa (dismissAiError limpa ai_last_error). use-conversations traz ai_last_error(+_at).
+  PASSOS RESTANTES: (1) ✅ nó de fluxo escolher agente (v39); (2) botão "acionar fluxo manualmente" no
+  inbox (Edge trigger-flow) ← PRÓXIMO; (3) CALIBRAR o tempo do "digitando…" (não proporcional ao
+  tamanho); (4) ✅ falha de IA visível (v40); (5) restringir /agentes a dono/admin; (6) níveis
+  hierárquicos no inbox (Passo 4: dono/admin tudo, atendente só as dele + filas dele). Plano detalhado:
   docs/conectachat-agentes-ia-plano.md.
 - Próximo grande marco: FASE C — bloco C7 (nó Calendly no fluxo; depende do F4) e C8 (relatórios).
 

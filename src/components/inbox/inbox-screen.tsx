@@ -653,6 +653,20 @@ export function InboxScreen() {
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }
 
+  // Fase D — dispensa o selo de falha da IA de uma conversa (limpa ai_last_error).
+  // Também limpa sozinho quando a IA volta a responder (no whatsapp-webhook).
+  async function dismissAiError(convId: string) {
+    const { error } = await (supabase as any)
+      .from("conversations")
+      .update({ ai_last_error: null, ai_last_error_at: null })
+      .eq("id", convId);
+    if (error) {
+      toast.error("Não foi possível dispensar o aviso.");
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
   // ===================================================================
   // Bloco N — TRANSFERÊNCIA
   // ===================================================================
@@ -1786,6 +1800,14 @@ export function InboxScreen() {
                         >
                           {c.assigned_user_id ? "Em atendimento" : "Aguardando"}
                         </span>
+                        {c.ai_last_error && (
+                          <span
+                            title={`Falha da IA: ${c.ai_last_error}`}
+                            className="flex shrink-0 items-center gap-0.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700"
+                          >
+                            <AlertCircle size={11} /> IA
+                          </span>
+                        )}
                         {c.department?.name && (
                           <span className="shrink-0 truncate rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
                             {c.department.name}
@@ -2069,6 +2091,24 @@ export function InboxScreen() {
                 </div>
               </div>
             </header>
+
+            {selected.ai_last_error && (
+              <div className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-4 py-2">
+                <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-red-700">A IA não conseguiu responder</p>
+                  <p className="text-xs text-red-600">{selected.ai_last_error}</p>
+                </div>
+                <button
+                  onClick={() => dismissAiError(selected.id)}
+                  title="Dispensar aviso"
+                  aria-label="Dispensar aviso"
+                  className="shrink-0 rounded p-0.5 text-red-400 hover:bg-red-100 hover:text-red-600"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
             {(messages ?? []).some((x) => x.pinned_at && !x.deleted_at) && (
               <div className="border-b border-amber-200 bg-amber-50 px-4 py-1.5">

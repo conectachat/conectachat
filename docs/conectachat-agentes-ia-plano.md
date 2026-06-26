@@ -21,7 +21,7 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
   Agora a IA vem LIGADA por padrão; o botão "Chatbot" no inbox vira DESLIGAR pontual (false=off). A
   segurança não é mais "opt-in por contato", e sim a regra "só responde sem humano" (ver Passo 2).
 
-## Edge Function whatsapp-webhook (v39 ACTIVE, verify_jwt false)
+## Edge Function whatsapp-webhook (v40 ACTIVE, verify_jwt false)
 - `runAutomation` = motor de fluxo primeiro; se NENHUM fluxo tratou → `runAgentAttendant`.
 - `runAgentAttendant`: gates (trava humana, status, ai_status handed_off, agente alocado,
   contact.ai_enabled, agente ativo, ativação/horário) → handoff por palavra-gatilho →
@@ -71,8 +71,13 @@ de IA já existente (ai_credentials + a IA embutida no whatsapp-webhook, F5a/F5b
 3. **Calibração do tempo de "digitando…"** (refinamento anotado pelo Renato): hoje o tempo do
    indicador não está proporcional ao tamanho da mensagem. Ajustar a fórmula em `sendAgentReply`
    (`typingMs = min(3000, 1200 + len*35)`) e/ou o uso de `sendPresence` para casar melhor.
-4. **Tornar falhas de IA visíveis** (robustez): quando o provedor devolve vazio, gravar um aviso
-   interno na conversa (não enviado ao cliente) tipo "⚠️ IA não respondeu — verifique modelo/chave".
+4. ✅ **ENTREGUE (webhook v40) — Falha de IA visível**: colunas `conversations.ai_last_error` (+`_at`).
+   Helpers `setAiError`/`clearAiError` gravam o motivo quando a IA falha (sem chave, resposta vazia,
+   exceção, agente do nó não encontrado) — em `runAgentAttendant` E `runAiNode` — e LIMPAM no sucesso.
+   NÃO marca em silêncio anti-ban nem nos gates normais (humano, fora do horário, chatbot desligado).
+   Inbox (selo escolhido pelo Renato): badge "⚠️ IA" no card da lista + banner vermelho dispensável no
+   topo da conversa (`dismissAiError`). `use-conversations` traz `ai_last_error`(+`_at`). Sem mexer nos
+   gatilhos de métrica (não cria mensagem; só atualiza a conversa).
 5. **Restringir /agentes a dono/admin** (igual decisão em aberto do Dashboard).
 
 ## Roadmap IA (fora do MVP)

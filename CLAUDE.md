@@ -201,11 +201,22 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   C8 (relatórios). Depois Google Agenda, HubSpot, etc.
 - Fase D — Atendente de IA (quase fechada; falta níveis hierárquicos no inbox + calibrar "digitando…").
 - MVP PRÉ-LANÇAMENTO — recursos de operação decididos 2026-06-26 (estudo das referências AtendChat +
-  Remix AtendeZap). Entram ANTES do lançamento (ordem de execução a definir; NÃO iniciados):
-  (1) CAMPANHAS/disparo em massa (listas/tags + intervalo + recorrência + relatório; maior retorno,
-  maior risco de ban → reusar anti-ban); (2) IMPORTAR CONTATOS (CSV; pré-requisito das campanhas);
-  (3) HORÁRIO DE ATENDIMENTO / fora de expediente (resposta automática por horário, por empresa/fila;
-  generalizar o que a IA já faz). Backlog pós-lançamento (em docs/roadmap.md): NPS, distribuição
+  Remix AtendeZap). Plano completo + refs de código em ~/.claude/plans (vamos-continuar-a-fase-pure-island.md).
+  (1) CAMPANHAS/disparo em massa — NÃO iniciado. Decisões: ritmo Conservador padrão mas CONFIGURÁVEL +
+  ALERTA DE RISCO POR CANAL (QR não-oficial=alto); alvo = etiqueta + listas dedicadas + todos; opt-out
+  automático junto (webhook marca contacts.blocked em "sair/parar/cancelar"). Tabelas novas (campaigns,
+  campaign_recipients, contact_lists, contact_list_members) + 2 Edge Functions (manage-campaign jwt +
+  run-campaign cron, espelhando run-scheduled) + tela. Anti-ban reusa agentRateLimited.
+  (2) IMPORTAR CONTATOS — JÁ EXISTE (contacts-screen.tsx handleFileChosen, CSV/XLSX). Só falta ajuste
+  opcional: jogar importados numa lista/etiqueta (casa com campanhas).
+  (3) ✅ HORÁRIO DE ATENDIMENTO / fora de expediente — ENTREGUE (por DEPARTAMENTO, decisão do Renato).
+  Banco: departments.business_hours(jsonb)/out_of_office_enabled/out_of_office_message (migration
+  department_business_hours). Webhook v43 (runOutOfOffice): quando nenhum fluxo trata, NÃO há agente de IA
+  no canal e sem humano → resolve o depto (conversation.department_id|channel.default_department_id), se
+  fora do business_hours do depto e toggle ligado → envia out_of_office_message 1×/6h por conversa
+  (sendOutOfOffice, marcador external_message_id 'system:offhours'; reusa isWithinBusinessHours). UI: editor
+  no modal de Departamento (settings-screen.tsx — toggle+mensagem+grade DAYS/Switch/time).
+  Backlog pós-lançamento (em docs/roadmap.md): NPS, distribuição
   automática+carteira, campos personalizados, transcrição de áudio, aniversários, notas internas, API
   pública+webhooks, LGPD, onboarding por IA. NÃO priorizar Typebot/Dialogflow/n8n (temos fluxo+IA).
 - Fase E — Stripe + enforcement de planos + LANÇAMENTO.

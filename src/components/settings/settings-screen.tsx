@@ -26,6 +26,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { TAG_PALETTE, ColorPicker, type Tag as TagType } from "@/components/contacts/contact-tags";
 import { CompanyDetailsCard } from "@/components/settings/company-details-card";
 import { NotificationsCard } from "@/components/settings/notifications-card";
@@ -45,7 +47,34 @@ const FIELD_TYPE_LABEL: Record<FieldType, string> = {
 };
 
 // --- Fase 2 / Passo 1: Departamentos --------------------------------------
-type Department = { id: string; name: string; member_count: number };
+type DayHours = { enabled: boolean; start: string; end: string };
+type BusinessHours = Record<string, DayHours>;
+type Department = {
+  id: string;
+  name: string;
+  member_count: number;
+  business_hours: BusinessHours | null;
+  out_of_office_enabled: boolean;
+  out_of_office_message: string | null;
+};
+
+// Dias da semana com as chaves que o webhook lê (mon..sun, 3 letras minúsculas).
+const DEPT_DAYS: { key: string; label: string }[] = [
+  { key: "mon", label: "Segunda" },
+  { key: "tue", label: "Terça" },
+  { key: "wed", label: "Quarta" },
+  { key: "thu", label: "Quinta" },
+  { key: "fri", label: "Sexta" },
+  { key: "sat", label: "Sábado" },
+  { key: "sun", label: "Domingo" },
+];
+function defaultBusinessHours(): BusinessHours {
+  const wd = (enabled: boolean): DayHours => ({ enabled, start: "08:00", end: "18:00" });
+  return {
+    mon: wd(true), tue: wd(true), wed: wd(true), thu: wd(true), fri: wd(true),
+    sat: wd(false), sun: wd(false),
+  };
+}
 type OrgUser = { user_id: string; role: string; name: string; email: string };
 const ORG_ROLE_LABEL: Record<string, string> = {
   owner: "Dono",
@@ -240,6 +269,10 @@ export function SettingsScreen() {
   const [deptName, setDeptName] = useState("");
   const [deptBusy, setDeptBusy] = useState(false);
   const [deptError, setDeptError] = useState<string | null>(null);
+  // Horário de atendimento do departamento (fora de expediente).
+  const [deptOooEnabled, setDeptOooEnabled] = useState(false);
+  const [deptOooMessage, setDeptOooMessage] = useState("");
+  const [deptHours, setDeptHours] = useState<BusinessHours>(defaultBusinessHours());
   const [allocDept, setAllocDept] = useState<Department | null>(null); // departamento aberto na alocação
 
   // Equipe / Usuários state (Fase 2 / Bloco J)
@@ -648,15 +681,19 @@ export function SettingsScreen() {
     queryKey: ["settings-departments", orgId],
     enabled: !!orgId,
     queryFn: async (): Promise<Department[]> => {
-      const { data, error } = await supabase
+      // (supabase as any): colunas business_hours/out_of_office_* novas, fora do types.ts (CLAUDE.md §8).
+      const { data, error } = await (supabase as any)
         .from("departments")
-        .select("id, name, department_members(count)")
+        .select("id, name, business_hours, out_of_office_enabled, out_of_office_message, department_members(count)")
         .order("name");
       if (error) throw error;
       return (data ?? []).map((d: any) => ({
         id: d.id,
         name: d.name,
         member_count: d.department_members?.[0]?.count ?? 0,
+        business_hours: d.business_hours ?? null,
+        out_of_office_enabled: d.out_of_office_enabled === true,
+        out_of_office_message: d.out_of_office_message ?? null,
       }));
     },
   });
@@ -702,16 +739,28 @@ export function SettingsScreen() {
     qc.invalidateQueries({ queryKey: ["settings-departments"] });
   }
 
+  function setDeptDay(key: string, patch: Partial<DayHours>) {
+    setDeptHours((h) => ({
+      ...h,
+      [key]: { ...(h[key] ?? { enabled: false, start: "08:00", end: "18:00" }), ...patch },
+    }));
+  }
   function openNewDept() {
     setEditingDept(null);
     setDeptName("");
     setDeptError(null);
+    setDeptOooEnabled(false);
+    setDeptOooMessage("");
+    setDeptHours(defaultBusinessHours());
     setDeptModalOpen(true);
   }
   function openEditDept(d: Department) {
     setEditingDept(d);
     setDeptName(d.name);
     setDeptError(null);
+    setDeptOooEnabled(d.out_of_office_enabled);
+    setDeptOooMessage(d.out_of_office_message ?? "");
+    setDeptHours(d.business_hours ?? defaultBusinessHours());
     setDeptModalOpen(true);
   }
   async function saveDept() {
@@ -722,9 +771,18 @@ export function SettingsScreen() {
       setDeptError("Sem empresa vinculada.");
       return;
     }
+    // Campos de horário (colunas novas → via (supabase as any), CLAUDE.md §8).
+    const hoursPayload = {
+      business_hours: deptHours,
+      out_of_office_enabled: deptOooEnabled,
+      out_of_office_message: deptOooMessage.trim() || null,
+    };
     setDeptBusy(true);
     if (editingDept) {
-      const { error } = await supabase.from("departments").update({ name: n }).eq("id", editingDept.id);
+      const { error } = await (supabase as any)
+        .from("departments")
+        .update({ name: n, ...hoursPayload })
+        .eq("id", editingDept.id);
       setDeptBusy(false);
       if (error) {
         setDeptError("Não foi possível salvar o departamento.");
@@ -732,7 +790,9 @@ export function SettingsScreen() {
         return;
       }
     } else {
-      const { error } = await supabase.from("departments").insert({ org_id: orgId, name: n });
+      const { error } = await (supabase as any)
+        .from("departments")
+        .insert({ org_id: orgId, name: n, ...hoursPayload });
       setDeptBusy(false);
       if (error) {
         setDeptError("Não foi possível criar o departamento.");
@@ -1720,9 +1780,9 @@ export function SettingsScreen() {
 
               {/* Modal: criar / renomear departamento */}
               <Dialog open={deptModalOpen} onOpenChange={setDeptModalOpen}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>{editingDept ? "Renomear departamento" : "Novo departamento"}</DialogTitle>
+                    <DialogTitle>{editingDept ? "Editar departamento" : "Novo departamento"}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -1734,6 +1794,70 @@ export function SettingsScreen() {
                         placeholder="Ex.: Suporte"
                       />
                     </div>
+
+                    {/* Horário de atendimento + resposta fora do expediente */}
+                    <div className="space-y-3 rounded-md border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Responder fora do horário</p>
+                          <p className="text-xs text-muted-foreground">
+                            Envia uma mensagem automática quando o cliente escreve fora do horário de
+                            atendimento deste departamento.
+                          </p>
+                        </div>
+                        <Switch checked={deptOooEnabled} onCheckedChange={setDeptOooEnabled} />
+                      </div>
+                      {deptOooEnabled && (
+                        <>
+                          <div className="space-y-1">
+                            <Label htmlFor="dept-ooo-msg">Mensagem fora do expediente</Label>
+                            <Textarea
+                              id="dept-ooo-msg"
+                              rows={3}
+                              value={deptOooMessage}
+                              onChange={(e) => setDeptOooMessage(e.target.value)}
+                              placeholder="Ex.: Olá! Nosso atendimento funciona de seg a sex, das 8h às 18h. Retornaremos assim que possível."
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-foreground">Horário de atendimento</p>
+                            <p className="text-xs text-muted-foreground">
+                              Fuso da empresa (configurado em Configurações → Empresa).
+                            </p>
+                            {DEPT_DAYS.map((d) => {
+                              const day = deptHours[d.key] ?? { enabled: false, start: "08:00", end: "18:00" };
+                              return (
+                                <div key={d.key} className="flex flex-wrap items-center gap-2">
+                                  <div className="flex w-28 items-center gap-2">
+                                    <Switch
+                                      checked={day.enabled}
+                                      onCheckedChange={(c) => setDeptDay(d.key, { enabled: c })}
+                                    />
+                                    <span className="text-sm text-foreground">{d.label}</span>
+                                  </div>
+                                  <Input
+                                    type="time"
+                                    value={day.start}
+                                    disabled={!day.enabled}
+                                    onChange={(e) => setDeptDay(d.key, { start: e.target.value })}
+                                    className="w-32"
+                                  />
+                                  <span className="text-sm text-muted-foreground">até</span>
+                                  <Input
+                                    type="time"
+                                    value={day.end}
+                                    disabled={!day.enabled}
+                                    onChange={(e) => setDeptDay(d.key, { end: e.target.value })}
+                                    className="w-32"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
                     {deptError && <p className="text-sm text-destructive">{deptError}</p>}
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => setDeptModalOpen(false)}>

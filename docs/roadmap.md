@@ -144,10 +144,11 @@ DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem s
        de entrega por contato. (Ref. AtendChat: Campaign/CampaignShipping/ContactList.)
     2. IMPORTAR CONTATOS (CSV/planilha) — o cliente sobe a base dele. Baixo-médio esforço; é
        pré-requisito prático das Campanhas e ajuda a ATIVAÇÃO. (Ref. AtendChat: ContactList import.)
-    3. HORÁRIO DE ATENDIMENTO / FORA DE EXPEDIENTE — resposta automática e comportamento por
-       horário, por empresa/fila. Já existe um pedaço na IA (activation_mode fora_do_horario +
-       business_hours); generalizar para o atendimento humano também. (Ref. AtendChat: Queue.schedules
-       + outOfHoursMessage; VerifyCurrentSchedule.)
+    3. ✅ HORÁRIO DE ATENDIMENTO / FORA DE EXPEDIENTE — ENTREGUE (por DEPARTAMENTO). Banco:
+       departments.business_hours(jsonb)/out_of_office_enabled/out_of_office_message. Webhook v43
+       (runOutOfOffice): sem fluxo + sem IA no canal + sem humano + fora do horário do depto → envia a
+       mensagem 1×/6h por conversa (marcador 'system:offhours'). UI no modal de Departamento
+       (Configurações). Reusa isWithinBusinessHours.
 
   Fase E — Stripe + enforcement de planos + LANÇAMENTO.
     Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597

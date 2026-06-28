@@ -207,8 +207,11 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   automático junto (webhook marca contacts.blocked em "sair/parar/cancelar"). Tabelas novas (campaigns,
   campaign_recipients, contact_lists, contact_list_members) + 2 Edge Functions (manage-campaign jwt +
   run-campaign cron, espelhando run-scheduled) + tela. Anti-ban reusa agentRateLimited.
-  (2) IMPORTAR CONTATOS — JÁ EXISTE (contacts-screen.tsx handleFileChosen, CSV/XLSX). Só falta ajuste
-  opcional: jogar importados numa lista/etiqueta (casa com campanhas).
+  (2) ✅ IMPORTAR CONTATOS — JÁ EXISTIA (contacts-screen.tsx handleFileChosen, CSV/XLSX, validação BR,
+  dedup, upsert). ENTREGUE o ajuste de ETIQUETA na importação: seletor de tag opcional no modal
+  (useOrgTags) → após o upsert, marca TODOS os contatos do arquivo via contact_tags (upsert
+  ignoreDuplicates) para já mirar campanhas. Falta só "jogar numa LISTA dedicada" (depende das tabelas
+  contact_lists, que vêm com Campanhas).
   (3) ✅ HORÁRIO DE ATENDIMENTO / fora de expediente — ENTREGUE (por DEPARTAMENTO, decisão do Renato).
   Banco: departments.business_hours(jsonb)/out_of_office_enabled/out_of_office_message (migration
   department_business_hours). Webhook v43 (runOutOfOffice): quando nenhum fluxo trata, NÃO há agente de IA

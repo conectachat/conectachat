@@ -20,7 +20,7 @@ import {
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { TagsManagerDialog, TagFilterSelect, ContactTagsSection, TagChip, type Tag } from "@/components/contacts/contact-tags";
+import { TagsManagerDialog, TagFilterSelect, ContactTagsSection, TagChip, useOrgTags, type Tag } from "@/components/contacts/contact-tags";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -452,8 +452,10 @@ export function ContactsScreen() {
   const [previewInvalid, setPreviewInvalid] = useState<Array<{ nome: string; telefone: string; email: string }>>([]);
   const [previewExisting, setPreviewExisting] = useState<Set<string>>(new Set());
   const [dupMode, setDupMode] = useState<"keep" | "replace">("keep");
+  const [importTagId, setImportTagId] = useState<string>(""); // etiqueta opcional p/ os importados
   const [importResult, setImportResult] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const importTags = useOrgTags(orgId);
 
   function resetImportState() {
     setImportFileName("");
@@ -462,6 +464,7 @@ export function ContactsScreen() {
     setPreviewInvalid([]);
     setPreviewExisting(new Set());
     setDupMode("keep");
+    setImportTagId("");
     setImportError(null);
     setImportResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -604,7 +607,41 @@ export function ContactsScreen() {
         });
         if (error) throw error;
       }
-      setImportResult(`${registros.length} contatos importados.`);
+
+      // Etiqueta opcional: marca TODOS os contatos do arquivo (novos + já existentes) com a tag,
+      // para o cliente já mirar uma campanha nessa etiqueta. Não derruba a importação se falhar.
+      let tagApplied = false;
+      if (importTagId) {
+        try {
+          const numerosAll = all.map((l) => l.telefone);
+          const ids: string[] = [];
+          for (let i = 0; i < numerosAll.length; i += 500) {
+            const fatia = numerosAll.slice(i, i + 500);
+            if (fatia.length === 0) break;
+            const { data } = await supabase
+              .from("contacts")
+              .select("id")
+              .eq("org_id", orgId)
+              .eq("channel_type", "whatsapp_baileys")
+              .in("external_id", fatia);
+            (data ?? []).forEach((c: any) => ids.push(c.id));
+          }
+          const links = ids.map((cid) => ({ contact_id: cid, tag_id: importTagId }));
+          for (let i = 0; i < links.length; i += 500) {
+            const { error: tErr } = await supabase
+              .from("contact_tags")
+              .upsert(links.slice(i, i + 500), { onConflict: "contact_id,tag_id", ignoreDuplicates: true });
+            if (tErr) throw tErr;
+          }
+          tagApplied = links.length > 0;
+        } catch (e) {
+          console.error("Falha ao aplicar etiqueta na importação:", e);
+        }
+      }
+
+      setImportResult(
+        `${registros.length} contatos importados.` + (tagApplied ? " Etiqueta aplicada." : ""),
+      );
       reloadAll();
     } catch (e) {
       setImportError("Não foi possível importar os contatos.");
@@ -903,6 +940,26 @@ export function ContactsScreen() {
                 <option value="NONE">Nenhum — os números já têm o código do país</option>
                 <option value="BR">Brasil (+55)</option>
               </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600">Etiqueta (opcional)</label>
+              <select
+                value={importTagId}
+                onChange={(e) => setImportTagId(e.target.value)}
+                className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+              >
+                <option value="">Não aplicar etiqueta</option>
+                {(importTags.data ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-gray-500">
+                Marca todos os contatos do arquivo com esta etiqueta — útil para depois mirar uma campanha.
+                Crie etiquetas em "Gerenciar tags".
+              </p>
             </div>
 
             <div>

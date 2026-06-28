@@ -142,8 +142,9 @@ DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem s
        gente compra SaaS de WhatsApp por isso). ATENÇÃO: maior esforço + risco de banimento —
        precisa de limites/cadência (reusar a lógica anti-ban). Inclui listas de contatos + status
        de entrega por contato. (Ref. AtendChat: Campaign/CampaignShipping/ContactList.)
-    2. IMPORTAR CONTATOS (CSV/planilha) — o cliente sobe a base dele. Baixo-médio esforço; é
-       pré-requisito prático das Campanhas e ajuda a ATIVAÇÃO. (Ref. AtendChat: ContactList import.)
+    2. ✅ IMPORTAR CONTATOS (CSV/XLSX) — JÁ EXISTIA (contacts-screen.tsx: validação BR, dedup, upsert).
+       ENTREGUE: etiqueta opcional na importação (marca todos os contatos do arquivo via contact_tags).
+       Falta só "jogar numa LISTA dedicada" (depende das tabelas de Campanhas).
     3. ✅ HORÁRIO DE ATENDIMENTO / FORA DE EXPEDIENTE — ENTREGUE (por DEPARTAMENTO). Banco:
        departments.business_hours(jsonb)/out_of_office_enabled/out_of_office_message. Webhook v43
        (runOutOfOffice): sem fluxo + sem IA no canal + sem humano + fora do horário do depto → envia a

@@ -212,9 +212,10 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   /campanhas (guard) + campaigns-screen.tsx (lista+progresso+pausar/retomar/cancelar) + modal nova campanha
   (canal, alvo etiqueta/todos, mensagem+variáveis {primeiro_nome}/{nome}, ritmo Conservador/Normal/custom +
   ALERTA DE RISCO POR CANAL via channelRiskInfo, horário comercial/humanizar, agendar). Hook use-campaigns.ts.
-  FALTAM (commit 2 + follow-ups): LISTAS dedicadas na UI (criar/popular via import + alvo 'list' no modal;
-  tabelas já existem); MÍDIA na campanha (run-campaign já suporta; falta UI). TESTE LIVE pendente com poucos
-  contatos (envia WhatsApp real).
+  LISTAS DEDICADAS ENTREGUES: use-contact-lists.ts (useContactLists + createContactList + addContactsToList);
+  alvo 'list' no modal de campanha; importação de contatos pode criar/usar uma lista (contacts-screen modal).
+  FALTAM (follow-ups): MÍDIA na campanha (run-campaign já suporta; falta UI de upload); TESTE LIVE pendente
+  com poucos contatos (envia WhatsApp real — testar com etiqueta de 1 número antes de público real).
   (2) ✅ IMPORTAR CONTATOS — JÁ EXISTIA (contacts-screen.tsx handleFileChosen, CSV/XLSX, validação BR,
   dedup, upsert). ENTREGUE o ajuste de ETIQUETA na importação: seletor de tag opcional no modal
   (useOrgTags) → após o upsert, marca TODOS os contatos do arquivo via contact_tags (upsert

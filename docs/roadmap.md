@@ -141,8 +141,9 @@ DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem s
        campaigns/campaign_recipients/contact_lists/contact_list_members; Edge Functions manage-campaign
        (jwt) + run-campaign (cron, anti-ban: rate/min+jitter, daily_cap, janela 08–20, backstop org,
        pula bloqueados); opt-out no webhook v44; tela /campanhas (admin) com modal (alvo etiqueta/todos,
-       ritmo configurável + ALERTA DE RISCO POR CANAL, agendar). FALTA: listas dedicadas na UI + mídia na
-       campanha (backend já suporta) + teste live com poucos contatos.
+       ritmo configurável + ALERTA DE RISCO POR CANAL, agendar). LISTAS DEDICADAS entregues (use-contact-lists
+       + alvo 'list' no modal + importar para uma lista). FALTA: mídia na campanha (backend já suporta) +
+       teste live com poucos contatos.
     2. ✅ IMPORTAR CONTATOS (CSV/XLSX) — JÁ EXISTIA (contacts-screen.tsx: validação BR, dedup, upsert).
        ENTREGUE: etiqueta opcional na importação (marca todos os contatos do arquivo via contact_tags).
        Falta só "jogar numa LISTA dedicada" (depende das tabelas de Campanhas).

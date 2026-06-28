@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useOrgTags } from "@/components/contacts/contact-tags";
+import { useContactLists } from "@/hooks/use-contact-lists";
 import {
   useCampaigns,
   useCampaignChannels,
@@ -48,6 +49,7 @@ export function CampaignsScreen() {
   const campaignsQuery = useCampaigns();
   const channelsQuery = useCampaignChannels();
   const tags = useOrgTags(orgId);
+  const lists = useContactLists();
 
   const campaigns = campaignsQuery.data ?? [];
   const channels = channelsQuery.data ?? [];
@@ -57,8 +59,9 @@ export function CampaignsScreen() {
   const [busy, setBusy] = useState(false);
   const [fName, setFName] = useState("");
   const [fChannel, setFChannel] = useState("");
-  const [fTargetType, setFTargetType] = useState<"tag" | "all">("tag");
+  const [fTargetType, setFTargetType] = useState<"tag" | "list" | "all">("tag");
   const [fTagId, setFTagId] = useState("");
+  const [fListId, setFListId] = useState("");
   const [fMessage, setFMessage] = useState("");
   const [fPreset, setFPreset] = useState<"conservador" | "normal" | "custom">("conservador");
   const [fRate, setFRate] = useState(8);
@@ -78,6 +81,7 @@ export function CampaignsScreen() {
     setFChannel(channels[0]?.id ?? "");
     setFTargetType("tag");
     setFTagId("");
+    setFListId("");
     setFMessage("");
     setFPreset("conservador");
     setFRate(PRESETS.conservador.rate);
@@ -105,6 +109,7 @@ export function CampaignsScreen() {
     if (!fName.trim()) return toast.error("Dê um nome à campanha.");
     if (!fChannel) return toast.error("Escolha o canal de envio.");
     if (fTargetType === "tag" && !fTagId) return toast.error("Escolha a etiqueta do público.");
+    if (fTargetType === "list" && !fListId) return toast.error("Escolha a lista do público.");
     if (!fMessage.trim()) return toast.error("Escreva a mensagem.");
     setBusy(true);
     try {
@@ -116,6 +121,7 @@ export function CampaignsScreen() {
         messageText: fMessage,
         targetType: fTargetType,
         targetTagId: fTargetType === "tag" ? fTagId : null,
+        targetListId: fTargetType === "list" ? fListId : null,
         ratePerMin: fRate,
         dailyCap: fDaily,
         humanize: fHumanize,
@@ -278,8 +284,9 @@ export function CampaignsScreen() {
               <div className="flex gap-2">
                 {(
                   [
-                    ["tag", "Por etiqueta"],
-                    ["all", "Todos os contatos"],
+                    ["tag", "Etiqueta"],
+                    ["list", "Lista"],
+                    ["all", "Todos"],
                   ] as const
                 ).map(([k, lbl]) => (
                   <button
@@ -309,6 +316,25 @@ export function CampaignsScreen() {
                     </option>
                   ))}
                 </select>
+              )}
+              {fTargetType === "list" && (
+                <select
+                  value={fListId}
+                  onChange={(e) => setFListId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                >
+                  <option value="">Selecione a lista…</option>
+                  {(lists.data ?? []).map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.member_count})
+                    </option>
+                  ))}
+                </select>
+              )}
+              {fTargetType === "list" && (lists.data ?? []).length === 0 && (
+                <p className="text-[11px] text-amber-700">
+                  Nenhuma lista ainda. Crie uma importando contatos em Contatos → Importar (campo "Lista").
+                </p>
               )}
               <p className="text-[11px] text-muted-foreground">
                 Contatos bloqueados (que pediram para sair) são sempre excluídos.

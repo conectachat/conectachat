@@ -21,6 +21,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { TagsManagerDialog, TagFilterSelect, ContactTagsSection, TagChip, useOrgTags, type Tag } from "@/components/contacts/contact-tags";
+import { useContactLists, createContactList, addContactsToList } from "@/hooks/use-contact-lists";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -453,9 +454,13 @@ export function ContactsScreen() {
   const [previewExisting, setPreviewExisting] = useState<Set<string>>(new Set());
   const [dupMode, setDupMode] = useState<"keep" | "replace">("keep");
   const [importTagId, setImportTagId] = useState<string>(""); // etiqueta opcional p/ os importados
+  const [importListMode, setImportListMode] = useState<"none" | "existing" | "new">("none");
+  const [importListId, setImportListId] = useState<string>("");
+  const [importNewListName, setImportNewListName] = useState<string>("");
   const [importResult, setImportResult] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const importTags = useOrgTags(orgId);
+  const importLists = useContactLists();
 
   function resetImportState() {
     setImportFileName("");
@@ -465,6 +470,9 @@ export function ContactsScreen() {
     setPreviewExisting(new Set());
     setDupMode("keep");
     setImportTagId("");
+    setImportListMode("none");
+    setImportListId("");
+    setImportNewListName("");
     setImportError(null);
     setImportResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -608,10 +616,14 @@ export function ContactsScreen() {
         if (error) throw error;
       }
 
-      // Etiqueta opcional: marca TODOS os contatos do arquivo (novos + já existentes) com a tag,
-      // para o cliente já mirar uma campanha nessa etiqueta. Não derruba a importação se falhar.
+      // Etiqueta e/ou Lista opcionais: marca TODOS os contatos do arquivo (novos + já existentes),
+      // para o cliente já mirar uma campanha. Não derruba a importação se falhar.
       let tagApplied = false;
-      if (importTagId) {
+      let listApplied = false;
+      const wantTag = !!importTagId;
+      const wantList =
+        importListMode === "existing" ? !!importListId : importListMode === "new" ? !!importNewListName.trim() : false;
+      if (wantTag || wantList) {
         try {
           const numerosAll = all.map((l) => l.telefone);
           const ids: string[] = [];
@@ -626,21 +638,34 @@ export function ContactsScreen() {
               .in("external_id", fatia);
             (data ?? []).forEach((c: any) => ids.push(c.id));
           }
-          const links = ids.map((cid) => ({ contact_id: cid, tag_id: importTagId }));
-          for (let i = 0; i < links.length; i += 500) {
-            const { error: tErr } = await supabase
-              .from("contact_tags")
-              .upsert(links.slice(i, i + 500), { onConflict: "contact_id,tag_id", ignoreDuplicates: true });
-            if (tErr) throw tErr;
+          if (wantTag && ids.length) {
+            const links = ids.map((cid) => ({ contact_id: cid, tag_id: importTagId }));
+            for (let i = 0; i < links.length; i += 500) {
+              await supabase
+                .from("contact_tags")
+                .upsert(links.slice(i, i + 500), { onConflict: "contact_id,tag_id", ignoreDuplicates: true });
+            }
+            tagApplied = true;
           }
-          tagApplied = links.length > 0;
+          if (wantList && ids.length) {
+            let listId = importListId;
+            if (importListMode === "new") {
+              listId = (await createContactList(orgId, importNewListName)) ?? "";
+            }
+            if (listId) {
+              await addContactsToList(listId, orgId, ids);
+              listApplied = true;
+            }
+          }
         } catch (e) {
-          console.error("Falha ao aplicar etiqueta na importação:", e);
+          console.error("Falha ao aplicar etiqueta/lista na importação:", e);
         }
       }
 
       setImportResult(
-        `${registros.length} contatos importados.` + (tagApplied ? " Etiqueta aplicada." : ""),
+        `${registros.length} contatos importados.` +
+          (tagApplied ? " Etiqueta aplicada." : "") +
+          (listApplied ? " Adicionados à lista." : ""),
       );
       reloadAll();
     } catch (e) {
@@ -960,6 +985,54 @@ export function ContactsScreen() {
                 Marca todos os contatos do arquivo com esta etiqueta — útil para depois mirar uma campanha.
                 Crie etiquetas em "Gerenciar tags".
               </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600">Adicionar a uma lista (opcional)</label>
+              <div className="mt-1 flex gap-1.5">
+                {(
+                  [
+                    ["none", "Nenhuma"],
+                    ["existing", "Lista existente"],
+                    ["new", "Nova lista"],
+                  ] as const
+                ).map(([k, lbl]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setImportListMode(k)}
+                    className={`flex-1 rounded border px-2 py-1.5 text-xs font-medium ${
+                      importListMode === k
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {importListMode === "existing" && (
+                <select
+                  value={importListId}
+                  onChange={(e) => setImportListId(e.target.value)}
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+                >
+                  <option value="">Selecione a lista…</option>
+                  {(importLists.data ?? []).map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.member_count})
+                    </option>
+                  ))}
+                </select>
+              )}
+              {importListMode === "new" && (
+                <input
+                  value={importNewListName}
+                  onChange={(e) => setImportNewListName(e.target.value)}
+                  placeholder="Nome da nova lista (ex.: Black Friday)"
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+                />
+              )}
             </div>
 
             <div>

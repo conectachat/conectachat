@@ -18,6 +18,7 @@ import {
   MessagesSquare,
   BarChart3,
   Bot,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
@@ -52,6 +53,7 @@ const items: NavItemData[] = [
   { title: "Fluxos", url: "/flows", icon: Workflow },
   { title: "Agentes", url: "/agentes", icon: Bot, adminOnly: true },
   { title: "Contatos", url: "/contacts", icon: Contact },
+  { title: "Campanhas", url: "/campanhas", icon: Megaphone, adminOnly: true },
   { title: "Agendamentos", url: "/schedules", icon: CalendarClock },
   { title: "Conexões", url: "/connections", icon: Plug },
   { title: "Integrações", url: "/integracoes", icon: Blocks },

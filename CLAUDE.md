@@ -202,11 +202,19 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
 - Fase D — Atendente de IA (quase fechada; falta níveis hierárquicos no inbox + calibrar "digitando…").
 - MVP PRÉ-LANÇAMENTO — recursos de operação decididos 2026-06-26 (estudo das referências AtendChat +
   Remix AtendeZap). Plano completo + refs de código em ~/.claude/plans (vamos-continuar-a-fase-pure-island.md).
-  (1) CAMPANHAS/disparo em massa — NÃO iniciado. Decisões: ritmo Conservador padrão mas CONFIGURÁVEL +
-  ALERTA DE RISCO POR CANAL (QR não-oficial=alto); alvo = etiqueta + listas dedicadas + todos; opt-out
-  automático junto (webhook marca contacts.blocked em "sair/parar/cancelar"). Tabelas novas (campaigns,
-  campaign_recipients, contact_lists, contact_list_members) + 2 Edge Functions (manage-campaign jwt +
-  run-campaign cron, espelhando run-scheduled) + tela. Anti-ban reusa agentRateLimited.
+  (1) CAMPANHAS/disparo em massa — BACKEND COMPLETO + FRONTEND CORE ENTREGUES. Banco: campaigns,
+  campaign_recipients, contact_lists, contact_list_members (RLS is_member_of; migration campaigns_e_listas).
+  Edge Functions: manage-campaign (jwt on: create+enfileira/pause/resume/cancel, valida org_members) +
+  run-campaign (jwt off, cron pg_cron 'conectachat-run-campaign' * * * * * com x-cron-secret; envio paceado
+  ANTI-BAN: rate_per_min+jitter, daily_cap 24h, janela 08–20 fuso da empresa, backstop org ~20/min, pula
+  contacts.blocked, reserva 'sending', completa sozinho). Opt-out no webhook v44 (handleOptOut: "sair/parar/
+  cancelar" curtas → contacts.blocked=true + confirmação 1×). Frontend: menu "Campanhas" (adminOnly) + rota
+  /campanhas (guard) + campaigns-screen.tsx (lista+progresso+pausar/retomar/cancelar) + modal nova campanha
+  (canal, alvo etiqueta/todos, mensagem+variáveis {primeiro_nome}/{nome}, ritmo Conservador/Normal/custom +
+  ALERTA DE RISCO POR CANAL via channelRiskInfo, horário comercial/humanizar, agendar). Hook use-campaigns.ts.
+  FALTAM (commit 2 + follow-ups): LISTAS dedicadas na UI (criar/popular via import + alvo 'list' no modal;
+  tabelas já existem); MÍDIA na campanha (run-campaign já suporta; falta UI). TESTE LIVE pendente com poucos
+  contatos (envia WhatsApp real).
   (2) ✅ IMPORTAR CONTATOS — JÁ EXISTIA (contacts-screen.tsx handleFileChosen, CSV/XLSX, validação BR,
   dedup, upsert). ENTREGUE o ajuste de ETIQUETA na importação: seletor de tag opcional no modal
   (useOrgTags) → após o upsert, marca TODOS os contatos do arquivo via contact_tags (upsert

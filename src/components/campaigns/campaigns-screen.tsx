@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Megaphone, Plus, Pause, Play, X, AlertTriangle } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Megaphone, Plus, Pause, Play, X, AlertTriangle, Paperclip, Mic, Square } from "lucide-react";
 import { toast } from "sonner";
 
+import { supabase } from "@/integrations/supabase/client";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,21 @@ const STATUS_LABEL: Record<CampaignStatus, { label: string; cls: string }> = {
 const VARS = [
   { key: "{primeiro_nome}", label: "Primeiro nome" },
   { key: "{nome}", label: "Nome completo" },
+  { key: "{saudacao}", label: "Saudação" },
+  { key: "{data}", label: "Data" },
+  { key: "{hora}", label: "Hora" },
+  { key: "{empresa}", label: "Empresa" },
+  { key: "{conexao}", label: "Canal" },
 ];
+
+function detectMediaType(file: File): string {
+  const mime = (file.type || "").toLowerCase();
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) return "image";
+  if (mime.startsWith("audio/") || ["mp3", "ogg", "oga", "wav", "m4a", "aac", "opus"].includes(ext)) return "audio";
+  if (mime.startsWith("video/") || ["mp4", "mov", "avi", "mkv"].includes(ext)) return "video";
+  return "document";
+}
 
 const PRESETS = {
   conservador: { rate: 8, daily: 300 },
@@ -69,6 +84,29 @@ export function CampaignsScreen() {
   const [fHumanize, setFHumanize] = useState(true);
   const [fBusinessHours, setFBusinessHours] = useState(true);
   const [fWhen, setFWhen] = useState(""); // datetime-local; vazio = agora
+  // mídia / áudio
+  const [fMediaPath, setFMediaPath] = useState<string | null>(null);
+  const [fMediaName, setFMediaName] = useState<string | null>(null);
+  const [fMediaType, setFMediaType] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Respostas rápidas ativas (para "Usar resposta rápida").
+  const quickRepliesQuery = useQuery({
+    queryKey: ["campaign-quick-replies", orgId],
+    enabled: !!orgId && open,
+    queryFn: async (): Promise<any[]> => {
+      const { data } = await (supabase as any)
+        .from("quick_replies")
+        .select("id, shortcut, title, content, media_path, media_name, media_type")
+        .eq("active", true)
+        .order("shortcut");
+      return data ?? [];
+    },
+  });
 
   const selectedChannel = useMemo(
     () => channels.find((c) => c.id === fChannel) ?? null,
@@ -89,7 +127,73 @@ export function CampaignsScreen() {
     setFHumanize(true);
     setFBusinessHours(true);
     setFWhen("");
+    setFMediaPath(null);
+    setFMediaName(null);
+    setFMediaType(null);
+    setRecording(false);
     setOpen(true);
+  }
+
+  async function uploadToBucket(blob: Blob, fileName: string, type: string) {
+    if (!orgId) return;
+    setUploading(true);
+    try {
+      const ext = (fileName.split(".").pop() || "bin").toLowerCase();
+      const path = `${orgId}/campaigns/${crypto.randomUUID()}.${ext}`;
+      const { error } = await (supabase as any).storage.from("media").upload(path, blob, {
+        contentType: (blob as any).type || undefined,
+        upsert: false,
+      });
+      if (error) throw error;
+      setFMediaPath(path);
+      setFMediaName(fileName);
+      setFMediaType(type);
+    } catch (_e) {
+      toast.error("Não foi possível enviar o arquivo.");
+    } finally {
+      setUploading(false);
+    }
+  }
+  function onFilePicked(file: File) {
+    void uploadToBucket(file, file.name, detectMediaType(file));
+  }
+  async function startRec() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        await uploadToBucket(blob, `audio-${Date.now()}.webm`, "audio");
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+    } catch {
+      toast.error("Não consegui acessar o microfone.");
+    }
+  }
+  function stopRec() {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  }
+  function clearMedia() {
+    setFMediaPath(null);
+    setFMediaName(null);
+    setFMediaType(null);
+  }
+  function applyQuickReply(qr: any) {
+    const txt = (qr.content ?? "").toString().replace(/\{\{\s*/g, "{").replace(/\s*\}\}/g, "}");
+    setFMessage(txt);
+    if (qr.media_path) {
+      setFMediaPath(qr.media_path);
+      setFMediaName(qr.media_name ?? "anexo");
+      setFMediaType(qr.media_type ?? "document");
+    }
   }
 
   function applyPreset(p: "conservador" | "normal" | "custom") {
@@ -110,7 +214,8 @@ export function CampaignsScreen() {
     if (!fChannel) return toast.error("Escolha o canal de envio.");
     if (fTargetType === "tag" && !fTagId) return toast.error("Escolha a etiqueta do público.");
     if (fTargetType === "list" && !fListId) return toast.error("Escolha a lista do público.");
-    if (!fMessage.trim()) return toast.error("Escreva a mensagem.");
+    if (!fMessage.trim() && !fMediaPath) return toast.error("Escreva a mensagem ou anexe uma mídia.");
+    if (uploading) return toast.error("Aguarde o envio do anexo terminar.");
     setBusy(true);
     try {
       const res = await invokeManageCampaign({
@@ -119,6 +224,9 @@ export function CampaignsScreen() {
         channelId: fChannel,
         name: fName.trim(),
         messageText: fMessage,
+        mediaPath: fMediaPath,
+        mediaName: fMediaName,
+        mediaType: fMediaType,
         targetType: fTargetType,
         targetTagId: fTargetType === "tag" ? fTagId : null,
         targetListId: fTargetType === "list" ? fListId : null,
@@ -342,7 +450,26 @@ export function CampaignsScreen() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="c-msg">Mensagem</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="c-msg">Mensagem</Label>
+                {(quickRepliesQuery.data ?? []).length > 0 && (
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const qr = (quickRepliesQuery.data ?? []).find((q: any) => q.id === e.target.value);
+                      if (qr) applyQuickReply(qr);
+                    }}
+                    className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 focus:outline-none"
+                  >
+                    <option value="">Usar resposta rápida…</option>
+                    {(quickRepliesQuery.data ?? []).map((q: any) => (
+                      <option key={q.id} value={q.id}>
+                        {q.title || q.shortcut || "Resposta"}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <Textarea
                 id="c-msg"
                 rows={4}
@@ -362,6 +489,59 @@ export function CampaignsScreen() {
                   </button>
                 ))}
               </div>
+
+              {/* Mídia / áudio */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onFilePicked(f);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || recording}
+                  className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Paperclip size={13} /> Anexar
+                </button>
+                {!recording ? (
+                  <button
+                    type="button"
+                    onClick={startRec}
+                    disabled={uploading}
+                    className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Mic size={13} /> Gravar áudio
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopRec}
+                    className="flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-600"
+                  >
+                    <Square size={13} /> Parar gravação
+                  </button>
+                )}
+                {uploading && <span className="text-xs text-gray-500">Enviando…</span>}
+                {fMediaPath && !uploading && (
+                  <span className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700">
+                    {fMediaType === "audio" ? "🎤 Áudio gravado" : `📎 ${fMediaName}`}
+                    <button type="button" onClick={clearMedia} className="text-gray-400 hover:text-gray-700">
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+              </div>
+              {fMediaType === "audio" && (
+                <p className="text-[11px] text-amber-700">O áudio é enviado como nota de voz (sem texto junto).</p>
+              )}
             </div>
 
             <div className="space-y-1.5">

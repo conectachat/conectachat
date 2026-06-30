@@ -142,8 +142,9 @@ DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem s
        (jwt) + run-campaign (cron, anti-ban: rate/min+jitter, daily_cap, janela 08–20, backstop org,
        pula bloqueados); opt-out no webhook v44; tela /campanhas (admin) com modal (alvo etiqueta/todos,
        ritmo configurável + ALERTA DE RISCO POR CANAL, agendar). LISTAS DEDICADAS entregues (use-contact-lists
-       + alvo 'list' no modal + importar para uma lista). FALTA: mídia na campanha (backend já suporta) +
-       teste live com poucos contatos.
+       + alvo 'list' no modal + importar para uma lista). MÍDIA + ÁUDIO + variáveis ampliadas + "usar
+       resposta rápida" entregues (run-campaign v2: áudio via sendWhatsAppAudio; vars saudacao/data/hora/
+       empresa/conexao). FALTA: teste live com poucos contatos.
     2. ✅ IMPORTAR CONTATOS (CSV/XLSX) — JÁ EXISTIA (contacts-screen.tsx: validação BR, dedup, upsert).
        ENTREGUE: etiqueta opcional na importação (marca todos os contatos do arquivo via contact_tags).
        Falta só "jogar numa LISTA dedicada" (depende das tabelas de Campanhas).

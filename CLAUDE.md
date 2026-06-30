@@ -214,8 +214,13 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   ALERTA DE RISCO POR CANAL via channelRiskInfo, horário comercial/humanizar, agendar). Hook use-campaigns.ts.
   LISTAS DEDICADAS ENTREGUES: use-contact-lists.ts (useContactLists + createContactList + addContactsToList);
   alvo 'list' no modal de campanha; importação de contatos pode criar/usar uma lista (contacts-screen modal).
-  FALTAM (follow-ups): MÍDIA na campanha (run-campaign já suporta; falta UI de upload); TESTE LIVE pendente
-  com poucos contatos (envia WhatsApp real — testar com etiqueta de 1 número antes de público real).
+  MÍDIA + ÁUDIO + VARIÁVEIS + RESPOSTAS RÁPIDAS ENTREGUES (run-campaign v2): modal anexa mídia (img/vídeo/doc)
+  e GRAVA ÁUDIO (MediaRecorder → bucket media {org}/campaigns/); run-campaign v2 envia áudio via
+  sendWhatsAppAudio (nota de voz) e demais via sendMedia; applyVars aceita {{ }} e resolve
+  {primeiro_nome}/{nome}/{saudacao}/{data}/{hora}/{empresa}/{conexao} (fuso da empresa); "Usar resposta
+  rápida" no modal (quick_replies → texto {{}}→{} + mídia). FALTA: TESTE LIVE com poucos contatos (envia
+  WhatsApp real — testar com etiqueta de 1 número; conferir se o áudio webm toca como nota de voz no
+  WhatsApp via Evolution).
   (2) ✅ IMPORTAR CONTATOS — JÁ EXISTIA (contacts-screen.tsx handleFileChosen, CSV/XLSX, validação BR,
   dedup, upsert). ENTREGUE o ajuste de ETIQUETA na importação: seletor de tag opcional no modal
   (useOrgTags) → após o upsert, marca TODOS os contatos do arquivo via contact_tags (upsert

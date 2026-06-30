@@ -192,6 +192,26 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   visível (v40); (5) ✅ /agentes restrito a dono/admin; (6) níveis hierárquicos no inbox (Passo 4:
   dono/admin tudo, atendente só as dele + filas dele). Plano detalhado:
   docs/conectachat-agentes-ia-plano.md.
+- MULTICANAL — WhatsApp OFICIAL (Cloud API) via EVOLUTION como ponte — MARCO 1 EM ENTREGA (código pronto,
+  falta push + pré-requisito de VPS + teste live). Decisão (Renato 2026-06-30): no MVP usar a Evolution como
+  ponte para a API oficial da Meta (instância tipo WHATSAPP-BUSINESS), sem virar Tech Provider; migrar p/
+  Meta direto + Embedded Signup (1 clique) com tração. Ordem de canais: WhatsApp → Instagram → Messenger.
+  FEITO: manage-channels v8 ACTIVE (ação isolada create_official: cria instância WHATSAPP-BUSINESS na
+  Evolution + aplica webhook; grava channels type 'whatsapp_cloud' SÓ com identificadores não-secretos —
+  number/phone_number_id/waba_id/business_id; NÃO persiste o token Meta; caminho Baileys intacto; SEM
+  mudança de banco) + frontend connections-screen.tsx (card whatsapp_cloud available=true + OfficialConnectionForm
+  próprio, sem QR). Regras de canal POR CONVERSA (o canal é de conversations.channel_id, não global): (1)
+  conversa que entrou pelo Oficial usa SEMPRE o Oficial em tudo (respostas/lembretes/disparos) e (2) a do QR
+  segue no QR — JÁ funcionam de graça (send-message v10 resolve a instância por conversation.channel.
+  external_instance_id; confere p/ texto/mídia/áudio). Marco 1 NÃO mexe no banco. Receber: a Evolution
+  repassa ao whatsapp-webhook no mesmo formato; contato/conversa nascem com channel_type='whatsapp_cloud'.
+  PRÉ-REQUISITO p/ RECEBER (tarefa do Renato no VPS): webhook da Cloud API na Evolution (WA_BUSINESS_TOKEN_WEBHOOK).
+  ADIADO p/ Marco 2: templates (modelos aprovados) + campanhas no Oficial + seletor de canal ao INICIAR do
+  card (regra 3 — bloqueada pela janela de 24h da Meta) + generalizar os 8 pontos hardcoded whatsapp_baileys
+  (inbox/contacts/schedules) p/ aceitar whatsapp_cloud + aviso de 24h no inbox. Marco "Migração de canal"
+  (regra 4: migrar contatos/conversas do QR p/ o Oficial) é passo próprio — pesado porque a identidade do
+  contato é (org_id, channel_type, external_id) SEM channel_id (mesmo número no QR e no Oficial = 2 contatos).
+  Plano: ~/.claude/plans/vamos-continuar-a-fase-pure-island.md.
 - Próximo grande marco: FASE C — bloco C7 (nó Calendly no fluxo; depende do F4) e C8 (relatórios).
 
 ## 10. Roadmap até o lançamento (sequência fixa, lançamento único)

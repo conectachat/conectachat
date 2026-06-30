@@ -68,10 +68,10 @@ const CHANNEL_CATALOG = [
   {
     type: "whatsapp_cloud",
     label: "WhatsApp Oficial",
-    sub: "API oficial da Meta",
+    sub: "API oficial da Meta (sem risco de banimento)",
     icon: ShieldCheck,
     color: "#0055A6",
-    available: false,
+    available: true,
   },
   { type: "telegram", label: "Telegram", sub: "Bot do Telegram", icon: Send, color: "#229ED9", available: false },
   {
@@ -122,6 +122,7 @@ export function ConnectionsScreen() {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [officialOpen, setOfficialOpen] = useState(false);
   const [editing, setEditing] = useState<ChannelRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ChannelRow | null>(null);
   const [qrTarget, setQrTarget] = useState<QrTarget | null>(null);
@@ -355,7 +356,13 @@ export function ConnectionsScreen() {
       return;
     }
     setPickerOpen(false);
-    setCreateOpen(true);
+    // WhatsApp Oficial (Cloud API) tem um formulário próprio (dados da Meta),
+    // sem QR. O QR (Baileys) segue no NewConnectionForm.
+    if (type === "whatsapp_cloud") {
+      setOfficialOpen(true);
+    } else {
+      setCreateOpen(true);
+    }
   }
 
   const qrLiveChannel = qrTarget ? (channels.find((c) => c.id === qrTarget.channelId) ?? null) : null;
@@ -427,6 +434,17 @@ export function ConnectionsScreen() {
           setCreateOpen(false);
           refetch();
           setQrTarget(t);
+        }}
+      />
+
+      {/* Conectar WhatsApp OFICIAL (Cloud API da Meta) — sem QR */}
+      <OfficialConnectionForm
+        open={officialOpen}
+        orgId={orgId}
+        onClose={() => setOfficialOpen(false)}
+        onCreated={() => {
+          setOfficialOpen(false);
+          refetch();
         }}
       />
 
@@ -850,6 +868,210 @@ function NewConnectionForm({
           </Button>
           <Button onClick={criar} disabled={creating || !name.trim()}>
             {creating ? "Criando…" : "Criar e mostrar QR"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===================================================================
+//  MODAL: CONECTAR WHATSAPP OFICIAL (Cloud API da Meta) — sem QR
+//  O cliente JÁ tem uma conta WhatsApp Business na Meta e cola os dados.
+//  A Evolution faz a ponte com a API oficial. Não há QR Code.
+// ===================================================================
+function OfficialConnectionForm({
+  open,
+  orgId,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  orgId: string | undefined;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [wabaId, setWabaId] = useState("");
+  const [businessId, setBusinessId] = useState("");
+  const [metaToken, setMetaToken] = useState("");
+  const [showHelp, setShowHelp] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setPhoneNumber("");
+      setPhoneNumberId("");
+      setWabaId("");
+      setBusinessId("");
+      setMetaToken("");
+      setShowHelp(false);
+    }
+  }, [open]);
+
+  const canSubmit =
+    !!orgId &&
+    name.trim().length > 0 &&
+    phoneNumber.trim().length > 0 &&
+    phoneNumberId.trim().length > 0 &&
+    wabaId.trim().length > 0 &&
+    metaToken.trim().length > 0;
+
+  async function criar() {
+    if (!canSubmit) return;
+    setCreating(true);
+    const { data, error } = await supabase.functions.invoke("manage-channels", {
+      body: {
+        action: "create_official",
+        orgId,
+        name: name.trim(),
+        phoneNumber: phoneNumber.trim(),
+        phoneNumberId: phoneNumberId.trim(),
+        wabaId: wabaId.trim(),
+        businessId: businessId.trim(),
+        metaToken: metaToken.trim(),
+      },
+    });
+    setCreating(false);
+    if (error || data?.error) {
+      toast.error("Não foi possível conectar o número oficial", { description: fnError(data, error) });
+      return;
+    }
+    toast.success("WhatsApp Oficial conectado!", {
+      description: "Confira o status no card. Mande uma mensagem para o número para testar o recebimento.",
+    });
+    onCreated();
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Conectar WhatsApp Oficial</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 py-1">
+          <div className="rounded-md border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+            Número <span className="font-medium text-foreground">oficial da Meta</span> (Cloud API): sem risco de
+            banimento. Você precisa de uma conta WhatsApp Business na Meta e dos dados abaixo.{" "}
+            <button
+              type="button"
+              className="font-medium text-brand-blue underline-offset-2 hover:underline"
+              onClick={() => setShowHelp((v) => !v)}
+            >
+              {showHelp ? "Esconder ajuda" : "Onde encontro esses dados?"}
+            </button>
+          </div>
+
+          {showHelp && (
+            <div className="space-y-1 rounded-md border border-dashed border-border p-2.5 text-xs text-muted-foreground">
+              <p>
+                No <span className="font-medium text-foreground">Painel de Desenvolvedores da Meta</span> (
+                developers.facebook.com) → seu App → <span className="font-medium text-foreground">WhatsApp</span> →
+                Configuração da API:
+              </p>
+              <ul className="ml-4 list-disc space-y-0.5">
+                <li>
+                  <span className="font-medium text-foreground">Número</span>: o telefone com DDI e DDD (ex.: 5531999999999).
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">ID do número (phone_number_id)</span> e{" "}
+                  <span className="font-medium text-foreground">ID da conta (WABA ID)</span>: aparecem na mesma tela.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Token</span>: um token de acesso permanente do App.
+                </li>
+              </ul>
+              <p>Na dúvida, fale com a gente que ajudamos a configurar.</p>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="off-name">Nome da conexão</Label>
+            <Input
+              id="off-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex.: WhatsApp Oficial Vendas"
+              maxLength={60}
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="off-phone">Número (com DDI e DDD)</Label>
+            <Input
+              id="off-phone"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="Ex.: 5531999999999"
+              inputMode="numeric"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="off-pnid">ID do número (phone_number_id)</Label>
+            <Input
+              id="off-pnid"
+              value={phoneNumberId}
+              onChange={(e) => setPhoneNumberId(e.target.value)}
+              placeholder="Ex.: 123456789012345"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="off-waba">ID da conta (WABA ID)</Label>
+            <Input
+              id="off-waba"
+              value={wabaId}
+              onChange={(e) => setWabaId(e.target.value)}
+              placeholder="Ex.: 109876543210987"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="off-token">Token de acesso (permanente)</Label>
+            <Input
+              id="off-token"
+              type="password"
+              value={metaToken}
+              onChange={(e) => setMetaToken(e.target.value)}
+              placeholder="Cole o token do App da Meta"
+              autoComplete="off"
+            />
+            <p className="text-xs text-muted-foreground">
+              O token vai direto e seguro para o servidor — não fica guardado no seu navegador.
+            </p>
+          </div>
+
+          <details className="text-xs text-muted-foreground">
+            <summary className="cursor-pointer select-none">Avançado (opcional)</summary>
+            <div className="mt-2 space-y-1.5">
+              <Label htmlFor="off-biz">ID do negócio (business_id)</Label>
+              <Input
+                id="off-biz"
+                value={businessId}
+                onChange={(e) => setBusinessId(e.target.value)}
+                placeholder="Opcional — se vazio, usamos o WABA ID"
+              />
+            </div>
+          </details>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={creating}>
+            Cancelar
+          </Button>
+          <Button onClick={criar} disabled={creating || !canSubmit}>
+            {creating ? "Conectando…" : "Conectar número oficial"}
           </Button>
         </DialogFooter>
       </DialogContent>

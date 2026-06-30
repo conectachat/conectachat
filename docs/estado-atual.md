@@ -1,4 +1,51 @@
 /* ============================================================
+ * MULTICANAL — WhatsApp OFICIAL (Cloud API) via EVOLUTION — 🎯 MARCO 1 EM ENTREGA
+ * (código pronto; falta push + pré-requisito de VPS + teste live na Duli)
+ * Plano completo: ~/.claude/plans/vamos-continuar-a-fase-pure-island.md
+ * ============================================================
+ * DECISÃO (Renato 2026-06-30): no MVP, usar a Evolution como PONTE para a API
+ *   OFICIAL da Meta (instância tipo WHATSAPP-BUSINESS) — evita virar Tech Provider
+ *   agora. Migrar p/ Meta DIRETO (Graph API) + Embedded Signup (1 clique) com tração
+ *   (migração incremental: a conta Meta do cliente — WABA/número/templates — permanece).
+ *   Ordem de canais: WhatsApp → Instagram → Messenger.
+ *
+ * MARCO 1 (conectar + receber + responder) — o que já foi feito:
+ *   - manage-channels v8 ACTIVE: ação ISOLADA create_official → POST /instance/create
+ *     com integration:"WHATSAPP-BUSINESS" + token/number/businessId; aplica o webhook
+ *     apontando p/ o nosso whatsapp-webhook (?secret=); grava channels type 'whatsapp_cloud'
+ *     com credentials = SÓ identificadores (number, phone_number_id, waba_id, business_id).
+ *     NÃO persiste o token Meta (passa à Evolution na criação; a Evolution guarda).
+ *     Caminho Baileys (create) intacto. SEM mudança de banco no Marco 1.
+ *   - Frontend connections-screen.tsx: card whatsapp_cloud available=true +
+ *     OfficialConnectionForm próprio (sem QR): nome, número, phone_number_id, waba_id,
+ *     token (password, não fica no navegador), business_id (avançado), bloco de ajuda.
+ *
+ * REGRAS DE CANAL POR CONVERSA (o canal é de conversations.channel_id, NÃO global):
+ *   1. Conversa que ENTROU pelo Oficial → tudo dela (respostas/lembretes/disparos) segue
+ *      no Oficial. ✅ JÁ funciona — send-message v10 resolve a instância por
+ *      conversation → channel.external_instance_id (vale p/ texto/mídia/áudio).
+ *   2. Conversa que ENTROU pelo QR → segue no QR. ✅ Mesmo mecanismo, de graça.
+ *   3. Iniciar pelo card do contato (nunca houve conversa) → perguntar por qual canal.
+ *      → MARCO 2 (iniciar no Oficial fora de 24h exige template aprovado).
+ *   4. Empresa começou no QR e conecta o Oficial → perguntar se migra contatos/conversas.
+ *      → Marco "Migração de canal" próprio: PESADO porque a identidade do contato é
+ *      (org_id, channel_type, external_id) SEM channel_id → mesmo número no QR e no Oficial
+ *      são 2 contatos distintos; migrar = duplicar/realocar + costurar histórico.
+ *
+ * RECEBER: a Evolution repassa ao whatsapp-webhook no MESMO formato Evolution já tratado;
+ *   o motor (fluxos/IA/push/fora-de-expediente) roda igual; contato/conversa nascem com
+ *   channel_type='whatsapp_cloud'. PRÉ-REQUISITO DE VPS (tarefa do Renato): configurar o
+ *   webhook da Cloud API na Evolution (WA_BUSINESS_TOKEN_WEBHOOK) p/ a Meta entregar lá.
+ *
+ * ADIADO PARA O MARCO 2: gestão de TEMPLATES (modelos aprovados pela Meta) + campanhas no
+ *   Oficial (usam template, não texto livre) + seletor de canal ao iniciar (regra 3) +
+ *   generalizar os 8 pontos hardcoded whatsapp_baileys (inbox :1459/:1625, contacts
+ *   :240/:345/:564/:606/:637, schedules :290) p/ aceitar whatsapp_cloud + aviso de janela
+ *   de 24h no inbox (fora de 24h a Meta recusa texto livre).
+ * ============================================================ */
+
+
+/* ============================================================
  * FASE C — INTEGRAÇÃO CALENDLY (C1–C6) — ✅ ENTREGUE e testado na Duli
  * (próximo: C7 nó no fluxo, depende do F4). Plano e progresso completos:
  * docs/conectachat-calendly-plano.md (seção 0). Resumo:

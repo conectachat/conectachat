@@ -9,6 +9,7 @@ import { useMessages, type Message } from "@/hooks/use-messages";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useOrgDepartments } from "@/hooks/use-flow-resources";
 import { useFlows } from "@/hooks/use-flows";
+import { useCatalogItems, buildItemCaption, formatPrice } from "@/hooks/use-catalog";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Logo } from "@/components/shared/logo";
 import { ContactTagsSection } from "@/components/contacts/contact-tags";
@@ -54,6 +55,7 @@ import {
   Archive,
   List,
   Workflow,
+  Package,
   Bot,
 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -488,6 +490,11 @@ export function InboxScreen() {
   const [triggerFlowOpen, setTriggerFlowOpen] = useState(false);
   const [triggerFlowId, setTriggerFlowId] = useState("");
   const [triggeringFlow, setTriggeringFlow] = useState(false);
+  // Catálogo: enviar um produto/serviço na conversa.
+  const catalogItemsQuery = useCatalogItems();
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [sendingItem, setSendingItem] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState("");
   // Bloco M — aba ativa da lista. "aguardando" = sem atendente e sem IA atuando;
@@ -696,6 +703,56 @@ export function InboxScreen() {
     setTriggerFlowId("");
     queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
     queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
+  // Catálogo: envia um item na conversa (foto + legenda, ou texto se não tiver foto).
+  async function sendCatalogItem(item: any) {
+    if (!selectedId) return;
+    setSendingItem(true);
+    try {
+      const caption = buildItemCaption(item);
+      if (item.image_path) {
+        const { data: blob, error: dErr } = await supabase.storage.from("media").download(item.image_path);
+        if (dErr || !blob) {
+          toast.error("Não foi possível baixar a foto do item.");
+          return;
+        }
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        const { error } = await supabase.functions.invoke("send-media", {
+          body: {
+            conversationId: selectedId,
+            base64,
+            mimetype: blob.type || "image/jpeg",
+            fileName: `${item.name || "produto"}.jpg`,
+            caption,
+          },
+        });
+        if (error) {
+          toast.error("Não foi possível enviar o item.");
+          return;
+        }
+      } else {
+        const { error } = await supabase.functions.invoke("send-message", {
+          body: { conversationId: selectedId, text: caption },
+        });
+        if (error) {
+          toast.error("Não foi possível enviar o item.");
+          return;
+        }
+      }
+      toast.success("Item enviado.");
+      setCatalogOpen(false);
+      setCatalogSearch("");
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    } finally {
+      setSendingItem(false);
+    }
   }
 
   // ===================================================================
@@ -1969,6 +2026,13 @@ export function InboxScreen() {
                 >
                   <Workflow size={16} /> <span className="hidden lg:inline">Acionar fluxo</span>
                 </button>
+                <button
+                  onClick={() => setCatalogOpen(true)}
+                  title="Enviar um produto/serviço do catálogo"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  <Package size={16} /> <span className="hidden lg:inline">Enviar produto</span>
+                </button>
                 {selected.assigned_user_id && selected.assigned_user_id === user?.id ? (
                   <button
                     onClick={() => assignConversation(null)}
@@ -2076,6 +2140,16 @@ export function InboxScreen() {
                         className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         <Workflow size={15} /> Acionar fluxo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCatalogOpen(true);
+                          setHeaderMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Package size={15} /> Enviar produto
                       </button>
                       <button
                         type="button"
@@ -3027,6 +3101,76 @@ export function InboxScreen() {
       )}
 
       {/* Bloco N — Modal de transferência */}
+      {catalogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !sendingItem && setCatalogOpen(false)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">Enviar produto / serviço</h3>
+              <button
+                onClick={() => !sendingItem && setCatalogOpen(false)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="border-b border-gray-100 p-3">
+              <input
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                placeholder="Buscar item…"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+              />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+              {catalogItemsQuery.isLoading ? (
+                <p className="py-8 text-center text-sm text-gray-500">Carregando…</p>
+              ) : (
+                (() => {
+                  const term = catalogSearch.trim().toLowerCase();
+                  const list = (catalogItemsQuery.data ?? []).filter(
+                    (it) => it.is_active && (!term || it.name.toLowerCase().includes(term)),
+                  );
+                  if (list.length === 0)
+                    return (
+                      <p className="py-8 text-center text-sm text-gray-500">
+                        Nenhum item ativo no catálogo. Cadastre no menu “Catálogo”.
+                      </p>
+                    );
+                  return list.map((it) => (
+                    <button
+                      key={it.id}
+                      disabled={sendingItem}
+                      onClick={() => sendCatalogItem(it)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-gray-900">{it.name}</span>
+                        <span className="block text-xs text-gray-500">
+                          {it.type === "service" ? "Serviço" : "Produto"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-sm font-semibold text-brand-green">
+                        {formatPrice(it.price, it.currency)}
+                      </span>
+                    </button>
+                  ));
+                })()
+              )}
+            </div>
+            {sendingItem && (
+              <div className="border-t border-gray-100 px-4 py-2 text-center text-xs text-gray-500">Enviando…</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {triggerFlowOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"

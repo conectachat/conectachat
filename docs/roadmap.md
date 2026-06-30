@@ -154,6 +154,13 @@ DEPOIS DA FASE A (roadmap geral até o lançamento — lançamento único, sem s
        mensagem 1×/6h por conversa (marcador 'system:offhours'). UI no modal de Departamento
        (Configurações). Reusa isWithinBusinessHours.
 
+  MÓDULO CATÁLOGO (antes do Stripe) — ✅ ENTREGUE. Banco: catalog_categories + catalog_items
+    (RLS; migration catalog_module). Item = produto/serviço com nome, descrição, preço (null=Sob
+    consulta), foto (bucket media), link de pagamento MANUAL (ponte até os gateways), categoria, ativo.
+    Tela /catalogo (admin) com grid + modal de item + categorias (use-catalog.ts). Inbox: botão
+    "Enviar produto" → envia foto+legenda (nome/preço/descrição/link) via send-media, ou texto se sem foto.
+    PRÓXIMO (fase própria): integrações de pagamento (PagSeguro, Mercado Pago, etc.).
+
   Fase E — Stripe + enforcement de planos + LANÇAMENTO.
     Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597
     (anual ~17% off; trial 14 dias sem cartão). Stripe na conta da Duli

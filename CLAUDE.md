@@ -236,6 +236,16 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   Backlog pós-lançamento (em docs/roadmap.md): NPS, distribuição
   automática+carteira, campos personalizados, transcrição de áudio, aniversários, notas internas, API
   pública+webhooks, LGPD, onboarding por IA. NÃO priorizar Typebot/Dialogflow/n8n (temos fluxo+IA).
+- MÓDULO CATÁLOGO (antes do Stripe, pedido do Renato 2026-06-30) — ENTREGUE. Banco: catalog_categories +
+  catalog_items (RLS is_member_of; migration catalog_module). Item: type produto/serviço, name, description,
+  price numeric(12,2) (null=Sob consulta), image_path (bucket media {org}/catalog/), payment_link (LINK
+  MANUAL — ponte até os gateways), category_id, is_active. Frontend: menu "Catálogo" (adminOnly) + rota
+  /catalogo (guard owner/admin) + catalog-screen.tsx (grid por categoria, modal de item c/ upload de foto
+  + preço + link + categoria + tipo, gestão de categorias) + use-catalog.ts (useCatalogItems/Categories,
+  useSignedMediaUrl, formatPrice, buildItemCaption). Inbox: botão "Enviar produto" no cabeçalho (+ menu
+  mobile) → modal escolhe item ATIVO → envia foto+legenda (buildItemCaption: nome/preço/descrição/link) via
+  send-media (baixa do bucket→base64), ou texto via send-message se sem foto. PRÓXIMO (fase própria):
+  integrações de pagamento (PagSeguro, Mercado Pago, etc.) — gerar link/cobrança e baixa automática.
 - Fase E — Stripe + enforcement de planos + LANÇAMENTO.
   Planos provisórios: Essencial R$149 / Profissional R$297 / Avançado R$597 (anual ~17% off;
   trial 14 dias sem cartão). Stripe começa na conta da Duli; migrar para a entidade ConectaChat com

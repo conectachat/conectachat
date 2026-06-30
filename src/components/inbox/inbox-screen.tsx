@@ -2019,20 +2019,6 @@ export function InboxScreen() {
                 >
                   <ArrowRightLeft size={16} /> <span className="hidden lg:inline">Transferir</span>
                 </button>
-                <button
-                  onClick={() => setTriggerFlowOpen(true)}
-                  title="Acionar um fluxo (chatbot) nesta conversa"
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-                >
-                  <Workflow size={16} /> <span className="hidden lg:inline">Acionar fluxo</span>
-                </button>
-                <button
-                  onClick={() => setCatalogOpen(true)}
-                  title="Enviar um produto/serviço do catálogo"
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-                >
-                  <Package size={16} /> <span className="hidden lg:inline">Enviar produto</span>
-                </button>
                 {selected.assigned_user_id && selected.assigned_user_id === user?.id ? (
                   <button
                     onClick={() => assignConversation(null)}
@@ -2130,26 +2116,6 @@ export function InboxScreen() {
                         className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         <ArrowRightLeft size={15} /> Transferir
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTriggerFlowOpen(true);
-                          setHeaderMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <Workflow size={15} /> Acionar fluxo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCatalogOpen(true);
-                          setHeaderMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <Package size={15} /> Enviar produto
                       </button>
                       <button
                         type="button"
@@ -2774,13 +2740,29 @@ export function InboxScreen() {
             </div>
 
             {!editingContact && (
-              <button
-                onClick={scheduleForContact}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                <CalendarClock size={16} />
-                Agendar mensagem
-              </button>
+              <div className="mt-4 space-y-2">
+                <button
+                  onClick={scheduleForContact}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <CalendarClock size={16} />
+                  Agendar mensagem
+                </button>
+                <button
+                  onClick={() => setCatalogOpen(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Package size={16} />
+                  Enviar produto
+                </button>
+                <button
+                  onClick={() => setTriggerFlowOpen(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Workflow size={16} />
+                  Acionar fluxo
+                </button>
+              </div>
             )}
 
             {!editingContact ? (

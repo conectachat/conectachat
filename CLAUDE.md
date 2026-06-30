@@ -181,8 +181,8 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   silêncio anti-ban/gates normais. Inbox: selo "⚠️ IA" no card + banner vermelho dispensável no topo da
   conversa (dismissAiError limpa ai_last_error). use-conversations traz ai_last_error(+_at).
   ACIONAR FLUXO MANUALMENTE ENTREGUE (webhook v41 + nova Edge Function trigger-flow): botão "Acionar
-  fluxo" no cabeçalho da conversa (+ menu mobile) abre modal com os fluxos ATIVOS (useFlows) e dispara
-  na conversa atual. Arquitetura: trigger-flow (verify_jwt TRUE) valida o usuário pelo JWT + vínculo
+  fluxo" no PAINEL LATERAL "Dados do contato" (movido do topo p/ limpar o cabeçalho) abre modal com os
+  fluxos ATIVOS (useFlows) e dispara na conversa atual. Arquitetura: trigger-flow (verify_jwt TRUE) valida o usuário pelo JWT + vínculo
   (org_members) e que o fluxo é da mesma org, e chama o whatsapp-webhook com ?secret=WEBHOOK_SECRET +
   body {action:'trigger_flow',conversation_id,flow_id}; o webhook monta EngineInput da conversa
   (buildEngineInputForConversation), encerra sessão ativa e inicia o fluxo (triggerFlowManually reusa
@@ -242,8 +242,9 @@ código é editado LOCALMENTE pelo Claude Code. Para NÃO dar conflito:
   MANUAL — ponte até os gateways), category_id, is_active. Frontend: menu "Catálogo" (adminOnly) + rota
   /catalogo (guard owner/admin) + catalog-screen.tsx (grid por categoria, modal de item c/ upload de foto
   + preço + link + categoria + tipo, gestão de categorias) + use-catalog.ts (useCatalogItems/Categories,
-  useSignedMediaUrl, formatPrice, buildItemCaption). Inbox: botão "Enviar produto" no cabeçalho (+ menu
-  mobile) → modal escolhe item ATIVO → envia foto+legenda (buildItemCaption: nome/preço/descrição/link) via
+  useSignedMediaUrl, formatPrice, buildItemCaption). Inbox: botão "Enviar produto" no PAINEL LATERAL "Dados
+  do contato" (junto de Agendar mensagem/Acionar fluxo) → modal escolhe item ATIVO → envia foto+legenda
+  (buildItemCaption: nome/preço/descrição/link) via
   send-media (baixa do bucket→base64), ou texto via send-message se sem foto. PRÓXIMO (fase própria):
   integrações de pagamento (PagSeguro, Mercado Pago, etc.) — gerar link/cobrança e baixa automática.
 - Fase E — Stripe + enforcement de planos + LANÇAMENTO.
